@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const repo = require('../repositories/authRepository');
+const { withTransaction } = require('../../db');
 const logger = require('../../config/logger');
 const { AppError } = require('../middlewares/errorHandler');
 
@@ -74,20 +75,26 @@ const registerIndividual = async (data) => {
 };
 
 // Club registration: club goes in unapproved, admin user goes in unapproved.
+// Both inserts run in a single transaction so a failed admin insert can never
+// leave an orphaned club row behind.
 const registerClub = async (data) => {
-  const club = await repo.createClub({ ...data.club, is_approved: false });
   const password_hash = await bcrypt.hash(data.admin.password, SALT_ROUNDS);
-  const user = await repo.createUser({
-    email: data.admin.email,
-    first_name: data.admin.first_name,
-    last_name: data.admin.last_name,
-    display_name: data.admin.display_name || `${data.admin.first_name} ${data.admin.last_name}`,
-    password_hash,
-    phone: data.admin.phone,
-    club_id: club.clubs_id,
-    is_approved: false,
-    account_role: 'Club_Admin',
-    platform_role: platformRoleFor('Club_Admin')
+  const { club, user } = await withTransaction(async (client) => {
+    const exec = (text, params) => client.query(text, params);
+    const createdClub = await repo.createClub({ ...data.club, is_approved: false }, exec);
+    const createdUser = await repo.createUser({
+      email: data.admin.email,
+      first_name: data.admin.first_name,
+      last_name: data.admin.last_name,
+      display_name: data.admin.display_name || `${data.admin.first_name} ${data.admin.last_name}`,
+      password_hash,
+      phone: data.admin.phone,
+      club_id: createdClub.clubs_id,
+      is_approved: false,
+      account_role: 'Club_Admin',
+      platform_role: platformRoleFor('Club_Admin')
+    }, exec);
+    return { club: createdClub, user: createdUser };
   });
   return { club, user: toPublicUser(user) };
 };

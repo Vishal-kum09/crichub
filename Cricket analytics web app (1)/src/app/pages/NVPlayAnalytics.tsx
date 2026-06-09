@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowLeft, BarChart3, Users, Trophy, Sparkles, ChevronDown, Calendar, Send, X } from 'lucide-react';
+import { getTeamStreams, getPlayerStreams, getTournamentStreams } from '../../lib/analyticsApi';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 
 interface NVPlayAnalyticsProps {
@@ -401,41 +402,43 @@ function TeamPerformanceDashboard({ selectedSubTab, setSelectedSubTab }: { selec
   const [venue, setVenue] = useState<string[]>([]);
 
   // Innings Progression Data
-  const runRateData = [
-    { over: 1, runRate: 6.5 },
-    { over: 2, runRate: 7.2 },
-    { over: 3, runRate: 7.8 },
-    { over: 4, runRate: 7.5 },
-    { over: 5, runRate: 8.9 },
-    { over: 6, runRate: 10.5 },
-    { over: 7, runRate: 9.8 },
-    { over: 8, runRate: 8.2 },
-    { over: 9, runRate: 9.1 },
-    { over: 10, runRate: 11.2 },
-  ];
-
-  const boundaryData = [
+  // Live team aggregations from the nv_play analyst stream (defaults render
+  // before the fetch resolves; mapped into the existing chart shapes).
+  const [runRateData, setRunRateData] = useState([
+    { over: 1, runRate: 6.5 }, { over: 2, runRate: 7.2 }, { over: 3, runRate: 7.8 },
+    { over: 4, runRate: 7.5 }, { over: 5, runRate: 8.9 }, { over: 6, runRate: 10.5 },
+  ]);
+  const [boundaryData, setBoundaryData] = useState([
     { name: 'Fours', value: 45, color: '#c41e3a' },
     { name: 'Sixes', value: 25, color: '#ff4d6d' },
-    { name: 'Singles', value: 68, color: '#8b0000' },
-    { name: 'Twos', value: 32, color: '#ff758f' },
-    { name: 'Threes', value: 12, color: '#ffb3c1' },
-  ];
-
-  const partnershipData = [
-    { partnership: 'P1', runs: 45 },
-    { partnership: 'P2', runs: 68 },
-    { partnership: 'P3', runs: 34 },
-    { partnership: 'P4', runs: 52 },
-    { partnership: 'P5', runs: 28 },
-  ];
-
-  // Bowling & Fielding Data
-  const economyData = [
+  ]);
+  const [partnershipData, setPartnershipData] = useState([
+    { partnership: 'P1', runs: 45 }, { partnership: 'P2', runs: 68 },
+    { partnership: 'P3', runs: 34 }, { partnership: 'P4', runs: 52 },
+  ]);
+  const [economyData, setEconomyData] = useState([
     { phase: 'Powerplay', economy: 6.5, wickets: 2.5 },
     { phase: 'Middle', economy: 5.2, wickets: 3.8 },
     { phase: 'Death', economy: 9.5, wickets: 4.2 },
-  ];
+  ]);
+
+  useEffect(() => {
+    getTeamStreams()
+      .then((d) => {
+        setRunRateData(d.run_rate_by_over.slice(0, 20).map((r) => ({ over: r.over_number, runRate: r.avg_runs })));
+        setBoundaryData([
+          { name: 'Fours', value: d.boundary_breakdown.fours_count, color: '#c41e3a' },
+          { name: 'Sixes', value: d.boundary_breakdown.sixes_count, color: '#ff4d6d' },
+        ]);
+        setPartnershipData(d.partnership_maps.slice(0, 6).map((p, i) => ({ partnership: `P${i + 1}`, runs: p.runs })));
+        setEconomyData([
+          { phase: 'Powerplay', economy: d.bowling_economy_by_phase.powerplay, wickets: 0 },
+          { phase: 'Middle', economy: d.bowling_economy_by_phase.middle, wickets: 0 },
+          { phase: 'Death', economy: d.bowling_economy_by_phase.death, wickets: 0 },
+        ]);
+      })
+      .catch(() => { /* keep defaults on error */ });
+  }, []);
 
   const extrasData = [
     { name: 'Wides', value: 28, color: '#c41e3a' },
@@ -796,20 +799,35 @@ function PlayerPerformanceDashboard({ selectedSubTab, setSelectedSubTab }: { sel
     { type: 'Leg-Cutter', deliveries: 18 },
   ];
 
-  const headToHeadData = [
+  // Live player aggregations from the nv_play analyst stream.
+  const [headToHeadData, setHeadToHeadData] = useState([
     { bowler: 'J. Bumrah', runs: 45, balls: 67, avg: 22.5, sr: 67.2 },
     { bowler: 'P. Cummins', runs: 62, balls: 89, avg: 31, sr: 69.7 },
     { bowler: 'R. Khan', runs: 38, balls: 52, avg: 19, sr: 73.1 },
-    { bowler: 'M. Starc', runs: 51, balls: 71, avg: 25.5, sr: 71.8 },
-  ];
-
-  const dismissalData = [
+  ]);
+  const [dismissalData, setDismissalData] = useState([
     { name: 'Bowled', value: 28, color: '#c41e3a' },
     { name: 'Caught', value: 42, color: '#ff4d6d' },
     { name: 'LBW', value: 18, color: '#8b0000' },
-    { name: 'Run Out', value: 8, color: '#ff758f' },
-    { name: 'Stumped', value: 4, color: '#ffb3c1' },
-  ];
+  ]);
+
+  const DISMISSAL_COLORS = ['#c41e3a', '#ff4d6d', '#8b0000', '#ff758f', '#ffb3c1', '#666666'];
+  useEffect(() => {
+    getPlayerStreams()
+      .then((d) => {
+        setHeadToHeadData(d.head_to_head.slice(0, 8).map((h) => ({
+          bowler: h.bowler_name,
+          runs: h.runs,
+          balls: h.balls,
+          avg: h.dismissals > 0 ? Math.round((h.runs / h.dismissals) * 10) / 10 : h.runs,
+          sr: h.balls > 0 ? Math.round((h.runs / h.balls) * 1000) / 10 : 0,
+        })));
+        setDismissalData(d.dismissal_patterns.slice(0, 6).map((p, i) => ({
+          name: p.dismissal_type, value: p.count, color: DISMISSAL_COLORS[i % DISMISSAL_COLORS.length],
+        })));
+      })
+      .catch(() => { /* keep defaults on error */ });
+  }, []);
 
   const bowlerTypePerformanceData = [
     { type: 'Pace', average: 45, strikeRate: 135 },
@@ -1171,13 +1189,12 @@ function TournamentPerformanceDashboard({ selectedSubTab, setSelectedSubTab }: {
     setEndDate(end);
   };
 
-  const pointsTableData = [
+  // Live tournament aggregations from the nv_play analyst stream.
+  const [pointsTableData, setPointsTableData] = useState([
     { team: 'India', m: 14, w: 10, l: 4, pts: 20, nrr: 1.25, winPct: 71.4 },
     { team: 'Australia', m: 14, w: 9, l: 5, pts: 18, nrr: 0.85, winPct: 64.3 },
     { team: 'England', m: 14, w: 8, l: 6, pts: 16, nrr: 0.45, winPct: 57.1 },
-    { team: 'New Zealand', m: 14, w: 7, l: 7, pts: 14, nrr: -0.12, winPct: 50.0 },
-    { team: 'South Africa', m: 14, w: 6, l: 8, pts: 12, nrr: -0.38, winPct: 42.9 },
-  ];
+  ]);
 
   const runRateComparisonData = [
     { match: 'M1', runRate: 8.5 },
@@ -1187,19 +1204,33 @@ function TournamentPerformanceDashboard({ selectedSubTab, setSelectedSubTab }: {
     { match: 'M5', runRate: 8.7 },
   ];
 
-  const topRunScorers = [
+  const [topRunScorers, setTopRunScorers] = useState([
     { player: 'Virat Kohli', runs: 892, avg: 62.3, sr: 142.5 },
     { player: 'Rohit Sharma', runs: 845, avg: 58.2, sr: 138.8 },
     { player: 'Steve Smith', runs: 778, avg: 54.1, sr: 128.4 },
-    { player: 'Kane Williamson', runs: 756, avg: 52.5, sr: 125.7 },
-  ];
-
-  const topWicketTakers = [
+  ]);
+  const [topWicketTakers, setTopWicketTakers] = useState([
     { player: 'J. Bumrah', wickets: 24, avg: 18.5, econ: 6.8 },
     { player: 'P. Cummins', wickets: 22, avg: 19.8, econ: 7.2 },
     { player: 'R. Khan', wickets: 21, avg: 17.2, econ: 6.5 },
-    { player: 'T. Boult', wickets: 20, avg: 20.1, econ: 7.5 },
-  ];
+  ]);
+
+  useEffect(() => {
+    getTournamentStreams()
+      .then((d) => {
+        setPointsTableData(d.points_table.slice(0, 12).map((t) => ({
+          team: t.team, m: t.played, w: t.won, l: t.lost, pts: t.points, nrr: t.nrr,
+          winPct: t.played > 0 ? Math.round((t.won / t.played) * 1000) / 10 : 0,
+        })));
+        setTopRunScorers(d.top_scorers.slice(0, 10).map((s) => ({
+          player: s.player_name, runs: s.runs, avg: s.average, sr: 0,
+        })));
+        setTopWicketTakers(d.top_wicket_takers.slice(0, 10).map((w) => ({
+          player: w.player_name, wickets: w.wickets, avg: 0, econ: w.economy,
+        })));
+      })
+      .catch(() => { /* keep defaults on error */ });
+  }, []);
 
   const economicalBowlers = [
     { player: 'R. Khan', matches: 14, overs: 56, runs: 364, econ: 6.5 },

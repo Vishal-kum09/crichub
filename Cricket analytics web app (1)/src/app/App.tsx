@@ -96,7 +96,7 @@ export default function App() {
       case '/match':
         return <MatchDetail matchId={currentRoute.params?.id || ''} onNavigate={navigate} />;
       case '/match-setup':
-        return <MatchSetup onNavigate={navigate} />;
+        return <MatchSetup matchId={currentRoute.params?.id} onNavigate={navigate} />;
       case '/scorer':
         return <ScorerConsole matchId={currentRoute.params?.id} onNavigate={navigate} />;
       case '/analytics':

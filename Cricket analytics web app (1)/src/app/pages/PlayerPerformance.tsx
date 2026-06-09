@@ -1,37 +1,42 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { TrendingUp, TrendingDown, Trophy, Target } from 'lucide-react';
+import { getMyPerformances } from '../../lib/analyticsApi';
 
 export function PlayerPerformance() {
   const [activeTab, setActiveTab] = useState<'batting' | 'bowling'>('batting');
 
-  // Mock batting data
-  const battingStats = {
-    totalRuns: 2847,
-    fours: 312,
-    sixes: 89,
-    fifties: 18,
-    hundreds: 7,
-    twoHundreds: 1,
-    strikeRate: 142.3,
-    average: 48.6,
-    ballsFaced: 2001,
-    matches: 65,
-  };
+  // Live batting/bowling stats — loaded from the player's own performance feed.
+  // Defaults are zeros so the page renders cleanly before the fetch resolves or
+  // when the account has no innings yet (resolved=false).
+  const [battingStats, setBattingStats] = useState({
+    totalRuns: 0, fours: 0, sixes: 0, fifties: 0, hundreds: 0, twoHundreds: 0,
+    strikeRate: 0, average: 0, ballsFaced: 0, matches: 0,
+  });
+  const [bowlingStats, setBowlingStats] = useState({
+    totalOvers: '0.0', maidens: 0, wickets: 0, dotBalls: 0, economyRate: 0,
+    average: 0, threeWickets: 0, fiveWickets: 0, tenWickets: 0, matches: 0,
+  });
 
-  // Mock bowling data
-  const bowlingStats = {
-    totalOvers: 285.4,
-    maidens: 12,
-    wickets: 98,
-    dotBalls: 892,
-    economyRate: 7.24,
-    average: 21.2,
-    threeWickets: 8,
-    fiveWickets: 3,
-    tenWickets: 0,
-    matches: 58,
-  };
+  useEffect(() => {
+    getMyPerformances()
+      .then((data) => {
+        const b = data.batting;
+        const w = data.bowling;
+        setBattingStats({
+          totalRuns: b.total_runs, fours: b.fours, sixes: b.sixes, fifties: b.fifties,
+          hundreds: b.hundreds, twoHundreds: b.double_hundreds, strikeRate: b.strike_rate,
+          average: b.batting_average, ballsFaced: b.balls_faced, matches: b.matches_played,
+        });
+        setBowlingStats({
+          totalOvers: w.overs_bowled, maidens: w.maidens, wickets: w.wickets,
+          dotBalls: w.dot_balls, economyRate: w.economy_rate, average: w.bowling_average,
+          threeWickets: w.three_fers, fiveWickets: w.five_fers, tenWickets: 0,
+          matches: w.matches_bowled,
+        });
+      })
+      .catch(() => { /* keep zeros on error */ });
+  }, []);
 
   // Batting trajectory data
   const runsTrajectory = [

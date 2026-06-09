@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 
 const logger = require('./config/logger');
@@ -15,8 +16,16 @@ const PORT = process.env.PORT || 3000;
 
 // ─── Security & Parsing Middleware ───────────────────────────────────────────
 
+// Helmet sets secure HTTP headers (HSTS, X-Content-Type-Options, frameguard,
+// etc.) automatically.
+app.use(helmet());
+
+// CORS: in production lock to the deployed frontend origin (set FRONTEND_ORIGIN
+// to the Cloud Run frontend URL); in development allow the local Vite dev server.
 app.use(cors({
-  origin: process.env.FRONTEND_ORIGIN || 'http://localhost:5173',
+  origin: process.env.NODE_ENV === 'production'
+    ? (process.env.FRONTEND_ORIGIN || 'https://cricket-frontend-REPLACE-nw.a.run.app')
+    : 'http://localhost:5173',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -31,22 +40,27 @@ app.use(requestLogger);
 
 // ─── Rate Limiting ────────────────────────────────────────────────────────────
 
-const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200,
-  message: { error: 'Too many requests, please try again later' },
+const WINDOW = 15 * 60 * 1000; // 15 minutes
+const limiter = (max, message) => rateLimit({
+  windowMs: WINDOW,
+  max,
+  message: { error: message },
   standardHeaders: true,
   legacyHeaders: false
 });
 
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20, // Stricter for auth endpoints
-  message: { error: 'Too many authentication attempts, please try again later' }
-});
+const globalLimiter = limiter(200, 'Too many requests, please try again later');
+const authLimiter = limiter(20, 'Too many authentication attempts, please try again later');
+const loginLimiter = limiter(10, 'Too many login attempts, please try again later');
+const otpLimiter = limiter(5, 'Too many OTP requests, please try again later');
 
-app.use('/api', globalLimiter);
-app.use('/api/auth', authLimiter);
+// Order matters — express runs every matching limiter. The most specific
+// (login, otp) are registered before the broader /api/auth and /api buckets, so
+// a login request is capped by the strictest applicable limit.
+app.use('/api', globalLimiter);                 // all /api          → 200 / 15m
+app.use('/api/auth', authLimiter);              // all /api/auth/*   → 20  / 15m
+app.use('/api/auth/login', loginLimiter);       // login             → 10  / 15m
+app.use('/api/auth/otp/send', otpLimiter);      // otp send          → 5   / 15m
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
@@ -60,19 +74,19 @@ app.use('/api/auth', require('./src/routes/authRoutes'));
 app.use('/api/viewer', require('./src/routes/viewerRoutes'));
 
 // Phase 4+: Scorer routes
-// app.use('/api/scorer', require('./src/routes/scorerRoutes'));
+app.use('/api/scorer', require('./src/routes/scorerRoutes'));
 
 // Phase 5+: Club Admin routes
-// app.use('/api/club-admin', require('./src/routes/clubAdminRoutes'));
+app.use('/api/club-admin', require('./src/routes/clubAdminRoutes'));
 
 // Phase 5+: Super Admin routes
-// app.use('/api/super-admin', require('./src/routes/superAdminRoutes'));
+app.use('/api/super-admin', require('./src/routes/superAdminRoutes'));
 
 // Phase 6+: Player routes
-// app.use('/api/player', require('./src/routes/playerRoutes'));
+app.use('/api/player', require('./src/routes/playerRoutes'));
 
 // Phase 6+: Analyst routes
-// app.use('/api/analyst', require('./src/routes/analystRoutes'));
+app.use('/api/analyst', require('./src/routes/analystRoutes'));
 
 // ─── 404 Handler ─────────────────────────────────────────────────────────────
 

@@ -1,5 +1,7 @@
 // Auth data-access — users, clubs, otp_verifications. Real column names.
-// Parameterized via the db.js query helper.
+// Parameterized via the db.js query helper. Write functions used in multi-step
+// flows accept an optional `exec` (a (text, params) => Promise runner) so the
+// service can pass a transaction client; it defaults to the pooled query helper.
 const { query } = require('../../db');
 
 // Full row incl password_hash — only used by login.
@@ -23,8 +25,8 @@ const findUserById = async (userId) => {
   return result.rows[0] || null;
 };
 
-const createUser = async (u) => {
-  const result = await query(
+const createUser = async (u, exec = query) => {
+  const result = await exec(
     `INSERT INTO users
        (email, first_name, last_name, display_name, password_hash, phone,
         club_id, is_approved, account_role, role)
@@ -37,8 +39,8 @@ const createUser = async (u) => {
   return result.rows[0];
 };
 
-const createClub = async (c) => {
-  const result = await query(
+const createClub = async (c, exec = query) => {
+  const result = await exec(
     `INSERT INTO clubs
        (name, home_ground, contact_number, email, country, display_initials,
         owner_name, is_approved)

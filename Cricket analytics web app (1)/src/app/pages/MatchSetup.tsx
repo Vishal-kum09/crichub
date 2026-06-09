@@ -2,12 +2,16 @@ import { useState } from 'react';
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { toast } from '../../lib/toast';
 import { mockTeams, mockPlayers } from '../../data/mockData';
+import { initializeMatch, setLiveSession } from '../../lib/scorerApi';
 
 interface MatchSetupProps {
   onNavigate: (path: string, id?: string) => void;
+  // Present when the wizard is backed by a real, assigned match — required to
+  // open a live innings against the DB. The mock wizard has no backing match.
+  matchId?: string;
 }
 
-export function MatchSetup({ onNavigate }: MatchSetupProps) {
+export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
   const [currentStep, setCurrentStep] = useState(1);
 
   // Step 1: Team Selection
@@ -67,6 +71,47 @@ export function MatchSetup({ onNavigate }: MatchSetupProps) {
     }
   };
 
+  // Resolve a display name back to its catalogue id (teams/players).
+  const teamIdFor = (name: string) => mockTeams.find((t) => t.name === name)?.id;
+  const playerIdFor = (name: string) => mockPlayers.find((p) => p.name === name)?.id;
+
+  const startMatch = async () => {
+    const battingTeamId = teamIdFor(battingTeam);
+    const fieldingTeamId = teamIdFor(bowlingTeam);
+
+    // Open the first innings against the DB when this wizard is backed by a real
+    // assigned match. Otherwise fall through to the local demo navigation.
+    if (matchId && battingTeamId && fieldingTeamId) {
+      try {
+        const res = await initializeMatch(matchId, {
+          batting_team_id: battingTeamId,
+          fielding_team_id: fieldingTeamId,
+          innings_number: 1,
+          striker_id: playerIdFor(striker),
+          non_striker_id: playerIdFor(nonStriker),
+          bowler_id: playerIdFor(openingBowler),
+        });
+        setLiveSession({
+          matchId,
+          inningsId: res.innings.innings_id,
+          strikerId: res.striker?.player_id ?? playerIdFor(striker),
+          nonStrikerId: res.non_striker?.player_id ?? playerIdFor(nonStriker),
+          bowlerId: res.bowler?.player_id ?? playerIdFor(openingBowler),
+        });
+        toast.success('Live innings started');
+        onNavigate('/scorer', matchId);
+        return;
+      } catch (err: any) {
+        toast.error(err?.response?.data?.error || 'Failed to start live innings');
+        return;
+      }
+    }
+
+    // Demo mode (no backing match): proceed without hitting the DB.
+    toast.success('Match setup complete!');
+    onNavigate('/scorer');
+  };
+
   const handleNext = () => {
     if (!canProceed()) {
       toast.error('Please complete all required fields');
@@ -77,8 +122,7 @@ export function MatchSetup({ onNavigate }: MatchSetupProps) {
       setCurrentStep(currentStep + 1);
     } else {
       // Final step - start match
-      toast.success('Match setup complete!');
-      onNavigate('/scorer');
+      void startMatch();
     }
   };
 

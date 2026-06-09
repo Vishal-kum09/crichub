@@ -1,83 +1,53 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Building2, Bell, Database, CheckCircle, XCircle, Eye, Edit, Trash2, ChevronRight } from 'lucide-react';
 import { toast } from '../../lib/toast';
+import {
+  getClubs,
+  getClubMembers,
+  getSuperPendingApprovals,
+  approveClub as apiApproveClub,
+  type ClubSummary,
+  type ClubMember,
+  type PendingClub,
+} from '../../lib/adminApi';
 
 export function SuperAdmin() {
   const [activeTab, setActiveTab] = useState<'clubs' | 'notifications' | 'data-management'>('clubs');
   const [selectedClub, setSelectedClub] = useState<string | null>(null);
 
-  // Mock clubs data
-  const clubs = [
-    {
-      id: '1',
-      name: 'Mumbai Indians Cricket Academy',
-      location: 'Mumbai, Maharashtra',
-      members: 145,
-      matches: 67,
-      status: 'Active',
-      registeredDate: '2023-05-12',
-    },
-    {
-      id: '2',
-      name: 'Chennai Super Kings Academy',
-      location: 'Chennai, Tamil Nadu',
-      members: 132,
-      matches: 58,
-      status: 'Active',
-      registeredDate: '2023-06-20',
-    },
-    {
-      id: '3',
-      name: 'Royal Challengers Academy',
-      location: 'Bangalore, Karnataka',
-      members: 98,
-      matches: 42,
-      status: 'Active',
-      registeredDate: '2023-07-15',
-    },
-  ];
+  // Live data — loaded from the backend (empty until fetched / on error).
+  const [clubs, setClubs] = useState<ClubSummary[]>([]);
+  const [clubMembers, setClubMembers] = useState<ClubMember[]>([]);
+  const [pendingRegistrations, setPendingRegistrations] = useState<PendingClub[]>([]);
 
-  // Mock club members
-  const clubMembers = {
-    '1': [
-      { id: '1', name: 'Rohit Sharma', role: 'Player', email: 'rohit@example.com', status: 'Active' },
-      { id: '2', name: 'Jasprit Bumrah', role: 'Player', email: 'bumrah@example.com', status: 'Active' },
-      { id: '3', name: 'John Scorer', role: 'Scorer', email: 'john@example.com', status: 'Active' },
-      { id: '4', name: 'Sarah Analyst', role: 'Analyst', email: 'sarah@example.com', status: 'Active' },
-    ],
+  const loadClubs = () => { getClubs().then(setClubs).catch(() => setClubs([])); };
+  const loadPending = () => {
+    getSuperPendingApprovals().then(setPendingRegistrations).catch(() => setPendingRegistrations([]));
   };
 
-  // Mock pending registrations
-  const [pendingRegistrations, setPendingRegistrations] = useState([
-    {
-      id: '1',
-      type: 'Club',
-      name: 'Kolkata Knight Riders Academy',
-      admin: 'Sourav Ganguly',
-      email: 'admin@kkr.com',
-      location: 'Kolkata, West Bengal',
-      date: '2024-01-20',
-    },
-    {
-      id: '2',
-      type: 'Club',
-      name: 'Delhi Capitals Cricket Club',
-      admin: 'Ricky Ponting',
-      email: 'admin@dc.com',
-      location: 'Delhi, India',
-      date: '2024-01-22',
-    },
-  ]);
+  useEffect(() => { loadClubs(); loadPending(); }, []);
 
-  const handleApproveClub = (id: string) => {
+  // Fetch members whenever a club is drilled into.
+  useEffect(() => {
+    if (!selectedClub) { setClubMembers([]); return; }
+    getClubMembers(selectedClub).then(setClubMembers).catch(() => setClubMembers([]));
+  }, [selectedClub]);
+
+  const handleApproveClub = async (id: string) => {
     const club = pendingRegistrations.find(r => r.id === id);
-    setPendingRegistrations(pendingRegistrations.filter(r => r.id !== id));
-    toast.success(`${club?.name} approved successfully!`);
+    try {
+      await apiApproveClub(id);
+      setPendingRegistrations(prev => prev.filter(r => r.id !== id));
+      toast.success(`${club?.name} approved successfully!`);
+      loadClubs();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Failed to approve club');
+    }
   };
 
   const handleRejectClub = (id: string) => {
     const club = pendingRegistrations.find(r => r.id === id);
-    setPendingRegistrations(pendingRegistrations.filter(r => r.id !== id));
+    setPendingRegistrations(prev => prev.filter(r => r.id !== id));
     toast.error(`${club?.name} registration rejected`);
   };
 
@@ -225,7 +195,7 @@ export function SuperAdmin() {
                   </tr>
                 </thead>
                 <tbody>
-                  {clubMembers[selectedClub as keyof typeof clubMembers]?.map((member) => (
+                  {clubMembers.map((member) => (
                     <tr key={member.id} className="border-b border-[#f0f0f0] hover:bg-[#f9f9f9]">
                       <td className="py-3 px-4 font-medium text-[#1a1a1a]">{member.name}</td>
                       <td className="py-3 px-4 text-[#666666]">{member.role}</td>

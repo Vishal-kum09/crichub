@@ -1,59 +1,108 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Users, Trophy, Calendar, CheckCircle, XCircle, Trash2, Edit } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { toast } from '../../lib/toast';
+import {
+  getPendingApprovals,
+  decideApproval,
+  toAssignedRole,
+  createMatch as apiCreateMatch,
+  createTournament as apiCreateTournament,
+  getRosterMatches,
+  getRosterPlayers,
+  getRosterScorers,
+  type PendingApproval,
+  type RosterMatch,
+  type RosterMember,
+} from '../../lib/adminApi';
 
 export function ClubAdmin() {
   const [activeTab, setActiveTab] = useState<'approvals' | 'create-match' | 'create-tournament' | 'roster'>('approvals');
   const [rosterView, setRosterView] = useState<'matches' | 'players' | 'scorers'>('matches');
   const [matchType, setMatchType] = useState<'club' | 'local'>('club');
 
-  // Mock data for approval queue
-  const [pendingApprovals, setPendingApprovals] = useState([
-    { id: '1', name: 'Rohit Sharma', email: 'rohit@example.com', phone: '+91-9876543210', role: 'player', date: '2024-01-15' },
-    { id: '2', name: 'Virat Kohli', email: 'virat@example.com', phone: '+91-9876543211', role: 'player', date: '2024-01-16' },
-    { id: '3', name: 'John Scorer', email: 'john@example.com', phone: '+91-9876543212', role: 'scorer', date: '2024-01-17' },
-    { id: '4', name: 'Sarah Analyst', email: 'sarah@example.com', phone: '+91-9876543213', role: 'analyst', date: '2024-01-18' },
-  ]);
+  // Live data — loaded from the backend (empty until fetched / on error).
+  const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
+  const [myMatches, setMyMatches] = useState<RosterMatch[]>([]);
+  const [myPlayers, setMyPlayers] = useState<RosterMember[]>([]);
+  const [myScorers, setMyScorers] = useState<RosterMember[]>([]);
 
-  // Mock roster data
-  const myMatches = [
-    { id: '1', opponent: 'Chennai Super Kings Academy', date: '2024-02-15', venue: 'Wankhede Stadium', status: 'Scheduled' },
-    { id: '2', opponent: 'Royal Challengers Academy', date: '2024-02-10', venue: 'M. Chinnaswamy Stadium', status: 'Completed' },
-  ];
+  // Create-match / create-tournament form state.
+  const [matchForm, setMatchForm] = useState({ date: '', time: '', venue: '', totalOvers: '20', opponentClubId: '' });
+  const [tournamentForm, setTournamentForm] = useState({ name: '', type: 'League', oversLimit: '20', maxTeams: '8', startDate: '', endDate: '' });
 
-  const myPlayers = [
-    { id: '1', name: 'Rohit Sharma', role: 'Batsman', matches: 45, avgRuns: 52.3, status: 'Active' },
-    { id: '2', name: 'Jasprit Bumrah', role: 'Bowler', matches: 42, avgWickets: 2.1, status: 'Active' },
-    { id: '3', name: 'Hardik Pandya', role: 'All-Rounder', matches: 38, avgRuns: 35.2, status: 'Active' },
-  ];
+  const loadApprovals = () => {
+    getPendingApprovals().then(setPendingApprovals).catch(() => setPendingApprovals([]));
+  };
 
-  const myScorers = [
-    { id: '1', name: 'John Scorer', email: 'john@example.com', matchesScored: 28, status: 'Active' },
-    { id: '2', name: 'Emily Smith', email: 'emily@example.com', matchesScored: 15, status: 'Active' },
-  ];
+  useEffect(() => { loadApprovals(); }, []);
+  useEffect(() => {
+    getRosterMatches().then(setMyMatches).catch(() => setMyMatches([]));
+    getRosterPlayers().then(setMyPlayers).catch(() => setMyPlayers([]));
+    getRosterScorers().then(setMyScorers).catch(() => setMyScorers([]));
+  }, []);
 
-  const handleApprove = (id: string) => {
+  const handleApprove = async (id: string) => {
     const approval = pendingApprovals.find(a => a.id === id);
-    setPendingApprovals(pendingApprovals.filter(a => a.id !== id));
-    toast.success(`${approval?.name} approved as ${approval?.role}!`);
+    try {
+      await decideApproval(id, 'APPROVE', toAssignedRole(approval?.role || 'player'));
+      setPendingApprovals(prev => prev.filter(a => a.id !== id));
+      toast.success(`${approval?.name} approved as ${approval?.role}!`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Failed to approve');
+    }
   };
 
-  const handleReject = (id: string) => {
+  const handleReject = async (id: string) => {
     const approval = pendingApprovals.find(a => a.id === id);
-    setPendingApprovals(pendingApprovals.filter(a => a.id !== id));
-    toast.error(`${approval?.name}'s registration rejected`);
+    try {
+      await decideApproval(id, 'REJECT');
+      setPendingApprovals(prev => prev.filter(a => a.id !== id));
+      toast.error(`${approval?.name}'s registration rejected`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Failed to reject');
+    }
   };
 
-  const handleCreateMatch = (e: React.FormEvent) => {
+  const handleCreateMatch = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success(matchType === 'club' ? 'Match request sent to opponent club!' : 'Local match created successfully!');
+    try {
+      const scheduledAt = matchForm.date
+        ? new Date(`${matchForm.date}T${matchForm.time || '10:00'}:00`).toISOString()
+        : new Date().toISOString();
+      await apiCreateMatch({
+        match_type: matchType === 'club' ? 'cross_club' : 'local',
+        opponent_club_id: matchType === 'club' && matchForm.opponentClubId ? matchForm.opponentClubId : undefined,
+        venue: matchForm.venue || 'TBD',
+        scheduled_at: scheduledAt,
+        total_overs: Number(matchForm.totalOvers) || 20,
+      });
+      toast.success(matchType === 'club' ? 'Match request sent to opponent club!' : 'Local match created successfully!');
+      getRosterMatches().then(setMyMatches).catch(() => {});
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Failed to create match');
+    }
   };
 
-  const handleCreateTournament = (e: React.FormEvent) => {
+  const handleCreateTournament = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success('Tournament created successfully!');
+    try {
+      const typeMap: Record<string, 'Knockout' | 'League' | 'RoundRobin'> = {
+        League: 'League', Knockout: 'Knockout', 'Round Robin': 'RoundRobin',
+      };
+      await apiCreateTournament({
+        tournament_name: tournamentForm.name,
+        tournament_type: typeMap[tournamentForm.type] || 'League',
+        overs_limit: Number(tournamentForm.oversLimit) || 20,
+        max_teams: Number(tournamentForm.maxTeams) || 8,
+        start_date: tournamentForm.startDate || undefined,
+        end_date: tournamentForm.endDate || undefined,
+      });
+      toast.success('Tournament created successfully!');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Failed to create tournament');
+    }
   };
 
   return (
@@ -195,42 +244,56 @@ export function ClubAdmin() {
           <form onSubmit={handleCreateMatch} className="space-y-4">
             {matchType === 'club' && (
               <div>
-                <label className="block text-sm font-medium text-[#666666] mb-2">Opponent Club</label>
-                <select className="w-full px-4 py-3 border border-[#e0e0e0] rounded-lg focus:outline-none focus:border-[#e60023]">
-                  <option>Chennai Super Kings Academy</option>
-                  <option>Royal Challengers Academy</option>
-                  <option>Kolkata Knight Riders Academy</option>
-                </select>
+                <label className="block text-sm font-medium text-[#666666] mb-2">Opponent Club ID</label>
+                <Input
+                  type="text"
+                  placeholder="Opponent club UUID"
+                  value={matchForm.opponentClubId}
+                  onChange={(e) => setMatchForm({ ...matchForm, opponentClubId: e.target.value })}
+                />
               </div>
             )}
 
             <div>
               <label className="block text-sm font-medium text-[#666666] mb-2">Match Date</label>
-              <Input type="date" required />
+              <Input
+                type="date"
+                required
+                value={matchForm.date}
+                onChange={(e) => setMatchForm({ ...matchForm, date: e.target.value })}
+              />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-[#666666] mb-2">Match Time</label>
-              <Input type="time" required />
+              <Input
+                type="time"
+                required
+                value={matchForm.time}
+                onChange={(e) => setMatchForm({ ...matchForm, time: e.target.value })}
+              />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-[#666666] mb-2">Venue</label>
-              <Input type="text" placeholder="Enter venue name" required />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-[#666666] mb-2">Match Type</label>
-              <select className="w-full px-4 py-3 border border-[#e0e0e0] rounded-lg focus:outline-none focus:border-[#e60023]">
-                <option>T20</option>
-                <option>50 Overs</option>
-                <option>Practice Match</option>
-              </select>
+              <Input
+                type="text"
+                placeholder="Enter venue name"
+                required
+                value={matchForm.venue}
+                onChange={(e) => setMatchForm({ ...matchForm, venue: e.target.value })}
+              />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-[#666666] mb-2">Total Overs</label>
-              <Input type="number" placeholder="20" required />
+              <Input
+                type="number"
+                placeholder="20"
+                required
+                value={matchForm.totalOvers}
+                onChange={(e) => setMatchForm({ ...matchForm, totalOvers: e.target.value })}
+              />
             </div>
 
             <Button type="submit" variant="primary" className="w-full">
@@ -248,12 +311,22 @@ export function ClubAdmin() {
           <form onSubmit={handleCreateTournament} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-[#666666] mb-2">Tournament Name</label>
-              <Input type="text" placeholder="e.g., Summer Cricket Championship" required />
+              <Input
+                type="text"
+                placeholder="e.g., Summer Cricket Championship"
+                required
+                value={tournamentForm.name}
+                onChange={(e) => setTournamentForm({ ...tournamentForm, name: e.target.value })}
+              />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-[#666666] mb-2">Tournament Type</label>
-              <select className="w-full px-4 py-3 border border-[#e0e0e0] rounded-lg focus:outline-none focus:border-[#e60023]">
+              <select
+                className="w-full px-4 py-3 border border-[#e0e0e0] rounded-lg focus:outline-none focus:border-[#e60023]"
+                value={tournamentForm.type}
+                onChange={(e) => setTournamentForm({ ...tournamentForm, type: e.target.value })}
+              >
                 <option>League</option>
                 <option>Knockout</option>
                 <option>Round Robin</option>
@@ -262,27 +335,42 @@ export function ClubAdmin() {
 
             <div>
               <label className="block text-sm font-medium text-[#666666] mb-2">Overs Limit</label>
-              <Input type="number" placeholder="20" required />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-[#666666] mb-2">Total Number of Matches</label>
-              <Input type="number" placeholder="10" required />
+              <Input
+                type="number"
+                placeholder="20"
+                required
+                value={tournamentForm.oversLimit}
+                onChange={(e) => setTournamentForm({ ...tournamentForm, oversLimit: e.target.value })}
+              />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-[#666666] mb-2">Maximum Participating Teams</label>
-              <Input type="number" placeholder="8" required />
+              <Input
+                type="number"
+                placeholder="8"
+                required
+                value={tournamentForm.maxTeams}
+                onChange={(e) => setTournamentForm({ ...tournamentForm, maxTeams: e.target.value })}
+              />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-[#666666] mb-2">Start Date</label>
-              <Input type="date" required />
+              <Input
+                type="date"
+                value={tournamentForm.startDate}
+                onChange={(e) => setTournamentForm({ ...tournamentForm, startDate: e.target.value })}
+              />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-[#666666] mb-2">End Date</label>
-              <Input type="date" required />
+              <Input
+                type="date"
+                value={tournamentForm.endDate}
+                onChange={(e) => setTournamentForm({ ...tournamentForm, endDate: e.target.value })}
+              />
             </div>
 
             <Button type="submit" variant="primary" className="w-full">
@@ -378,8 +466,8 @@ export function ClubAdmin() {
                   <tr className="border-b border-[#e0e0e0]">
                     <th className="text-left py-3 px-4 font-semibold text-[#666666]">Player Name</th>
                     <th className="text-left py-3 px-4 font-semibold text-[#666666]">Role</th>
-                    <th className="text-center py-3 px-4 font-semibold text-[#666666]">Matches</th>
-                    <th className="text-center py-3 px-4 font-semibold text-[#666666]">Performance</th>
+                    <th className="text-center py-3 px-4 font-semibold text-[#666666]">Email</th>
+                    <th className="text-center py-3 px-4 font-semibold text-[#666666]">Stats</th>
                     <th className="text-left py-3 px-4 font-semibold text-[#666666]">Status</th>
                     <th className="text-right py-3 px-4 font-semibold text-[#666666]">Actions</th>
                   </tr>
@@ -389,10 +477,8 @@ export function ClubAdmin() {
                     <tr key={player.id} className="border-b border-[#f0f0f0] hover:bg-[#f9f9f9]">
                       <td className="py-3 px-4 font-medium text-[#1a1a1a]">{player.name}</td>
                       <td className="py-3 px-4 text-[#666666]">{player.role}</td>
-                      <td className="py-3 px-4 text-center text-[#666666]">{player.matches}</td>
-                      <td className="py-3 px-4 text-center text-[#666666]">
-                        {player.avgRuns ? `${player.avgRuns} avg` : `${player.avgWickets} wkts`}
-                      </td>
+                      <td className="py-3 px-4 text-center text-[#666666]">{player.email}</td>
+                      <td className="py-3 px-4 text-center text-[#666666]">—</td>
                       <td className="py-3 px-4">
                         <span className="px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-800">
                           {player.status}
@@ -433,7 +519,7 @@ export function ClubAdmin() {
                     <tr key={scorer.id} className="border-b border-[#f0f0f0] hover:bg-[#f9f9f9]">
                       <td className="py-3 px-4 font-medium text-[#1a1a1a]">{scorer.name}</td>
                       <td className="py-3 px-4 text-[#666666]">{scorer.email}</td>
-                      <td className="py-3 px-4 text-center text-[#666666]">{scorer.matchesScored}</td>
+                      <td className="py-3 px-4 text-center text-[#666666]">—</td>
                       <td className="py-3 px-4">
                         <span className="px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-800">
                           {scorer.status}

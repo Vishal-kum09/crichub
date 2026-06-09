@@ -1,6 +1,18 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Play, Pause, Save, ArrowLeft, Undo, Redo, MoreHorizontal, RotateCcw, AlertCircle } from 'lucide-react';
 import { toast } from '../../lib/toast';
+
+// sessionStorage key for crash-recovery of an in-progress scoring session.
+const SCORER_SESSION_KEY = 'scorer_session';
+import {
+  recordBall as apiRecordBall,
+  wicketWizard as apiWicketWizard,
+  undoBall as apiUndoBall,
+  getLiveSession,
+  toExtraType,
+  type InningsState,
+  type DismissalType,
+} from '../../lib/scorerApi';
 
 interface ScorerConsoleProps {
   matchId?: string;
@@ -101,6 +113,100 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
   const [selectedFielder, setSelectedFielder] = useState('');
   const [nextBatsman, setNextBatsman] = useState('');
 
+  // Live DB session — present when MatchSetup initialized a real innings.
+  // matchId prop identifies the match; the session carries the innings + ids.
+  const [session] = useState(() => getLiveSession());
+  const isConnected = Boolean(session && matchId);
+
+  // Mirror the authoritative innings state from the backend into the local
+  // scoreboard so the UI reflects what was actually committed to the DB.
+  const syncFromInnings = (innings: InningsState) => {
+    setScore(innings.total_runs);
+    setWickets(innings.total_wickets);
+    setOvers(innings.overs_completed);
+    setBalls(innings.balls_this_over);
+    setExtras({
+      wides: innings.extras.wides,
+      noBalls: innings.extras.no_balls,
+      byes: innings.extras.byes,
+      legByes: innings.extras.leg_byes,
+      penalties: innings.extras.penalties,
+    });
+  };
+
+  // ── Crash guard + offline queue ──────────────────────────────────────────
+  // Deliveries that failed to reach the backend (network error) are queued here
+  // and replayed on the next successful request. connLostToast holds the id of
+  // the non-dismissable "connection lost" banner so we can clear it on recovery.
+  const pendingDeliveries = useRef<any[]>([]);
+  const connLostToast = useRef<string | number | null>(null);
+
+  // Persist a snapshot of the live scoreboard to sessionStorage so a refresh or
+  // crash mid-innings can be recovered. Keyed by match id.
+  const saveSession = (innings: InningsState) => {
+    if (!matchId) return;
+    sessionStorage.setItem(SCORER_SESSION_KEY, JSON.stringify({
+      matchId,
+      inningsId: session?.inningsId ?? null,
+      score: innings.total_runs,
+      wickets: innings.total_wickets,
+      overs: innings.overs_completed,
+      balls: innings.balls_this_over,
+      extras: {
+        wides: innings.extras.wides,
+        noBalls: innings.extras.no_balls,
+        byes: innings.extras.byes,
+        legByes: innings.extras.leg_byes,
+        penalties: innings.extras.penalties,
+      },
+      savedAt: Date.now(),
+    }));
+  };
+
+  const clearSession = () => sessionStorage.removeItem(SCORER_SESSION_KEY);
+
+  // Restore a saved session for THIS match on mount; clear it on unmount.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(SCORER_SESSION_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (saved && saved.matchId === matchId) {
+          setScore(saved.score ?? 0);
+          setWickets(saved.wickets ?? 0);
+          setOvers(saved.overs ?? 0);
+          setBalls(saved.balls ?? 0);
+          if (saved.extras) setExtras(saved.extras);
+          toast.info('Recovered in-progress scoring session');
+        }
+      }
+    } catch { /* ignore corrupt session blob */ }
+    return () => { clearSession(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Replay any queued deliveries in order once connectivity is back.
+  const flushPendingDeliveries = async () => {
+    if (!isConnected || !session || pendingDeliveries.current.length === 0) return;
+    const queue = [...pendingDeliveries.current];
+    pendingDeliveries.current = [];
+    for (const payload of queue) {
+      try {
+        const res = await apiRecordBall(matchId!, payload);
+        syncFromInnings(res.innings);
+        saveSession(res.innings);
+      } catch (err: any) {
+        // Still offline — requeue the rest and stop.
+        if (!err?.response) { pendingDeliveries.current.push(payload); }
+      }
+    }
+    if (pendingDeliveries.current.length === 0 && connLostToast.current != null) {
+      toast.dismiss(connLostToast.current);
+      connLostToast.current = null;
+      toast.success('Reconnected — queued deliveries synced');
+    }
+  };
+
   // Calculate run rate
   const runRate = overs + balls / 6 > 0 ? (score / (overs + balls / 6)).toFixed(2) : '0.00';
 
@@ -171,6 +277,51 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
       if (currentRuns % 2 !== 0) {
         swapStrike();
       }
+    }
+
+    // Persist to the backend when connected to a real innings. The backend is
+    // the source of truth, so the local scoreboard is reconciled from its
+    // response (which keeps the over/ball counters exact even under extras).
+    if (isConnected && session) {
+      const extraType = toExtraType(currentExtraType);
+      // For byes/leg-byes the console stores the runs in currentRuns; for
+      // wides the penalty is folded into currentExtras (1 + additional).
+      const runsOffBat = extraType === 'NB' || extraType === 'None' ? currentRuns : 0;
+      const extraRuns =
+        extraType === 'WD' ? Math.max(0, currentExtras - 1)
+        : extraType === 'B' || extraType === 'LB' ? currentRuns
+        : 0;
+      const payload = {
+        innings_id: session.inningsId,
+        runs_off_bat: runsOffBat,
+        extra_type: extraType,
+        extra_runs: extraRuns,
+        is_wicket: isWicket,
+        striker_id: session.strikerId,
+        non_striker_id: session.nonStrikerId,
+        bowler_id: session.bowlerId,
+      };
+      apiRecordBall(matchId!, payload)
+        .then((res) => {
+          syncFromInnings(res.innings);
+          saveSession(res.innings);           // crash-recovery snapshot
+          void flushPendingDeliveries();      // replay anything queued offline
+          if (res.innings_complete) {
+            clearSession();                    // innings over — discard session
+            toast.success('Innings complete');
+          }
+        })
+        .catch((err) => {
+          if (!err?.response) {
+            // Network error (no response) — queue locally and warn persistently.
+            pendingDeliveries.current.push(payload);
+            if (connLostToast.current == null) {
+              connLostToast.current = toast.persist('Connection lost — deliveries queued locally');
+            }
+          } else {
+            toast.error(err?.response?.data?.error || 'Failed to record ball');
+          }
+        });
     }
 
     // Reset current ball
@@ -288,6 +439,13 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
       setBalls(5);
     } else {
       setBalls(balls - 1);
+    }
+
+    // Reverse the last delivery in the DB and reconcile from the restored state.
+    if (isConnected && session) {
+      apiUndoBall(matchId!, session.inningsId)
+        .then((res) => syncFromInnings(res.innings))
+        .catch((err) => toast.error(err?.response?.data?.error || 'Failed to undo'));
     }
 
     toast.success('Ball undone');
@@ -957,6 +1115,23 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
                     setIsWicket(true);
                     setWickets(wickets + 1);
                     setShowWicketDialog(false);
+                    // Run the 4-step wicket pipeline against the DB when connected.
+                    if (isConnected && session && selectedDismissal) {
+                      apiWicketWizard(matchId!, {
+                        innings_id: session.inningsId,
+                        dismissed_player_id: session.strikerId!,
+                        dismissal_type: selectedDismissal as DismissalType,
+                        fielder_id: selectedFielder || undefined,
+                        incoming_batsman_id: nextBatsman || session.nonStrikerId!,
+                      })
+                        .then((res) => {
+                          syncFromInnings(res.innings);
+                          if (res.innings_complete) toast.success('All out — innings complete');
+                        })
+                        .catch((err) =>
+                          toast.error(err?.response?.data?.error || 'Failed to record wicket')
+                        );
+                    }
                     toast.success('Wicket recorded');
                   }}
                   className="flex-1 p-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all"

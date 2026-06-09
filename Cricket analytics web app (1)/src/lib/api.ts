@@ -21,20 +21,25 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config;
 });
 
-// Response interceptor — handle auth expiry and network failures globally.
+// Response interceptor — handle auth expiry, forbidden, and network failures.
 api.interceptors.response.use(
   (response) => response,
-  (error: AxiosError) => {
+  (error: AxiosError<{ error?: string }>) => {
     if (error.response) {
-      // Server responded with an error status.
+      // 401 — token missing/expired: clear session and bounce to sign-in.
       if (error.response.status === 401) {
         localStorage.removeItem(TOKEN_KEY);
         if (window.location.pathname !== '/signin') {
           window.location.href = '/signin';
         }
       }
+      // 403 — authenticated but not allowed: surface the server's message.
+      if (error.response.status === 403) {
+        toast.error(error.response.data?.error || 'Access denied');
+      }
     } else if (error.request) {
       // Request was made but no response arrived → network/connection issue.
+      // Surface a toast but do NOT throw — callers handle the rejection.
       toast.error('Connection lost — please check your network');
     }
     return Promise.reject(error);

@@ -3,7 +3,8 @@ import { Card } from '../components/Card';
 import { Badge, StatusBadge } from '../components/Badge';
 import { api } from '../../lib/api';
 import type { Match } from '../../data/mockData';
-import { Filter, Search } from 'lucide-react';
+import { Filter, Search, ClipboardList } from 'lucide-react';
+import { getAssignedMatches, type AssignedMatch } from '../../lib/scorerApi';
 
 interface MatchesProps {
   onNavigate: (path: string, matchId?: string) => void;
@@ -25,6 +26,17 @@ export function Matches({ onNavigate }: MatchesProps) {
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Fixtures the signed-in scorer is assigned to. Silently empty for
+  // non-scorers (the endpoint 403s for other roles).
+  const [assigned, setAssigned] = useState<AssignedMatch[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    getAssignedMatches()
+      .then((rows) => { if (!cancelled) setAssigned(rows); })
+      .catch(() => { if (!cancelled) setAssigned([]); });
+    return () => { cancelled = true; };
+  }, []);
 
   const formats = ['All', 'T20', 'ODI', 'Test'];
   const statuses = ['All', 'Live', 'Scheduled', 'Completed'];
@@ -79,6 +91,42 @@ export function Matches({ onNavigate }: MatchesProps) {
           New Match
         </button>
       </div>
+
+      {/* Assigned to me (Scorer) — only rendered when the scorer has fixtures */}
+      {assigned.length > 0 && (
+        <Card>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-[#1a1a1a]">
+              <ClipboardList size={18} className="text-[#e60023]" />
+              <span className="font-semibold">Assigned to me</span>
+              <span className="text-xs text-[#666666]">({assigned.length})</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {assigned.map((m) => (
+                <div
+                  key={m.id}
+                  className="flex items-center justify-between p-4 bg-[#f9f9f9] rounded-xl border border-[#e0e0e0]"
+                >
+                  <div>
+                    <p className="font-semibold text-[#1a1a1a]">
+                      {m.team1_short_name} vs {m.team2_short_name}
+                    </p>
+                    <p className="text-xs text-[#666666]">
+                      {m.format} · {m.venue || 'TBD'} · {m.status}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => onNavigate('/match-setup', m.id)}
+                    className="px-4 py-2 bg-[#1a1a1a] text-white rounded-lg text-sm font-medium hover:bg-[#2a2a2a] transition-colors"
+                  >
+                    Score
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Filter Bar */}
       <Card>

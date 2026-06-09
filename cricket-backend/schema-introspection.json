@@ -1,0 +1,4937 @@
+{
+  "cols": [
+    {
+      "table_name": "ai_commentary",
+      "column_name": "ai_commentary_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "match_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "innings_id",
+      "data_type": "uuid",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "delivery_id",
+      "data_type": "uuid",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "over_id",
+      "data_type": "uuid",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "task",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "style",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": "'broadcast_english'::character varying"
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "output",
+      "data_type": "text",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "source",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "status",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "is_visible",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "true"
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "is_manual_override",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "false"
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "replaced_commentary_id",
+      "data_type": "uuid",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "version",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": "1"
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "attempts",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "response_time_ms",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "errors",
+      "data_type": "jsonb",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "token_usage",
+      "data_type": "jsonb",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "source_payload",
+      "data_type": "jsonb",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "created_by",
+      "data_type": "uuid",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "ai_commentary_settings",
+      "column_name": "match_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "ai_commentary_settings",
+      "column_name": "mode",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": "'auto_with_manual_override'::character varying"
+    },
+    {
+      "table_name": "ai_commentary_settings",
+      "column_name": "language",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": "'en'::character varying"
+    },
+    {
+      "table_name": "ai_commentary_settings",
+      "column_name": "default_style",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": "'broadcast_english'::character varying"
+    },
+    {
+      "table_name": "ai_commentary_settings",
+      "column_name": "live_delay_seconds",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "3"
+    },
+    {
+      "table_name": "ai_commentary_settings",
+      "column_name": "live_retry_attempts",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "2"
+    },
+    {
+      "table_name": "ai_commentary_settings",
+      "column_name": "fallback_enabled",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "true"
+    },
+    {
+      "table_name": "ai_commentary_settings",
+      "column_name": "auto_publish",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "true"
+    },
+    {
+      "table_name": "ai_commentary_settings",
+      "column_name": "updated_by",
+      "data_type": "uuid",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "ai_commentary_settings",
+      "column_name": "updated_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "app_config",
+      "column_name": "app_config_key",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "app_config",
+      "column_name": "value",
+      "data_type": "text",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "app_config",
+      "column_name": "description",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "app_config",
+      "column_name": "is_secret",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "false"
+    },
+    {
+      "table_name": "app_config",
+      "column_name": "updated_by",
+      "data_type": "uuid",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "app_config",
+      "column_name": "updated_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "audit_logs",
+      "column_name": "audit_logs_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "audit_logs",
+      "column_name": "match_id",
+      "data_type": "uuid",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "audit_logs",
+      "column_name": "user_id",
+      "data_type": "uuid",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "audit_logs",
+      "column_name": "action",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "audit_logs",
+      "column_name": "table_name",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "audit_logs",
+      "column_name": "record_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "audit_logs",
+      "column_name": "old_values",
+      "data_type": "jsonb",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "audit_logs",
+      "column_name": "new_values",
+      "data_type": "jsonb",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "audit_logs",
+      "column_name": "ip_address",
+      "data_type": "inet",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "audit_logs",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "batter_over_stats",
+      "column_name": "batter_over_stats_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "batter_over_stats",
+      "column_name": "innings_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "batter_over_stats",
+      "column_name": "batter_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "batter_over_stats",
+      "column_name": "over_number",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "batter_over_stats",
+      "column_name": "runs",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "batter_over_stats",
+      "column_name": "balls",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "batter_over_stats",
+      "column_name": "fours",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "batter_over_stats",
+      "column_name": "sixes",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "batting_scorecards",
+      "column_name": "batting_scorecards_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "batting_scorecards",
+      "column_name": "innings_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "batting_scorecards",
+      "column_name": "player_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "batting_scorecards",
+      "column_name": "batting_position",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "batting_scorecards",
+      "column_name": "runs_scored",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "batting_scorecards",
+      "column_name": "balls_faced",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "batting_scorecards",
+      "column_name": "fours",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "batting_scorecards",
+      "column_name": "sixes",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "batting_scorecards",
+      "column_name": "dot_balls_faced",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "batting_scorecards",
+      "column_name": "strike_rate",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "batting_scorecards",
+      "column_name": "minutes_batted",
+      "data_type": "smallint",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "batting_scorecards",
+      "column_name": "is_dismissed",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "false"
+    },
+    {
+      "table_name": "batting_scorecards",
+      "column_name": "dismissal_id",
+      "data_type": "uuid",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "batting_scorecards",
+      "column_name": "came_in_at_over",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "batting_scorecards",
+      "column_name": "dismissed_at_over",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "bowler_over_stats",
+      "column_name": "bowler_over_stats_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "bowler_over_stats",
+      "column_name": "innings_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "bowler_over_stats",
+      "column_name": "bowler_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "bowler_over_stats",
+      "column_name": "over_number",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "bowler_over_stats",
+      "column_name": "runs_conceded",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "bowler_over_stats",
+      "column_name": "wickets",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "bowler_over_stats",
+      "column_name": "fours",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "bowler_over_stats",
+      "column_name": "sixes",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "bowler_over_stats",
+      "column_name": "dot_balls",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "bowler_over_stats",
+      "column_name": "is_maiden",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "false"
+    },
+    {
+      "table_name": "bowler_over_stats",
+      "column_name": "wides",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "bowler_over_stats",
+      "column_name": "no_balls",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "bowling_figures",
+      "column_name": "bowling_figures_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "bowling_figures",
+      "column_name": "innings_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "bowling_figures",
+      "column_name": "player_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "bowling_figures",
+      "column_name": "overs_bowled",
+      "data_type": "numeric",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "bowling_figures",
+      "column_name": "balls_bowled",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "bowling_figures",
+      "column_name": "runs_conceded",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "bowling_figures",
+      "column_name": "wickets",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "bowling_figures",
+      "column_name": "maidens",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "bowling_figures",
+      "column_name": "wides",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "bowling_figures",
+      "column_name": "no_balls",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "bowling_figures",
+      "column_name": "dot_balls",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "bowling_figures",
+      "column_name": "boundaries_hit",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "bowling_figures",
+      "column_name": "sixes_hit",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "bowling_figures",
+      "column_name": "economy_rate",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "bowling_figures",
+      "column_name": "bowling_sr",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "bowling_figures",
+      "column_name": "bowling_avg",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "bowling_figures",
+      "column_name": "top_speed",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "bowling_figures",
+      "column_name": "average_speed",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "bowling_figures",
+      "column_name": "dot_ball_percent",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "bowling_figures",
+      "column_name": "primary_movement",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "bowling_spells",
+      "column_name": "bowling_spells_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "bowling_spells",
+      "column_name": "innings_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "bowling_spells",
+      "column_name": "bowler_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "bowling_spells",
+      "column_name": "spell_number",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "bowling_spells",
+      "column_name": "from_over",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "bowling_spells",
+      "column_name": "to_over",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "bowling_spells",
+      "column_name": "overs_count",
+      "data_type": "numeric",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "bowling_spells",
+      "column_name": "runs_conceded",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "bowling_spells",
+      "column_name": "wickets",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "bowling_spells",
+      "column_name": "avg_speed_start",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "bowling_spells",
+      "column_name": "avg_speed_end",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "bowling_spells",
+      "column_name": "speed_variance",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "bowling_spells",
+      "column_name": "max_speed_in_spell",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "cache_invalidations",
+      "column_name": "cache_invalidations_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "cache_invalidations",
+      "column_name": "cache_key",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "cache_invalidations",
+      "column_name": "trigger_event",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "cache_invalidations",
+      "column_name": "invalidated_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "deliveries_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "innings_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "over_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "over_number",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "ball_in_over",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "delivery_sequence",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "bowler_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "batter_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "non_striker_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "delivery_type",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "runs_batter",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "runs_extras",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "runs_total",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "ball_speed",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "movement_type",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "spin_rate",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "swing_degree",
+      "data_type": "real",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "is_dot",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "false"
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "is_boundary_four",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "false"
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "is_boundary_six",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "false"
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "is_wicket",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "false"
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "pitch_x",
+      "data_type": "real",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "pitch_y",
+      "data_type": "real",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "pitch_z",
+      "data_type": "real",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "pitch_length",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "shot_type",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "wagon_x",
+      "data_type": "real",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "wagon_y",
+      "data_type": "real",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "wagon_z",
+      "data_type": "real",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "idempotency_key",
+      "data_type": "uuid",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "scored_by",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "deleted_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "dismissals",
+      "column_name": "dismissals_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "dismissals",
+      "column_name": "delivery_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "dismissals",
+      "column_name": "innings_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "dismissals",
+      "column_name": "dismissed_batter_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "dismissals",
+      "column_name": "bowler_id",
+      "data_type": "uuid",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "dismissals",
+      "column_name": "dismissal_type",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "dismissals",
+      "column_name": "is_caught_behind",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "false"
+    },
+    {
+      "table_name": "dismissals",
+      "column_name": "is_caught_and_bowled",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "false"
+    },
+    {
+      "table_name": "dismissals",
+      "column_name": "direct_hit",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "false"
+    },
+    {
+      "table_name": "dismissals",
+      "column_name": "end_broken",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "dismissals",
+      "column_name": "primary_fielder_id",
+      "data_type": "uuid",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "dismissals",
+      "column_name": "secondary_fielder_id",
+      "data_type": "uuid",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "dismissals",
+      "column_name": "runs_at_fall",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "dismissals",
+      "column_name": "balls_at_fall",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "dismissals",
+      "column_name": "over_at_fall",
+      "data_type": "numeric",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "dismissals",
+      "column_name": "wicket_number",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "extras",
+      "column_name": "id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "extras",
+      "column_name": "innings_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "extras",
+      "column_name": "delivery_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "extras",
+      "column_name": "extra_type",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "extras",
+      "column_name": "runs",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "fall_of_wickets",
+      "column_name": "id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "fall_of_wickets",
+      "column_name": "innings_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "fall_of_wickets",
+      "column_name": "wicket_number",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "fall_of_wickets",
+      "column_name": "dismissed_batter_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "fall_of_wickets",
+      "column_name": "runs_at_fall",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "fall_of_wickets",
+      "column_name": "balls_at_fall",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "fall_of_wickets",
+      "column_name": "over_at_fall",
+      "data_type": "numeric",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "field_positions",
+      "column_name": "field_positions_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "field_positions",
+      "column_name": "field_setting_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "field_positions",
+      "column_name": "player_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "field_positions",
+      "column_name": "position_name",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "field_positions",
+      "column_name": "x",
+      "data_type": "real",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "field_positions",
+      "column_name": "y",
+      "data_type": "real",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "field_positions",
+      "column_name": "is_in_circle",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "false"
+    },
+    {
+      "table_name": "field_settings",
+      "column_name": "field_settings_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "field_settings",
+      "column_name": "innings_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "field_settings",
+      "column_name": "delivery_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "field_settings",
+      "column_name": "over_number",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "field_settings",
+      "column_name": "bowler_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "field_settings",
+      "column_name": "fielding_side",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "field_settings",
+      "column_name": "notes",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "field_settings",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "fixtures",
+      "column_name": "fixtures_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "fixtures",
+      "column_name": "tournament_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "fixtures",
+      "column_name": "match_id",
+      "data_type": "uuid",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "fixtures",
+      "column_name": "stage",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "fixtures",
+      "column_name": "fixture_number",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "fixtures",
+      "column_name": "team1_id",
+      "data_type": "uuid",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "fixtures",
+      "column_name": "team2_id",
+      "data_type": "uuid",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "fixtures",
+      "column_name": "scheduled_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "fixtures",
+      "column_name": "venue",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "innings",
+      "column_name": "innings_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "innings",
+      "column_name": "match_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "innings",
+      "column_name": "innings_number",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "innings",
+      "column_name": "batting_team_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "innings",
+      "column_name": "fielding_team_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "innings",
+      "column_name": "status",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "NO",
+      "column_default": "'in_progress'::innings_status"
+    },
+    {
+      "table_name": "innings",
+      "column_name": "total_runs",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "innings",
+      "column_name": "total_wickets",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "innings",
+      "column_name": "total_balls",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "innings",
+      "column_name": "extras_wides",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "innings",
+      "column_name": "extras_no_balls",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "innings",
+      "column_name": "extras_leg_byes",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "innings",
+      "column_name": "extras_byes",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "innings",
+      "column_name": "extras_penalties",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "innings",
+      "column_name": "total_extras",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "innings",
+      "column_name": "target_runs",
+      "data_type": "smallint",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "innings",
+      "column_name": "follow_on",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "false"
+    },
+    {
+      "table_name": "innings",
+      "column_name": "started_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "innings",
+      "column_name": "completed_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "match_comments",
+      "column_name": "match_comments_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "match_comments",
+      "column_name": "match_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "match_comments",
+      "column_name": "author_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "match_comments",
+      "column_name": "content",
+      "data_type": "text",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "match_comments",
+      "column_name": "is_pinned",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "false"
+    },
+    {
+      "table_name": "match_comments",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "match_comments",
+      "column_name": "updated_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "match_media",
+      "column_name": "match_media_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "match_media",
+      "column_name": "match_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "match_media",
+      "column_name": "media_type",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "match_media",
+      "column_name": "storage_path",
+      "data_type": "text",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "match_media",
+      "column_name": "caption",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "match_media",
+      "column_name": "uploaded_by",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "match_media",
+      "column_name": "uploaded_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "match_officials",
+      "column_name": "match_officials_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "match_officials",
+      "column_name": "match_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "match_officials",
+      "column_name": "official_name",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "match_officials",
+      "column_name": "role",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "matches_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "matches",
+      "column_name": "external_match_id",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "match_date",
+      "data_type": "date",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "start_time",
+      "data_type": "time without time zone",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "tournament_id",
+      "data_type": "uuid",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "format",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "ball_type",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "overs_per_match",
+      "data_type": "smallint",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "team1_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "team2_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "venue",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "pitch_num",
+      "data_type": "smallint",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "venue_neutral",
+      "data_type": "boolean",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "city",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "country",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "scheduled_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "started_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "completed_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "status",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "NO",
+      "column_default": "'scheduled'::match_status"
+    },
+    {
+      "table_name": "matches",
+      "column_name": "toss_winner_id",
+      "data_type": "uuid",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "toss_decision",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "result_type",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "result_margin",
+      "data_type": "smallint",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "winning_team_id",
+      "data_type": "uuid",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "result_summary",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "is_public",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "true"
+    },
+    {
+      "table_name": "matches",
+      "column_name": "notes",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "created_by",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "matches",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "matches",
+      "column_name": "updated_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "notifications_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "user_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "match_id",
+      "data_type": "uuid",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "type",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "title",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "body",
+      "data_type": "text",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "data",
+      "data_type": "jsonb",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "is_read",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "false"
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "scheduled_for",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "read_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "competition",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "match",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "date",
+      "data_type": "date",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "start_time",
+      "data_type": "time without time zone",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "innings",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "over",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "ball",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "innings_ball",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "batter",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "batter_id",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "bowler",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "bowler_id",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "runs",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "extra_runs",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "bowler_extra_runs",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "extra",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "penalty_runs",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "runs_awarded_to",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "penalty",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "ball_outcome",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "line",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "length",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "shot",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "feet",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "secondary_feet",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "connection",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "delivery",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "speed",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "appeal_type",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "on_field_decision",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "referral_decision",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "wicket",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "dismissed_batter",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "fieldx",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "fieldy",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "arrivalx",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "arrivaly",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "events",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "user_events",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "around_the_wicket",
+      "data_type": "boolean",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "keeper_up",
+      "data_type": "boolean",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "fielder1",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "fielder1_events",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "fielder1_position",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "fielder2",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "fielder2_events",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "fielder2_position",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "fielder3",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "fielder3_events",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "fielder3_position",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "fielder4",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "fielder4_events",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "fielder4_position",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "batting_hand",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "bowler_type",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "timestamp",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "runs_saved_or_lost",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "toss_won_by",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "toss_decision",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "ground_end",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "non_striker",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "non_striker_id",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "team_runs",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "team_wickets",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "batting_position",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "power_play",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "day",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "session",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pitch_number",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "umpire",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "result",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "winning_team",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "losing_team",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "batting_team",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "bowling_team",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "venue",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "north_boundary",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "south_boundary",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "east_boundary",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "west_boundary",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "user",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "analysis_key_moment",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "video_key_moment",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "breaks",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "temperature_c",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "humidity",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pressure_hpa",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "legal_ball",
+      "data_type": "boolean",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "actual_ball",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "free_hit",
+      "data_type": "boolean",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "partnership_number",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "cumulative_batter_balls",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "cumulative_batter_runs",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "bowling_spell",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "bowling_over_in_spell",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "batter_coming_in_over",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "run_rate_at_start",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "run_rate_after",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "req_run_rate_at_start",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "req_run_rate_after",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pitchx",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pitchy",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "releasex",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "releasey",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "releasez",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "releasex_external",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "releasey_external",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "releasez_external",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "releasey_vision_ai",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "releasez_vision_ai",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "bouncespeed",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "stumpspeed",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "dropspeed",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "impactx",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "impacty",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "impactz",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "landingx",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "landingy",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "deviation",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "swingangle",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "dropangle",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "bounceangle",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "releaseangle",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "releaseaccelerationy",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "releaseaccelerationz",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pastx",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pasty",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pastz",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "speed_radar",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "speed_external",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "analyst_pitch_length",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "analyst_pitch_line",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "external_pitchx",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "external_pitchy",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "analyst_arrival_line",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "analyst_arrival_height",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "ball_type",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "ball_colour",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pitchside_fielder_1_x",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pitchside_fielder_1_y",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pitchside_fielder_2_x",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pitchside_fielder_2_y",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pitchside_fielder_3_x",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pitchside_fielder_3_y",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pitchside_fielder_4_x",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pitchside_fielder_4_y",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pitchside_fielder_5_x",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pitchside_fielder_5_y",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pitchside_fielder_6_x",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pitchside_fielder_6_y",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pitchside_fielder_7_x",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pitchside_fielder_7_y",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pitchside_fielder_8_x",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pitchside_fielder_8_y",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pitchside_fielder_9_x",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "pitchside_fielder_9_y",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "nv_play",
+      "column_name": "match_type",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "overs",
+      "column_name": "overs_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "overs",
+      "column_name": "innings_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "overs",
+      "column_name": "over_number",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "overs",
+      "column_name": "bowler_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "overs",
+      "column_name": "runs_scored",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "overs",
+      "column_name": "wickets_taken",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "overs",
+      "column_name": "legal_balls",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "overs",
+      "column_name": "dot_balls",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "overs",
+      "column_name": "boundaries_four",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "overs",
+      "column_name": "boundaries_six",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "overs",
+      "column_name": "wides",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "overs",
+      "column_name": "no_balls",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "overs",
+      "column_name": "is_maiden",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "false"
+    },
+    {
+      "table_name": "overs",
+      "column_name": "cumulative_runs",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "overs",
+      "column_name": "cumulative_wickets",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "overs",
+      "column_name": "run_rate",
+      "data_type": "numeric",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "overs",
+      "column_name": "phase",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "partnerships",
+      "column_name": "partnerships_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "partnerships",
+      "column_name": "innings_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "partnerships",
+      "column_name": "wicket_number",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "partnerships",
+      "column_name": "batter1_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "partnerships",
+      "column_name": "batter2_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "partnerships",
+      "column_name": "runs",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "partnerships",
+      "column_name": "balls",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "partnerships",
+      "column_name": "batter1_runs",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "partnerships",
+      "column_name": "batter1_balls",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "partnerships",
+      "column_name": "batter2_runs",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "partnerships",
+      "column_name": "batter2_balls",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "partnerships",
+      "column_name": "started_at_runs",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "partnerships",
+      "column_name": "ended_at_runs",
+      "data_type": "smallint",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "pitch_map_data",
+      "column_name": "pitch_map_data_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "pitch_map_data",
+      "column_name": "delivery_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "pitch_map_data",
+      "column_name": "innings_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "pitch_map_data",
+      "column_name": "bowler_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "pitch_map_data",
+      "column_name": "batter_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "pitch_map_data",
+      "column_name": "x",
+      "data_type": "real",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "pitch_map_data",
+      "column_name": "y",
+      "data_type": "real",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "pitch_map_data",
+      "column_name": "z",
+      "data_type": "real",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "pitch_map_data",
+      "column_name": "length_label",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "pitch_map_data",
+      "column_name": "line_label",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "pitch_map_data",
+      "column_name": "recorded_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "player_career_stats_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "player_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "format",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "matches_played",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "innings_batted",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "total_runs",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "balls_faced",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "highest_score",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "batting_average",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "batting_sr",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "total_fours",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "total_sixes",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "centuries",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "fifties",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "innings_bowled",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "overs_bowled",
+      "data_type": "numeric",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "runs_conceded",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "wickets_taken",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "bowling_average",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "bowling_economy",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "bowling_sr",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "three_wicket_haul",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "five_wicket_hauls",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "top_speed",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "average_speed",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "lethal_ball_type",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "most_accurate_line",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "updated_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "players",
+      "column_name": "players_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "players",
+      "column_name": "full_name",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "players",
+      "column_name": "display_name",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "players",
+      "column_name": "date_of_birth",
+      "data_type": "date",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "players",
+      "column_name": "batting_style",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "players",
+      "column_name": "bowling_style",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "players",
+      "column_name": "primary_role",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "players",
+      "column_name": "jersey_number",
+      "data_type": "smallint",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "players",
+      "column_name": "photo_url",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "players",
+      "column_name": "nationality",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "players",
+      "column_name": "is_active",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "true"
+    },
+    {
+      "table_name": "players",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "points_table",
+      "column_name": "point_table_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "points_table",
+      "column_name": "tournament_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "points_table",
+      "column_name": "team_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "points_table",
+      "column_name": "group_name",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "points_table",
+      "column_name": "played",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "points_table",
+      "column_name": "won",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "points_table",
+      "column_name": "lost",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "points_table",
+      "column_name": "tied",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "points_table",
+      "column_name": "no_result",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "points_table",
+      "column_name": "win_points",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "points_table",
+      "column_name": "bonus_points",
+      "data_type": "smallint",
+      "is_nullable": "YES",
+      "column_default": "0"
+    },
+    {
+      "table_name": "points_table",
+      "column_name": "total_points",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "points_table",
+      "column_name": "net_run_rate",
+      "data_type": "numeric",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "points_table",
+      "column_name": "updated_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "roles",
+      "column_name": "roles_id",
+      "data_type": "smallint",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "roles",
+      "column_name": "name",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "roles",
+      "column_name": "description",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "roles",
+      "column_name": "can_create_match",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "false"
+    },
+    {
+      "table_name": "roles",
+      "column_name": "can_score",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "false"
+    },
+    {
+      "table_name": "roles",
+      "column_name": "can_export",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "false"
+    },
+    {
+      "table_name": "roles",
+      "column_name": "can_manage_users",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "false"
+    },
+    {
+      "table_name": "run_outs",
+      "column_name": "id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "run_outs",
+      "column_name": "dismissal_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "run_outs",
+      "column_name": "direct_hit",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "false"
+    },
+    {
+      "table_name": "run_outs",
+      "column_name": "end_broken",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "run_outs",
+      "column_name": "primary_fielder_id",
+      "data_type": "uuid",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "run_outs",
+      "column_name": "secondary_fielder_id",
+      "data_type": "uuid",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "scorer_assignments",
+      "column_name": "scorer_assignments_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "scorer_assignments",
+      "column_name": "match_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "scorer_assignments",
+      "column_name": "scorer_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "scorer_assignments",
+      "column_name": "assigned_by",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "scorer_assignments",
+      "column_name": "invite_token",
+      "data_type": "uuid",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "scorer_assignments",
+      "column_name": "token_expires_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "scorer_assignments",
+      "column_name": "accepted_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "scorer_assignments",
+      "column_name": "revoked_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "scorer_assignments",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "team_players",
+      "column_name": "team_players_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "team_players",
+      "column_name": "team_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "team_players",
+      "column_name": "player_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "team_players",
+      "column_name": "jersey_number",
+      "data_type": "smallint",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "team_players",
+      "column_name": "squad_role",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "team_players",
+      "column_name": "joined_at",
+      "data_type": "date",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "team_players",
+      "column_name": "left_at",
+      "data_type": "date",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "teams",
+      "column_name": "teams_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "teams",
+      "column_name": "name",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "teams",
+      "column_name": "short_name",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "teams",
+      "column_name": "logo_url",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "teams",
+      "column_name": "home_ground",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "teams",
+      "column_name": "country",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "teams",
+      "column_name": "created_by",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "teams",
+      "column_name": "is_active",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "true"
+    },
+    {
+      "table_name": "teams",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "tournament_teams",
+      "column_name": "tournament_teams_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "tournament_teams",
+      "column_name": "tournament_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "tournament_teams",
+      "column_name": "team_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "tournament_teams",
+      "column_name": "group_name",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "tournament_teams",
+      "column_name": "seed",
+      "data_type": "smallint",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "tournament_teams",
+      "column_name": "registered_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "tournaments",
+      "column_name": "tournaments_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "tournaments",
+      "column_name": "name",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "tournaments",
+      "column_name": "format",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "tournaments",
+      "column_name": "match_format",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "tournaments",
+      "column_name": "no_of_overs_match",
+      "data_type": "smallint",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "tournaments",
+      "column_name": "start_date",
+      "data_type": "date",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "tournaments",
+      "column_name": "end_date",
+      "data_type": "date",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "tournaments",
+      "column_name": "host_team",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "tournaments",
+      "column_name": "logo_url",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "tournaments",
+      "column_name": "status",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "NO",
+      "column_default": "'upcoming'::tournament_status"
+    },
+    {
+      "table_name": "tournaments",
+      "column_name": "created_by",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "tournaments",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "user_sessions",
+      "column_name": "user_sessions_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "user_sessions",
+      "column_name": "user_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "user_sessions",
+      "column_name": "ip_address",
+      "data_type": "inet",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "user_sessions",
+      "column_name": "user_agent",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "user_sessions",
+      "column_name": "logged_in_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "user_sessions",
+      "column_name": "logged_out_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "users",
+      "column_name": "user_id",
+      "data_type": "uuid",
+      "is_nullable": "NO",
+      "column_default": "uuid_generate_v4()"
+    },
+    {
+      "table_name": "users",
+      "column_name": "email",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "users",
+      "column_name": "first_name",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "users",
+      "column_name": "last_name",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "users",
+      "column_name": "display_name",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "users",
+      "column_name": "role",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "NO",
+      "column_default": "'viewer'::platform_role"
+    },
+    {
+      "table_name": "users",
+      "column_name": "avatar_url",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "users",
+      "column_name": "is_active",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "column_default": "true"
+    },
+    {
+      "table_name": "users",
+      "column_name": "last_login_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "users",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "users",
+      "column_name": "updated_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    }
+  ],
+  "pks": [
+    {
+      "table_name": "users",
+      "column_name": "user_id"
+    },
+    {
+      "table_name": "roles",
+      "column_name": "roles_id"
+    },
+    {
+      "table_name": "teams",
+      "column_name": "teams_id"
+    },
+    {
+      "table_name": "players",
+      "column_name": "players_id"
+    },
+    {
+      "table_name": "tournaments",
+      "column_name": "tournaments_id"
+    },
+    {
+      "table_name": "app_config",
+      "column_name": "app_config_key"
+    },
+    {
+      "table_name": "cache_invalidations",
+      "column_name": "cache_invalidations_id"
+    },
+    {
+      "table_name": "user_sessions",
+      "column_name": "user_sessions_id"
+    },
+    {
+      "table_name": "team_players",
+      "column_name": "team_players_id"
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "player_career_stats_id"
+    },
+    {
+      "table_name": "tournament_teams",
+      "column_name": "tournament_teams_id"
+    },
+    {
+      "table_name": "matches",
+      "column_name": "matches_id"
+    },
+    {
+      "table_name": "scorer_assignments",
+      "column_name": "scorer_assignments_id"
+    },
+    {
+      "table_name": "match_officials",
+      "column_name": "match_officials_id"
+    },
+    {
+      "table_name": "match_media",
+      "column_name": "match_media_id"
+    },
+    {
+      "table_name": "match_comments",
+      "column_name": "match_comments_id"
+    },
+    {
+      "table_name": "fixtures",
+      "column_name": "fixtures_id"
+    },
+    {
+      "table_name": "points_table",
+      "column_name": "point_table_id"
+    },
+    {
+      "table_name": "innings",
+      "column_name": "innings_id"
+    },
+    {
+      "table_name": "overs",
+      "column_name": "overs_id"
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "deliveries_id"
+    },
+    {
+      "table_name": "extras",
+      "column_name": "id"
+    },
+    {
+      "table_name": "dismissals",
+      "column_name": "dismissals_id"
+    },
+    {
+      "table_name": "run_outs",
+      "column_name": "id"
+    },
+    {
+      "table_name": "fall_of_wickets",
+      "column_name": "id"
+    },
+    {
+      "table_name": "field_settings",
+      "column_name": "field_settings_id"
+    },
+    {
+      "table_name": "field_positions",
+      "column_name": "field_positions_id"
+    },
+    {
+      "table_name": "pitch_map_data",
+      "column_name": "pitch_map_data_id"
+    },
+    {
+      "table_name": "batting_scorecards",
+      "column_name": "batting_scorecards_id"
+    },
+    {
+      "table_name": "partnerships",
+      "column_name": "partnerships_id"
+    },
+    {
+      "table_name": "batter_over_stats",
+      "column_name": "batter_over_stats_id"
+    },
+    {
+      "table_name": "bowling_figures",
+      "column_name": "bowling_figures_id"
+    },
+    {
+      "table_name": "bowler_over_stats",
+      "column_name": "bowler_over_stats_id"
+    },
+    {
+      "table_name": "bowling_spells",
+      "column_name": "bowling_spells_id"
+    },
+    {
+      "table_name": "audit_logs",
+      "column_name": "audit_logs_id"
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "notifications_id"
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "ai_commentary_id"
+    },
+    {
+      "table_name": "ai_commentary_settings",
+      "column_name": "match_id"
+    }
+  ],
+  "fks": [
+    {
+      "table_name": "teams",
+      "column_name": "created_by",
+      "ref_table": "users",
+      "ref_col": "user_id"
+    },
+    {
+      "table_name": "tournaments",
+      "column_name": "created_by",
+      "ref_table": "users",
+      "ref_col": "user_id"
+    },
+    {
+      "table_name": "app_config",
+      "column_name": "updated_by",
+      "ref_table": "users",
+      "ref_col": "user_id"
+    },
+    {
+      "table_name": "user_sessions",
+      "column_name": "user_id",
+      "ref_table": "users",
+      "ref_col": "user_id"
+    },
+    {
+      "table_name": "team_players",
+      "column_name": "team_id",
+      "ref_table": "teams",
+      "ref_col": "teams_id"
+    },
+    {
+      "table_name": "team_players",
+      "column_name": "player_id",
+      "ref_table": "players",
+      "ref_col": "players_id"
+    },
+    {
+      "table_name": "player_career_stats",
+      "column_name": "player_id",
+      "ref_table": "players",
+      "ref_col": "players_id"
+    },
+    {
+      "table_name": "tournament_teams",
+      "column_name": "tournament_id",
+      "ref_table": "tournaments",
+      "ref_col": "tournaments_id"
+    },
+    {
+      "table_name": "tournament_teams",
+      "column_name": "team_id",
+      "ref_table": "teams",
+      "ref_col": "teams_id"
+    },
+    {
+      "table_name": "matches",
+      "column_name": "tournament_id",
+      "ref_table": "tournaments",
+      "ref_col": "tournaments_id"
+    },
+    {
+      "table_name": "matches",
+      "column_name": "team1_id",
+      "ref_table": "teams",
+      "ref_col": "teams_id"
+    },
+    {
+      "table_name": "matches",
+      "column_name": "team2_id",
+      "ref_table": "teams",
+      "ref_col": "teams_id"
+    },
+    {
+      "table_name": "matches",
+      "column_name": "toss_winner_id",
+      "ref_table": "teams",
+      "ref_col": "teams_id"
+    },
+    {
+      "table_name": "matches",
+      "column_name": "winning_team_id",
+      "ref_table": "teams",
+      "ref_col": "teams_id"
+    },
+    {
+      "table_name": "matches",
+      "column_name": "created_by",
+      "ref_table": "users",
+      "ref_col": "user_id"
+    },
+    {
+      "table_name": "scorer_assignments",
+      "column_name": "match_id",
+      "ref_table": "matches",
+      "ref_col": "matches_id"
+    },
+    {
+      "table_name": "scorer_assignments",
+      "column_name": "scorer_id",
+      "ref_table": "users",
+      "ref_col": "user_id"
+    },
+    {
+      "table_name": "scorer_assignments",
+      "column_name": "assigned_by",
+      "ref_table": "users",
+      "ref_col": "user_id"
+    },
+    {
+      "table_name": "match_officials",
+      "column_name": "match_id",
+      "ref_table": "matches",
+      "ref_col": "matches_id"
+    },
+    {
+      "table_name": "match_media",
+      "column_name": "match_id",
+      "ref_table": "matches",
+      "ref_col": "matches_id"
+    },
+    {
+      "table_name": "match_media",
+      "column_name": "uploaded_by",
+      "ref_table": "users",
+      "ref_col": "user_id"
+    },
+    {
+      "table_name": "match_comments",
+      "column_name": "match_id",
+      "ref_table": "matches",
+      "ref_col": "matches_id"
+    },
+    {
+      "table_name": "match_comments",
+      "column_name": "author_id",
+      "ref_table": "users",
+      "ref_col": "user_id"
+    },
+    {
+      "table_name": "fixtures",
+      "column_name": "tournament_id",
+      "ref_table": "tournaments",
+      "ref_col": "tournaments_id"
+    },
+    {
+      "table_name": "fixtures",
+      "column_name": "match_id",
+      "ref_table": "matches",
+      "ref_col": "matches_id"
+    },
+    {
+      "table_name": "fixtures",
+      "column_name": "team1_id",
+      "ref_table": "teams",
+      "ref_col": "teams_id"
+    },
+    {
+      "table_name": "fixtures",
+      "column_name": "team2_id",
+      "ref_table": "teams",
+      "ref_col": "teams_id"
+    },
+    {
+      "table_name": "points_table",
+      "column_name": "tournament_id",
+      "ref_table": "tournaments",
+      "ref_col": "tournaments_id"
+    },
+    {
+      "table_name": "points_table",
+      "column_name": "team_id",
+      "ref_table": "teams",
+      "ref_col": "teams_id"
+    },
+    {
+      "table_name": "innings",
+      "column_name": "match_id",
+      "ref_table": "matches",
+      "ref_col": "matches_id"
+    },
+    {
+      "table_name": "innings",
+      "column_name": "batting_team_id",
+      "ref_table": "teams",
+      "ref_col": "teams_id"
+    },
+    {
+      "table_name": "innings",
+      "column_name": "fielding_team_id",
+      "ref_table": "teams",
+      "ref_col": "teams_id"
+    },
+    {
+      "table_name": "overs",
+      "column_name": "innings_id",
+      "ref_table": "innings",
+      "ref_col": "innings_id"
+    },
+    {
+      "table_name": "overs",
+      "column_name": "bowler_id",
+      "ref_table": "players",
+      "ref_col": "players_id"
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "innings_id",
+      "ref_table": "innings",
+      "ref_col": "innings_id"
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "over_id",
+      "ref_table": "overs",
+      "ref_col": "overs_id"
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "bowler_id",
+      "ref_table": "players",
+      "ref_col": "players_id"
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "batter_id",
+      "ref_table": "players",
+      "ref_col": "players_id"
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "non_striker_id",
+      "ref_table": "players",
+      "ref_col": "players_id"
+    },
+    {
+      "table_name": "deliveries",
+      "column_name": "scored_by",
+      "ref_table": "users",
+      "ref_col": "user_id"
+    },
+    {
+      "table_name": "extras",
+      "column_name": "innings_id",
+      "ref_table": "innings",
+      "ref_col": "innings_id"
+    },
+    {
+      "table_name": "extras",
+      "column_name": "delivery_id",
+      "ref_table": "deliveries",
+      "ref_col": "deliveries_id"
+    },
+    {
+      "table_name": "dismissals",
+      "column_name": "delivery_id",
+      "ref_table": "deliveries",
+      "ref_col": "deliveries_id"
+    },
+    {
+      "table_name": "dismissals",
+      "column_name": "innings_id",
+      "ref_table": "innings",
+      "ref_col": "innings_id"
+    },
+    {
+      "table_name": "dismissals",
+      "column_name": "dismissed_batter_id",
+      "ref_table": "players",
+      "ref_col": "players_id"
+    },
+    {
+      "table_name": "dismissals",
+      "column_name": "bowler_id",
+      "ref_table": "players",
+      "ref_col": "players_id"
+    },
+    {
+      "table_name": "dismissals",
+      "column_name": "primary_fielder_id",
+      "ref_table": "players",
+      "ref_col": "players_id"
+    },
+    {
+      "table_name": "dismissals",
+      "column_name": "secondary_fielder_id",
+      "ref_table": "players",
+      "ref_col": "players_id"
+    },
+    {
+      "table_name": "run_outs",
+      "column_name": "dismissal_id",
+      "ref_table": "dismissals",
+      "ref_col": "dismissals_id"
+    },
+    {
+      "table_name": "run_outs",
+      "column_name": "primary_fielder_id",
+      "ref_table": "players",
+      "ref_col": "players_id"
+    },
+    {
+      "table_name": "run_outs",
+      "column_name": "secondary_fielder_id",
+      "ref_table": "players",
+      "ref_col": "players_id"
+    },
+    {
+      "table_name": "fall_of_wickets",
+      "column_name": "innings_id",
+      "ref_table": "innings",
+      "ref_col": "innings_id"
+    },
+    {
+      "table_name": "fall_of_wickets",
+      "column_name": "dismissed_batter_id",
+      "ref_table": "players",
+      "ref_col": "players_id"
+    },
+    {
+      "table_name": "field_settings",
+      "column_name": "innings_id",
+      "ref_table": "innings",
+      "ref_col": "innings_id"
+    },
+    {
+      "table_name": "field_settings",
+      "column_name": "delivery_id",
+      "ref_table": "deliveries",
+      "ref_col": "deliveries_id"
+    },
+    {
+      "table_name": "field_settings",
+      "column_name": "bowler_id",
+      "ref_table": "players",
+      "ref_col": "players_id"
+    },
+    {
+      "table_name": "field_positions",
+      "column_name": "field_setting_id",
+      "ref_table": "field_settings",
+      "ref_col": "field_settings_id"
+    },
+    {
+      "table_name": "field_positions",
+      "column_name": "player_id",
+      "ref_table": "players",
+      "ref_col": "players_id"
+    },
+    {
+      "table_name": "pitch_map_data",
+      "column_name": "delivery_id",
+      "ref_table": "deliveries",
+      "ref_col": "deliveries_id"
+    },
+    {
+      "table_name": "pitch_map_data",
+      "column_name": "innings_id",
+      "ref_table": "innings",
+      "ref_col": "innings_id"
+    },
+    {
+      "table_name": "pitch_map_data",
+      "column_name": "bowler_id",
+      "ref_table": "players",
+      "ref_col": "players_id"
+    },
+    {
+      "table_name": "pitch_map_data",
+      "column_name": "batter_id",
+      "ref_table": "players",
+      "ref_col": "players_id"
+    },
+    {
+      "table_name": "batting_scorecards",
+      "column_name": "innings_id",
+      "ref_table": "innings",
+      "ref_col": "innings_id"
+    },
+    {
+      "table_name": "batting_scorecards",
+      "column_name": "player_id",
+      "ref_table": "players",
+      "ref_col": "players_id"
+    },
+    {
+      "table_name": "batting_scorecards",
+      "column_name": "dismissal_id",
+      "ref_table": "dismissals",
+      "ref_col": "dismissals_id"
+    },
+    {
+      "table_name": "partnerships",
+      "column_name": "innings_id",
+      "ref_table": "innings",
+      "ref_col": "innings_id"
+    },
+    {
+      "table_name": "partnerships",
+      "column_name": "batter1_id",
+      "ref_table": "players",
+      "ref_col": "players_id"
+    },
+    {
+      "table_name": "partnerships",
+      "column_name": "batter2_id",
+      "ref_table": "players",
+      "ref_col": "players_id"
+    },
+    {
+      "table_name": "batter_over_stats",
+      "column_name": "innings_id",
+      "ref_table": "innings",
+      "ref_col": "innings_id"
+    },
+    {
+      "table_name": "batter_over_stats",
+      "column_name": "batter_id",
+      "ref_table": "players",
+      "ref_col": "players_id"
+    },
+    {
+      "table_name": "bowling_figures",
+      "column_name": "innings_id",
+      "ref_table": "innings",
+      "ref_col": "innings_id"
+    },
+    {
+      "table_name": "bowling_figures",
+      "column_name": "player_id",
+      "ref_table": "players",
+      "ref_col": "players_id"
+    },
+    {
+      "table_name": "bowler_over_stats",
+      "column_name": "innings_id",
+      "ref_table": "innings",
+      "ref_col": "innings_id"
+    },
+    {
+      "table_name": "bowler_over_stats",
+      "column_name": "bowler_id",
+      "ref_table": "players",
+      "ref_col": "players_id"
+    },
+    {
+      "table_name": "bowling_spells",
+      "column_name": "innings_id",
+      "ref_table": "innings",
+      "ref_col": "innings_id"
+    },
+    {
+      "table_name": "bowling_spells",
+      "column_name": "bowler_id",
+      "ref_table": "players",
+      "ref_col": "players_id"
+    },
+    {
+      "table_name": "audit_logs",
+      "column_name": "match_id",
+      "ref_table": "matches",
+      "ref_col": "matches_id"
+    },
+    {
+      "table_name": "audit_logs",
+      "column_name": "user_id",
+      "ref_table": "users",
+      "ref_col": "user_id"
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "user_id",
+      "ref_table": "users",
+      "ref_col": "user_id"
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "match_id",
+      "ref_table": "matches",
+      "ref_col": "matches_id"
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "match_id",
+      "ref_table": "matches",
+      "ref_col": "matches_id"
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "innings_id",
+      "ref_table": "innings",
+      "ref_col": "innings_id"
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "delivery_id",
+      "ref_table": "deliveries",
+      "ref_col": "deliveries_id"
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "over_id",
+      "ref_table": "overs",
+      "ref_col": "overs_id"
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "replaced_commentary_id",
+      "ref_table": "ai_commentary",
+      "ref_col": "ai_commentary_id"
+    },
+    {
+      "table_name": "ai_commentary",
+      "column_name": "created_by",
+      "ref_table": "users",
+      "ref_col": "user_id"
+    },
+    {
+      "table_name": "ai_commentary_settings",
+      "column_name": "match_id",
+      "ref_table": "matches",
+      "ref_col": "matches_id"
+    },
+    {
+      "table_name": "ai_commentary_settings",
+      "column_name": "updated_by",
+      "ref_table": "users",
+      "ref_col": "user_id"
+    }
+  ]
+}

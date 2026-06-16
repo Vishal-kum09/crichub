@@ -215,10 +215,12 @@ const presentBatter = (card) => {
 const presentBowler = (fig) =>
   fig && {
     player_id: fig.player_id,
+    player_name: fig.player_name,
     balls_bowled: fig.balls_bowled,
     overs: `${Math.floor(fig.balls_bowled / 6)}.${fig.balls_bowled % 6}`,
     runs_conceded: fig.runs_conceded,
-    wickets: fig.wickets
+    wickets: fig.wickets,
+    maidens: fig.maidens || 0
   };
 
 // ─── 🔥 INITIALIZE (UPGRADED WITH TEAMS RESOLUTION BRIDGE) ───────────────────
@@ -387,7 +389,12 @@ const recordBall = async (matchId, input) => {
       isFour: m.isFour,
       isSix: m.isSix,
       isWicket: !!input.is_wicket,
-      scoredBy: input.scored_by
+      scoredBy: input.scored_by,
+      wagonX: input.wagon_x,
+      wagonY: input.wagon_y,
+      fieldArea: input.field_area,
+      shotAngle: input.shot_angle,
+      batsmanHand: input.batsman_hand
     });
 
     if (deliveryType !== 'legal') {
@@ -843,28 +850,61 @@ const getMatchPreview = async (scorerId, matchId) => {
 };
 
 const getLiveMatchState = async (matchId) => {
-  // 1. Fetch the active match and innings state from your database/repository
-  // (Look at how you fetch these at the top of your recordBall function!)
-  const activeInnings = await scorerRepository.getCurrentInnings(matchId);
-  
-  if (!activeInnings) {
-    return { ok: false, message: "No active innings found for this match." };
-  }
+  return withTransaction(async (client) => {
+    const activeInnings = await repo.getCurrentInnings(client, matchId);
 
-  // 2. Fetch the active players using the IDs stored in the innings state
-  const strikerCard = await scorerRepository.getBatterCard(activeInnings.innings_id, activeInnings.striker_id);
-  const nonStrikerCard = await scorerRepository.getBatterCard(activeInnings.innings_id, activeInnings.non_striker_id);
-  const bowlerFig = await scorerRepository.getBowlerFigures(activeInnings.innings_id, activeInnings.bowler_id);
+    if (!activeInnings) {
+      throw new AppError('No active innings found for this match', 404);
+    }
 
-  // 3. Format and return the data using your updated presentBatter function!
-  return {
-    ok: true,
-    match_id: matchId,
-    innings: presentInningsState(activeInnings),
-    striker: presentBatter(strikerCard),
-    non_striker: presentBatter(nonStrikerCard),
-    bowler: presentBowler(bowlerFig)
-  };
+    const crease = await resolveCrease(client, activeInnings.innings_id);
+    const strikerCard = crease.strikerId
+      ? await repo.getBattingCard(client, activeInnings.innings_id, crease.strikerId)
+      : null;
+    const nonStrikerCard = crease.nonStrikerId
+      ? await repo.getBattingCard(client, activeInnings.innings_id, crease.nonStrikerId)
+      : null;
+    const bowlerFig = crease.bowlerId
+      ? await repo.getBowlingFigure(client, activeInnings.innings_id, crease.bowlerId)
+      : null;
+
+    const match = await repo.getMatch(client, matchId);
+    const roster = match
+      ? [
+          ...(await repo.findTeamRoster(match.team1_id)),
+          ...(await repo.findTeamRoster(match.team2_id))
+        ]
+      : [];
+    const uniqueRoster = Array.from(new Map(roster.map((p) => [p.id, p])).values());
+    const playerNames = {};
+    const playerIdMap = {};
+
+    for (const player of uniqueRoster) {
+      playerNames[player.id] = player.name;
+      playerIdMap[player.name] = player.id;
+    }
+
+    for (const playerId of [crease.strikerId, crease.nonStrikerId, crease.bowlerId]) {
+      if (playerId && !playerNames[playerId]) {
+        const playerName = await repo.getPlayerName(client, playerId);
+        playerNames[playerId] = playerName;
+        playerIdMap[playerName] = playerId;
+      }
+    }
+
+    return {
+      ok: true,
+      match_id: matchId,
+      innings: presentInningsState(activeInnings),
+      striker: presentBatter(strikerCard),
+      non_striker: presentBatter(nonStrikerCard),
+      bowler: presentBowler(bowlerFig),
+      playerNames,
+      battingRoster: uniqueRoster.map((p) => p.name),
+      fieldingRoster: uniqueRoster.map((p) => p.name),
+      playerIdMap
+    };
+  });
 };
 
 module.exports = {

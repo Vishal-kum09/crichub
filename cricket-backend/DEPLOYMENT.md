@@ -45,7 +45,7 @@ gcloud run deploy cricket-backend \
   --region europe-west2 \
   --platform managed \
   --allow-unauthenticated \
-  --set-env-vars="NODE_ENV=production,DB_NAME=sportsdb,DB_USER=postgres" \
+  --set-env-vars="NODE_ENV=production,DB_NAME=postgres,DB_USER=postgres" \
   --set-secrets="DB_PASSWORD=DB_PASSWORD:latest,JWT_SECRET=JWT_SECRET:latest" \
   --add-cloudsql-instances=sportsanalytics-495612:europe-west2:sportsdb \
   --memory=512Mi --concurrency=100 --min-instances=0 --max-instances=10 \

@@ -32,6 +32,7 @@
 
   export interface BatterState {
     player_id: string;
+    player_name?: string;
     runs: number;
     balls_faced: number;
     fours: number;
@@ -41,10 +42,12 @@
 
   export interface BowlerState {
     player_id: string;
+    player_name?: string;
     balls_bowled: number;
     overs: string;
     runs_conceded: number;
     wickets: number;
+    maidens?: number;
   }
 
   export interface InitializePayload {
@@ -74,6 +77,12 @@
     striker_id?: string;
     non_striker_id?: string;
     bowler_id?: string;
+    wagon_x?: number | null;
+    wagon_y?: number | null;
+    field_area?: string | null;
+    shot_angle?: number | null;
+    batsman_hand?: 'right' | 'left';
+    pitch_distance?: number | null;
   }
 
   export interface BallResponse {
@@ -200,6 +209,24 @@
 
   export async function getMatchPreview(matchId: string): Promise<MatchPreview> {
     const { data } = await api.get(`/api/scorer/matches/${matchId}/preview`);
+    return data;
+  }
+
+  export interface LiveMatchState {
+    ok: boolean;
+    match_id: string;
+    innings: InningsState;
+    striker: BatterState | null;
+    non_striker: BatterState | null;
+    bowler: BowlerState | null;
+    playerNames?: { [key: string]: string };
+    battingRoster?: string[];
+    fieldingRoster?: string[];
+    playerIdMap?: { [name: string]: string };
+  }
+
+  export async function getLiveMatchState(matchId: string): Promise<LiveMatchState> {
+    const { data } = await api.get(`/api/scorer/matches/${matchId}/live`);
     return data;
   }
 

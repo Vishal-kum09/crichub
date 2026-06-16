@@ -22,7 +22,13 @@ const BallInputSchema = z.object({
   is_wicket: z.boolean(),
   striker_id: uuid.optional(),
   non_striker_id: uuid.optional(),
-  bowler_id: uuid.optional()
+  bowler_id: uuid.optional(),
+  wagon_x: z.number().nullable().optional(),
+  wagon_y: z.number().nullable().optional(),
+  field_area: z.string().nullable().optional(),
+  shot_angle: z.number().nullable().optional(),
+  batsman_hand: z.enum(['right', 'left']).optional(),
+  pitch_distance: z.number().nullable().optional()
 });
 
 const WicketWizardSchema = z.object({

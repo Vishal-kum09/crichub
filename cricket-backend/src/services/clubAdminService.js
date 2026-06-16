@@ -25,7 +25,10 @@ const presentRosterMatch = (m) => ({
   opponent: m.opponent || `${m.team1_name} vs ${m.team2_name}`,
   date: m.match_date || m.scheduled_at,
   venue: m.venue || '',
-  status: m.status
+  status: m.status,
+  team1_score: m.team1_score || undefined,
+  team2_score: m.team2_score || undefined,
+  live_score: m.live_score || undefined
 });
 
 const presentApproval = (u) => ({

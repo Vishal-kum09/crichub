@@ -482,6 +482,7 @@ const recordBall = async (matchId, input) => {
       (oversPerMatch && oversCompleted >= oversPerMatch)
     ) {
       finalInnings = await repo.setInningsStatus(client, input.innings_id, 'completed');
+      await repo.setMatchStatus(client, innings.match_id, 'completed');
       inningsComplete = true;
     }
 
@@ -634,6 +635,7 @@ const wicketWizard = async (matchId, input) => {
     let inningsComplete = false;
     if (!retiredHurt && updatedInnings.total_wickets >= 10) {
       updatedInnings = await repo.setInningsStatus(client, innings.innings_id, 'completed');
+      await repo.setMatchStatus(client, innings.match_id, 'completed');
       inningsComplete = true;
     }
 
@@ -777,6 +779,7 @@ const presentAssignedMatch = (r) => ({
   team1_short_name: r.team1_short_name,
   team2_name: r.team2_name,
   team2_short_name: r.team2_short_name,
+  live_score: r.live_score || undefined,
   accepted: r.accepted_at != null,
   assigned_at: r.assigned_at
 });

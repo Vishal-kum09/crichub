@@ -406,31 +406,45 @@ export function ClubAdmin() {
             {myMatches.length === 0 ? (
               <div className="text-center py-12 text-sm font-bold text-gray-400">No active matches scheduled.</div>
             ) : (
-              <div className="overflow-x-auto border border-gray-100 rounded-xl">
-                <table className="w-full text-xs text-left whitespace-nowrap">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200 text-gray-400 font-black uppercase tracking-wider">
-                      <th className="py-3 px-4">Opponent Match Vector</th>
-                      <th className="py-3 px-4">Scheduled Date</th>
-                      <th className="py-3 px-4">Venue Arena</th>
-                      <th className="py-3 px-4">Live Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 font-semibold text-gray-700">
-                    {myMatches.map((match) => (
-                      <tr key={match.id} className="hover:bg-gray-50/40 transition-colors">
-                        <td className="py-3 px-4 font-extrabold text-gray-900">{match.opponent}</td>
-                        <td className="py-3 px-4">{new Date(match.date).toLocaleDateString()}</td>
-                        <td className="py-3 px-4 truncate max-w-[160px]">{match.venue}</td>
-                        <td className="py-3 px-4">
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${match.status === 'scheduled' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
-                            {match.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {myMatches.map((match) => (
+                  <div key={match.id} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Club Fixture</p>
+                        <h3 className="text-base font-black text-gray-900 mt-1">{match.opponent}</h3>
+                      </div>
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase border ${match.status === 'scheduled' ? 'bg-blue-50 text-blue-700 border-blue-200' : match.status === 'completed' ? 'bg-gray-100 text-gray-700 border-gray-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                        {match.status}
+                      </span>
+                    </div>
+                    {(match.live_score || match.team1_score || match.team2_score) && (
+                      <div className="mt-4 rounded-xl bg-gray-50 border border-gray-100 p-4">
+                        {match.status === 'live' && match.live_score ? (
+                          <>
+                            <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Live Score</p>
+                            <p className="text-2xl font-black text-gray-900 tabular-nums">{match.live_score}</p>
+                          </>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <p className="text-[10px] font-black uppercase text-gray-400">Innings 1</p>
+                              <p className="font-black text-gray-900 tabular-nums">{match.team1_score || '-'}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-black uppercase text-gray-400">Innings 2</p>
+                              <p className="font-black text-gray-900 tabular-nums">{match.team2_score || '-'}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <div className="mt-4 grid grid-cols-2 gap-3 text-xs font-bold text-gray-500">
+                      <p>{new Date(match.date).toLocaleDateString()}</p>
+                      <p className="text-right truncate">{match.venue}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>

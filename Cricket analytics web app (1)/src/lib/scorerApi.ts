@@ -133,6 +133,7 @@
     team1_short_name: string;
     team2_name: string;
     team2_short_name: string;
+    live_score?: string;
     accepted: boolean;
     assigned_at: string;
   }

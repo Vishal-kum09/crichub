@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card } from '../components/Card';
-import { Badge, StatusBadge } from '../components/Badge';
+import { Badge } from '../components/Badge';
 import { api } from '../../lib/api';
 import type { Match } from '../../data/mockData';
 import { Filter, Search } from 'lucide-react';
@@ -58,6 +58,8 @@ export function Matches({ onNavigate }: MatchesProps) {
       match.venue.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesFormat && matchesSearch;
   });
+
+  const statusLabel = (status: string) => status === 'In Progress' ? 'Live' : status;
 
   return (
     <div className="space-y-4 lg:space-y-6">
@@ -126,68 +128,48 @@ export function Matches({ onNavigate }: MatchesProps) {
         </div>
       </Card>
 
-      {/* Matches List - Desktop Table View */}
-      <div className="hidden md:block">
-        <Card>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="text-left text-sm text-[#666666] border-b border-[#e0e0e0]">
-                  <th className="pb-3">Date</th>
-                  <th className="pb-3">Opponent</th>
-                  <th className="pb-3">Venue</th>
-                  <th className="pb-3">Format</th>
-                  <th className="pb-3">Status</th>
-                  <th className="pb-3">Result</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredMatches.map((match) => (
-                  <tr
-                    key={match.id}
-                    onClick={() => onNavigate('/match', match.id)}
-                    className="border-b border-[#f0f0f0] last:border-0 hover:bg-[#f9f9f9] cursor-pointer transition-colors"
-                  >
-                    <td className="py-4 text-sm">{new Date(match.date).toLocaleDateString()}</td>
-                    <td className="py-4 font-medium">{match.opponent}</td>
-                    <td className="py-4 text-sm text-[#666666]">{match.venue}</td>
-                    <td className="py-4"><Badge>{match.format}</Badge></td>
-                    <td className="py-4"><StatusBadge status={match.status} /></td>
-                    <td className="py-4 text-sm">{match.result || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {filteredMatches.map((match) => (
+          <button
+            key={match.id}
+            onClick={() => onNavigate('/match', match.id)}
+            className="text-left bg-white border border-[#e0e0e0] rounded-2xl p-5 shadow-sm hover:shadow-lg hover:border-[#d0d0d0] transition-all"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge>{match.format}</Badge>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${match.status === 'In Progress' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-gray-100 text-gray-700 border border-gray-200'}`}>
+                    {statusLabel(match.status)}
+                  </span>
+                </div>
+                <h3 className="text-lg font-black text-[#1a1a1a]">{match.teamA}</h3>
+                <p className="text-xs font-bold text-[#999999] my-1">vs</p>
+                <h3 className="text-lg font-black text-[#1a1a1a]">{match.teamB}</h3>
+              </div>
+              <div className="text-right min-w-[120px]">
+                {match.status === 'In Progress' && match.liveScore ? (
+                  <>
+                    <p className="text-[10px] font-black uppercase text-red-600">Live</p>
+                    <p className="text-2xl font-black text-[#1a1a1a] tabular-nums">{match.liveScore}</p>
+                  </>
+                ) : match.status === 'Completed' || match.result ? (
+                  <div className="space-y-2">
+                    <p className="text-sm font-black text-[#1a1a1a] tabular-nums">{match.teamAScore || '-'}</p>
+                    <p className="text-sm font-black text-[#1a1a1a] tabular-nums">{match.teamBScore || '-'}</p>
+                  </div>
+                ) : (
+                  <p className="text-sm font-bold text-[#666666]">{new Date(match.date).toLocaleDateString()}</p>
+                )}
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-[#f0f0f0] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-bold text-[#666666]">
+              <span>{match.venue}</span>
+              <span>{match.result || new Date(match.date).toLocaleDateString()}</span>
+            </div>
+          </button>
+        ))}
       </div>
-
-      {/* Matches List - Mobile Cards View */}
-      {/* Matches List - Mobile Cards View */}
-<div className="md:hidden space-y-4">
-  {filteredMatches.map((match) => (
-    <Card key={match.id} className="hover:shadow-lg transition-shadow">
-      {/* onClick shifted inside to standard div container */}
-      <div 
-        onClick={() => onNavigate('/match', match.id)} 
-        className="space-y-3 cursor-pointer p-4"
-      >
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold">{match.opponent}</h3>
-          <StatusBadge status={match.status as any} />
-        </div>
-        <div className="space-y-1 text-sm text-[#666666]">
-          <p>{match.venue}</p>
-          <p>{new Date(match.date).toLocaleDateString()}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge>{match.format}</Badge>
-          {match.result && <span className="text-sm">{match.result}</span>}
-        </div>
-      </div>
-    </Card>
-  ))}
-</div>
       
 
       {/* Loader UI Overlays */}

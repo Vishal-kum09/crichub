@@ -243,6 +243,36 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
 
               {scorecard.innings[activeInningsIndex] ? (
                 <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+                      <p className="text-xs font-bold text-gray-400 uppercase">Total</p>
+                      <p className="text-3xl font-black text-gray-900 tabular-nums">
+                        {scorecard.innings[activeInningsIndex].total.runs}/{scorecard.innings[activeInningsIndex].total.wickets}
+                      </p>
+                      <p className="text-sm font-medium text-gray-500">
+                        {oversFromBalls(scorecard.innings[activeInningsIndex].total.balls)} Overs
+                      </p>
+                    </div>
+                    <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+                      <p className="text-xs font-bold text-gray-400 uppercase">Extras</p>
+                      <p className="text-3xl font-black text-gray-900 tabular-nums">
+                        {scorecard.innings[activeInningsIndex].extras.total}
+                      </p>
+                      <p className="text-sm font-medium text-gray-500">
+                        NB {scorecard.innings[activeInningsIndex].extras.no_balls}, WD {scorecard.innings[activeInningsIndex].extras.wides}, B {scorecard.innings[activeInningsIndex].extras.byes}, LB {scorecard.innings[activeInningsIndex].extras.leg_byes}
+                      </p>
+                    </div>
+                    <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+                      <p className="text-xs font-bold text-gray-400 uppercase">Total Wickets</p>
+                      <p className="text-3xl font-black text-gray-900 tabular-nums">
+                        {scorecard.innings[activeInningsIndex].total.wickets}
+                      </p>
+                      <p className="text-sm font-medium text-gray-500">
+                        {10 - scorecard.innings[activeInningsIndex].total.wickets > 0 ? `${10 - scorecard.innings[activeInningsIndex].total.wickets} wickets in hand` : 'All out'}
+                      </p>
+                    </div>
+                  </div>
+
                   {/* Batting Engine Display Container */}
                   <div className="bg-white rounded-2xl p-4 md:p-6 border border-gray-200 shadow-sm overflow-hidden">
                     <h4 className="text-base md:text-lg font-black text-gray-900 mb-4 flex items-center gap-2">🏏 {scorecard.innings[activeInningsIndex].batting_team_name} Batting Lineup</h4>
@@ -274,6 +304,15 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
                         </tbody>
                       </table>
                     </div>
+                  </div>
+
+                  <div className="bg-white rounded-2xl p-4 md:p-6 border border-gray-200 shadow-sm">
+                    <h4 className="text-base md:text-lg font-black text-gray-900 mb-2">Yet to Bat</h4>
+                    <p className="text-sm font-medium text-gray-600">
+                      {scorecard.innings[activeInningsIndex].yet_to_bat.length > 0
+                        ? scorecard.innings[activeInningsIndex].yet_to_bat.join(', ')
+                        : 'All listed batters have appeared'}
+                    </p>
                   </div>
 
                   {/* Bowling Engine Display Container */}

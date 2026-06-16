@@ -34,10 +34,11 @@ export interface Match {
   venue: string;
   date: string;
   format: 'T20' | 'ODI' | 'Test';
-  status: 'Won' | 'Lost' | 'Scheduled' | 'In Progress';
+  status: 'Won' | 'Lost' | 'Scheduled' | 'In Progress' | 'Completed' | 'Abandoned' | 'Rained Off';
   result?: string;
   teamAScore?: string;
   teamBScore?: string;
+  liveScore?: string;
   competition: string;
 }
 

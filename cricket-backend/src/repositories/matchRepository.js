@@ -41,7 +41,23 @@ const MATCH_SELECT = `
     m.result_type,
     m.result_margin,
     m.winning_team_id,
-    m.result_summary
+    m.result_summary,
+    (SELECT CONCAT(i.total_runs, '/', i.total_wickets,
+            ' (', FLOOR(i.total_balls / 6), '.', i.total_balls % 6, ' Ov)')
+       FROM innings i
+      WHERE i.match_id = m.matches_id AND i.innings_number = 1
+      LIMIT 1) AS team1_score,
+    (SELECT CONCAT(i.total_runs, '/', i.total_wickets,
+            ' (', FLOOR(i.total_balls / 6), '.', i.total_balls % 6, ' Ov)')
+       FROM innings i
+      WHERE i.match_id = m.matches_id AND i.innings_number = 2
+      LIMIT 1) AS team2_score,
+    (SELECT CONCAT(i.total_runs, '/', i.total_wickets,
+            ' (', FLOOR(i.total_balls / 6), '.', i.total_balls % 6, ' Ov)')
+       FROM innings i
+      WHERE i.match_id = m.matches_id
+      ORDER BY i.innings_number DESC
+      LIMIT 1) AS live_score
   FROM matches m
   LEFT JOIN club c1 ON c1.club_id = m.host_club_id
   LEFT JOIN club c2 ON c2.club_id = m.opponent_club_id

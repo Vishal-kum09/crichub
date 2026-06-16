@@ -21,6 +21,9 @@ export interface RosterMatch {
   date: string;
   venue: string;
   status: string;
+  team1_score?: string;
+  team2_score?: string;
+  live_score?: string;
 }
 
 export interface RosterMember {

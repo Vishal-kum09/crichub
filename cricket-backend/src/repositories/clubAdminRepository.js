@@ -135,6 +135,22 @@ const findClubMatches = async (clubId) => {
         m.status,
         m.overs_per_match, 
         m.notes,
+        (SELECT CONCAT(i.total_runs, '/', i.total_wickets,
+                ' (', FLOOR(i.total_balls / 6), '.', i.total_balls % 6, ' Ov)')
+           FROM innings i
+          WHERE i.match_id = m.matches_id AND i.innings_number = 1
+          LIMIT 1) AS team1_score,
+        (SELECT CONCAT(i.total_runs, '/', i.total_wickets,
+                ' (', FLOOR(i.total_balls / 6), '.', i.total_balls % 6, ' Ov)')
+           FROM innings i
+          WHERE i.match_id = m.matches_id AND i.innings_number = 2
+          LIMIT 1) AS team2_score,
+        (SELECT CONCAT(i.total_runs, '/', i.total_wickets,
+                ' (', FLOOR(i.total_balls / 6), '.', i.total_balls % 6, ' Ov)')
+           FROM innings i
+          WHERE i.match_id = m.matches_id
+          ORDER BY i.innings_number DESC
+          LIMIT 1) AS live_score,
         CASE 
           WHEN m.host_club_id = $1 THEN COALESCE(oc.club_name, 'Internal Local Match')
           ELSE hc.club_name

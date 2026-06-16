@@ -66,6 +66,9 @@ const presentMatch = (row) => ({
   format: row.format,
   status: mapStatus(row.status),
   result: row.result_summary || undefined,
+  teamAScore: row.team1_score || undefined,
+  teamBScore: row.team2_score || undefined,
+  liveScore: row.live_score || undefined,
   competition: row.competition || ''
 });
 

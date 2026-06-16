@@ -99,12 +99,18 @@ export function ScorerDashboard({ onNavigate }: ScorerDashboardProps) {
                           <Calendar size={14} /> {new Date(match.scheduled_at || match.match_date).toLocaleDateString()}
                         </p>
                       </div>
+                      {match.live_score && (
+                        <div className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3">
+                          <p className="text-[10px] uppercase tracking-wider font-black text-emerald-700">Live Score</p>
+                          <p className="text-2xl font-black text-gray-900 tabular-nums">{match.live_score}</p>
+                        </div>
+                      )}
                     </div>
                     <button
-                      onClick={() => onNavigate('/match-setup', match.id)}
+                      onClick={() => onNavigate(match.status === 'live' ? '/scorer' : '/match-setup', match.id)}
                       className="w-full mt-2 py-2.5 bg-[#e60023] text-white rounded-xl text-sm font-bold shadow-md hover:bg-red-700 transition-all flex items-center justify-center gap-1.5 group"
                     >
-                      Start Live Scoring
+                      {match.status === 'live' ? 'Resume Scoring' : 'Start Live Scoring'}
                       <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
                     </button>
                   </div>

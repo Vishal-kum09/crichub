@@ -353,6 +353,12 @@ const findAssignedMatches = async (scorerId) => {
             m.status, m.format, m.overs_per_match, m.venue,
             c1.club_name AS team1_name, c1.display_name AS team1_short_name,
             c2.club_name AS team2_name, c2.display_name AS team2_short_name,
+            (SELECT CONCAT(i.total_runs, '/', i.total_wickets,
+                    ' (', FLOOR(i.total_balls / 6), '.', i.total_balls % 6, ' Ov)')
+               FROM innings i
+              WHERE i.match_id = m.matches_id
+              ORDER BY i.innings_number DESC
+              LIMIT 1) AS live_score,
             sa.accepted_at, sa.created_at AS assigned_at
        FROM scorer_assignments sa
        JOIN matches m ON m.matches_id = sa.match_id
@@ -375,13 +381,13 @@ const findCompletedMatchesForScorer = async (scorerId) => {
             (SELECT CONCAT(i.total_runs, '/', i.total_wickets,
                     ' (', FLOOR(i.total_balls / 6), '.', i.total_balls % 6, ' Ov)')
                FROM innings i
-              WHERE i.match_id = m.matches_id AND i.batting_team_id = m.host_club_id
-              ORDER BY i.innings_number DESC LIMIT 1) AS team1_score,
+              WHERE i.match_id = m.matches_id AND i.innings_number = 1
+              LIMIT 1) AS team1_score,
             (SELECT CONCAT(i.total_runs, '/', i.total_wickets,
                     ' (', FLOOR(i.total_balls / 6), '.', i.total_balls % 6, ' Ov)')
                FROM innings i
-              WHERE i.match_id = m.matches_id AND i.batting_team_id = m.opponent_club_id
-              ORDER BY i.innings_number DESC LIMIT 1) AS team2_score
+              WHERE i.match_id = m.matches_id AND i.innings_number = 2
+              LIMIT 1) AS team2_score
        FROM scorer_assignments sa
        JOIN matches m ON m.matches_id = sa.match_id
        LEFT JOIN club c1 ON c1.club_id = m.host_club_id

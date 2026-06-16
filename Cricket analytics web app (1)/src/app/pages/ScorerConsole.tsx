@@ -135,7 +135,16 @@ const [currentBowler, setCurrentBowler] = useState(
   // Wicket dialog state
   const [selectedDismissal, setSelectedDismissal] = useState('');
   const [selectedFielder, setSelectedFielder] = useState('');
+  const [selectedOutBatsman, setSelectedOutBatsman] = useState(striker);
   const [nextBatsman, setNextBatsman] = useState('');
+
+  const totalExtras = extras.wides + extras.noBalls + extras.byes + extras.legByes + extras.penalties;
+  const yetToBat = battingRoster.filter(
+    name => !batsmen.some(b => b.name === name)
+      && name !== striker
+      && name !== nonStriker
+      && name !== nextBatsman
+  );
 
   const syncFromInnings = (innings: InningsState) => {
     setScore(innings.total_runs);
@@ -217,6 +226,12 @@ const [currentBowler, setCurrentBowler] = useState(
 
   const runRate = overs + balls / 6 > 0 ? (score / (overs + balls / 6)).toFixed(2) : '0.00';
 
+  useEffect(() => {
+    if (selectedOutBatsman !== striker && selectedOutBatsman !== nonStriker) {
+      setSelectedOutBatsman(striker);
+    }
+  }, [striker, nonStriker, selectedOutBatsman]);
+
   const handleRunClick = (runs: number) => {
     if (!isLive) return;
     setCurrentRuns(runs);
@@ -233,11 +248,29 @@ const [currentBowler, setCurrentBowler] = useState(
     }
   };
 
-  const recordBall = () => {
+  const recordBall = (wicketOverride?: {
+    isWicket: boolean;
+    dismissal: string;
+    fielder: string;
+    outBatsman: string;
+    nextBatsman: string;
+  }) => {
     if (!isLive) return;
+    const wicketSelected = wicketOverride?.isWicket ?? isWicket;
+    const dismissalForBall = wicketOverride?.dismissal ?? selectedDismissal;
+    const fielderForBall = wicketOverride?.fielder ?? selectedFielder;
+    const outBatsmanForBall = wicketOverride?.outBatsman ?? selectedOutBatsman;
+    const nextBatsmanForBall = wicketOverride?.nextBatsman ?? nextBatsman;
+
+    if (wicketSelected && (!dismissalForBall || !nextBatsmanForBall)) {
+      toast.error('Select dismissal type and next batsman before recording the wicket');
+      setShowWicketDialog(true);
+      return;
+    }
 
     let totalRuns = currentRuns + currentExtras;
     const isLegalDelivery = currentExtraType !== 'wide' && currentExtraType !== 'no-ball';
+    const dismissedBatsman = outBatsmanForBall || striker;
 
     const ballEvent: BallEvent = {
       over: overs,
@@ -246,17 +279,25 @@ const [currentBowler, setCurrentBowler] = useState(
       batsmanRuns: currentExtraType === 'bye' || currentExtraType === 'leg-bye' ? 0 : currentRuns,
       extraRuns: currentExtras,
       extraType: currentExtraType as any,
-      wicket: isWicket,
+      wicket: wicketSelected,
+      dismissalType: wicketSelected ? dismissalForBall : undefined,
+      outBatsman: wicketSelected ? dismissedBatsman : undefined,
+      fielder: wicketSelected ? fielderForBall : undefined,
       batsman: striker,
       nonStriker: nonStriker,
       bowler: currentBowler,
-      commentary: generateCommentary(currentRuns, currentExtras, currentExtraType, isWicket),
+      commentary: generateCommentary(currentRuns, currentExtras, currentExtraType, wicketSelected, {
+        dismissal: dismissalForBall,
+        fielder: fielderForBall,
+        outBatsman: dismissedBatsman,
+      }),
       timestamp: new Date(),
     };
 
     setScore(score + totalRuns);
+    if (wicketSelected) setWickets(wickets + 1);
     updateBatsmanStats(striker, currentRuns, isLegalDelivery);
-    updateBowlerStats(currentBowler, totalRuns, isWicket, isLegalDelivery);
+    updateBowlerStats(currentBowler, totalRuns, wicketSelected, isLegalDelivery);
 
     if (currentExtraType) {
       updateExtras(currentExtraType, currentExtras + currentRuns);
@@ -265,12 +306,10 @@ const [currentBowler, setCurrentBowler] = useState(
     setBallHistory([ballEvent, ...ballHistory]);
     setUndoStack([]);
 
-    if (isLegalDelivery && !isWicket) {
-      progressBall();
-      if (currentRuns % 2 !== 0) {
-        swapStrike();
-      }
-    }
+    advanceCreaseAfterDelivery(isLegalDelivery, currentRuns, wicketSelected, dismissedBatsman, nextBatsmanForBall, {
+      dismissal: dismissalForBall,
+      fielder: fielderForBall,
+    });
 
     if (isConnected && session) {
       const extraType = toExtraType(currentExtraType);
@@ -284,15 +323,40 @@ const [currentBowler, setCurrentBowler] = useState(
         runs_off_bat: runsOffBat,
         extra_type: extraType,
         extra_runs: extraRuns,
-        is_wicket: isWicket,
+        is_wicket: wicketSelected,
         striker_id: session.strikerId,
         non_striker_id: session.nonStrikerId,
         bowler_id: session.bowlerId,
       };
+      const wicketPayload = wicketSelected ? {
+        innings_id: session.inningsId,
+        dismissed_player_id:
+          dismissedBatsman === striker
+            ? session.strikerId!
+            : session.nonStrikerId!,
+        dismissal_type: dismissalForBall as DismissalType,
+        fielder_id: fielderForBall ? (session.playerIdMap?.[fielderForBall] || fielderForBall) : undefined,
+        incoming_batsman_id: session.playerIdMap?.[nextBatsmanForBall] || nextBatsmanForBall,
+      } : null;
       apiRecordBall(matchId!, payload)
-        .then((res) => {
-          syncFromInnings(res.innings);
-          saveSession(res.innings);
+        .then(async (res) => {
+          if (wicketPayload) {
+            const wicketRes = await apiWicketWizard(matchId!, wicketPayload);
+            syncFromInnings(wicketRes.innings);
+            saveSession(wicketRes.innings);
+            if (session) {
+              const incomingId = wicketPayload.incoming_batsman_id;
+              if (dismissedBatsman === striker) session.strikerId = incomingId;
+              else session.nonStrikerId = incomingId;
+            }
+            if (wicketRes.innings_complete) {
+              clearSession();
+              toast.success('All out - innings complete');
+            }
+          } else {
+            syncFromInnings(res.innings);
+            saveSession(res.innings);
+          }
           void flushPendingDeliveries();
           if (res.innings_complete) {
             clearSession();
@@ -315,14 +379,46 @@ const [currentBowler, setCurrentBowler] = useState(
     toast.success('Ball recorded');
   };
 
-  const generateCommentary = (runs: number, extraRuns: number, extraType: string | null, wicket: boolean): string => {
-    if (wicket) return `${striker} is OUT!`;
+  const generateCommentary = (
+    runs: number,
+    extraRuns: number,
+    extraType: string | null,
+    wicket: boolean,
+    wicketDetails?: { dismissal: string; fielder: string; outBatsman: string }
+  ): string => {
+    if (wicket) {
+      const dismissal = wicketDetails?.fielder ? `${wicketDetails.dismissal} by ${wicketDetails.fielder}` : wicketDetails?.dismissal;
+      return `${wicketDetails?.outBatsman || striker} is OUT${dismissal ? ` - ${dismissal}` : ''}!`;
+    }
     if (runs === 6) return `SIX! ${striker} smashes it for maximum!`;
     if (runs === 4) return `FOUR! Beautiful shot by ${striker}`;
     if (extraType === 'wide') return `Wide ball, ${extraRuns + runs} runs`;
     if (extraType === 'no-ball') return `No ball called, ${extraRuns + runs} runs`;
     if (runs === 0) return 'Dot ball';
     return `${runs} run${runs > 1 ? 's' : ''} scored`;
+  };
+
+  const formatDismissalLine = (type: string, fielder: string, bowler: string) => {
+    switch (type) {
+      case 'Bowled':
+        return `b ${bowler}`;
+      case 'LBW':
+        return `lbw b ${bowler}`;
+      case 'Caught':
+        return fielder ? `c ${fielder} b ${bowler}` : `c & b ${bowler}`;
+      case 'Stumped':
+        return fielder ? `st ${fielder} b ${bowler}` : `st b ${bowler}`;
+      case 'Run Out':
+        return fielder ? `run out (${fielder})` : 'run out';
+      case 'Hit Wicket':
+        return `hit wicket b ${bowler}`;
+      case 'Retired Hurt':
+        return 'retired hurt';
+      case 'Obstructing the Field':
+        return 'obstructing the field';
+      default:
+        return type || 'out';
+    }
   };
 
   const updateBatsmanStats = (batsmanName: string, runs: number, countBall: boolean) => {
@@ -338,6 +434,59 @@ const [currentBowler, setCurrentBowler] = useState(
       }
       return b;
     }));
+  };
+
+  const advanceCreaseAfterDelivery = (
+    isLegal: boolean,
+    runs: number,
+    wicket: boolean,
+    dismissedBatsman?: string,
+    incomingBatsman?: string,
+    wicketDetails?: { dismissal: string; fielder: string }
+  ) => {
+    let nextStriker = striker;
+    let nextNonStriker = nonStriker;
+
+    if (wicket && incomingBatsman) {
+      const dismissalText = formatDismissalLine(
+        wicketDetails?.dismissal || selectedDismissal,
+        wicketDetails?.fielder || '',
+        currentBowler
+      );
+
+      setBatsmen(prev => {
+        const withDismissal = prev.map(b =>
+          b.name === dismissedBatsman
+            ? { ...b, isOut: true, dismissal: dismissalText }
+            : b
+        );
+        return withDismissal.some(b => b.name === incomingBatsman)
+          ? withDismissal
+          : [...withDismissal, { name: incomingBatsman, runs: 0, balls: 0, fours: 0, sixes: 0, isOut: false }];
+      });
+
+      if (dismissedBatsman === striker) nextStriker = incomingBatsman;
+      if (dismissedBatsman === nonStriker) nextNonStriker = incomingBatsman;
+    }
+
+    if (isLegal) {
+      if (balls === 5) {
+        setOvers(overs + 1);
+        setBalls(0);
+        setShowBowlerChangeDialog(true);
+        [nextStriker, nextNonStriker] = [nextNonStriker, nextStriker];
+      } else {
+        setBalls(balls + 1);
+        if (!wicket && runs % 2 !== 0) {
+          [nextStriker, nextNonStriker] = [nextNonStriker, nextStriker];
+        }
+      }
+    } else if (!wicket && runs % 2 !== 0 && currentExtraType === 'no-ball') {
+      [nextStriker, nextNonStriker] = [nextNonStriker, nextStriker];
+    }
+
+    setStriker(nextStriker);
+    setNonStriker(nextNonStriker);
   };
 
   const updateBowlerStats = (bowlerName: string, runs: number, wicket: boolean, isLegal: boolean) => {
@@ -403,6 +552,10 @@ const [currentBowler, setCurrentBowler] = useState(
     setCurrentExtras(0);
     setCurrentExtraType(null);
     setIsWicket(false);
+    setSelectedDismissal('');
+    setSelectedFielder('');
+    setSelectedOutBatsman(striker);
+    setNextBatsman('');
   };
 
   const undoLastBall = () => {
@@ -794,7 +947,10 @@ const [currentBowler, setCurrentBowler] = useState(
             {/* Wicket Toggle */}
             <div className="mb-6">
               <button
-                onClick={() => setShowWicketDialog(true)}
+                onClick={() => {
+                  setSelectedOutBatsman(selectedOutBatsman || striker);
+                  setShowWicketDialog(true);
+                }}
                 disabled={!isLive}
                 className="w-full p-4 bg-red-600 text-white rounded-xl font-semibold text-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
               >
@@ -883,6 +1039,7 @@ const [currentBowler, setCurrentBowler] = useState(
                 <thead>
                   <tr className="text-left text-sm text-[#666666] border-b border-[#e0e0e0]">
                     <th className="pb-3">Batsman</th>
+                    <th className="pb-3">Dismissal</th>
                     <th className="pb-3 tabular-nums">R</th>
                     <th className="pb-3 tabular-nums">B</th>
                     <th className="pb-3 tabular-nums">4s</th>
@@ -894,6 +1051,7 @@ const [currentBowler, setCurrentBowler] = useState(
                   {batsmen.map((batsman, index) => (
                     <tr key={index} className="border-b border-[#f0f0f0] last:border-0">
                       <td className="py-3 font-medium">{batsman.name}{batsman.name === striker ? '*' : ''}</td>
+                      <td className="py-3 text-sm text-[#666666]">{batsman.isOut ? batsman.dismissal : 'not out'}</td>
                       <td className="py-3 tabular-nums font-semibold">{batsman.runs}</td>
                       <td className="py-3 tabular-nums">{batsman.balls}</td>
                       <td className="py-3 tabular-nums">{batsman.fours}</td>
@@ -906,6 +1064,34 @@ const [currentBowler, setCurrentBowler] = useState(
                 </tbody>
               </table>
             </div>
+          </div>
+
+          {/* Innings Summary */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-[#e0e0e0]">
+              <p className="text-sm text-[#666666] mb-2">Total</p>
+              <p className="text-3xl font-bold tabular-nums">{score}/{wickets}</p>
+              <p className="text-sm text-[#666666] mt-1">Overs {overs}.{balls}</p>
+            </div>
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-[#e0e0e0]">
+              <p className="text-sm text-[#666666] mb-2">Extras</p>
+              <p className="text-3xl font-bold tabular-nums">{totalExtras}</p>
+              <p className="text-sm text-[#666666] mt-1">
+                NB {extras.noBalls}, WD {extras.wides}, B {extras.byes}, LB {extras.legByes}, P {extras.penalties}
+              </p>
+            </div>
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-[#e0e0e0]">
+              <p className="text-sm text-[#666666] mb-2">Total Wickets</p>
+              <p className="text-3xl font-bold tabular-nums">{wickets}</p>
+              <p className="text-sm text-[#666666] mt-1">{10 - wickets > 0 ? `${10 - wickets} wickets in hand` : 'All out'}</p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm p-6 border border-[#e0e0e0]">
+            <h2 className="text-xl font-semibold mb-3">Yet to Bat</h2>
+            <p className="text-sm text-[#666666]">
+              {yetToBat.length > 0 ? yetToBat.join(', ') : 'All listed batters have appeared'}
+            </p>
           </div>
 
           {/* Bowling Table */}
@@ -1055,16 +1241,20 @@ const [currentBowler, setCurrentBowler] = useState(
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-2">Batsman Out</label>
-                <select className="w-full p-3 border border-[#e0e0e0] rounded-lg">
-                  <option>{striker}</option>
-                  <option>{nonStriker}</option>
+                <select
+                  value={selectedOutBatsman}
+                  onChange={(e) => setSelectedOutBatsman(e.target.value)}
+                  className="w-full p-3 border border-[#e0e0e0] rounded-lg"
+                >
+                  <option value={striker}>{striker}</option>
+                  <option value={nonStriker}>{nonStriker}</option>
                 </select>
               </div>
 
               <div>
                 <label className="block text-sm font-medium mb-2">Dismissal Type</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {['Bowled', 'LBW', 'Caught', 'Run Out', 'Stumped', 'Hit Wicket', 'Timed Out'].map(type => (
+                  {['Bowled', 'LBW', 'Caught', 'Run Out', 'Stumped', 'Hit Wicket', 'Retired Hurt', 'Obstructing the Field'].map(type => (
                     <button
                       key={type}
                       onClick={() => setSelectedDismissal(type)}
@@ -1101,8 +1291,7 @@ const [currentBowler, setCurrentBowler] = useState(
                            className="w-full p-3 border border-[#e0e0e0] rounded-lg">
                       <option value="">Select next batsman</option>
                       {battingRoster
-      // Jo out ho chuke hain ya strike par hain, unhe filter karein
-                    .filter(name => name !== striker && name !== nonStriker) 
+                    .filter(name => name !== striker && name !== nonStriker && !batsmen.some(b => b.name === name && b.isOut)) 
                     .map(name => (
                         <option key={name} value={name}>{name}</option>))}
                     </select>
@@ -1111,11 +1300,25 @@ const [currentBowler, setCurrentBowler] = useState(
               <div className="flex gap-3 pt-4">
                 <button
   onClick={() => {
-    setIsWicket(true);
-    setWickets(wickets + 1);
-    setShowWicketDialog(false);
-    
-    if (isConnected && session && selectedDismissal) {
+    if (!selectedDismissal) {
+      toast.error('Please select a dismissal type');
+      return;
+    }
+    if (!nextBatsman) {
+      toast.error('Please select the next batsman');
+      return;
+    }
+	    setShowWicketDialog(false);
+	    recordBall({
+	      isWicket: true,
+	      dismissal: selectedDismissal,
+	      fielder: selectedFielder,
+	      outBatsman: selectedOutBatsman,
+	      nextBatsman,
+	    });
+	    return;
+	    
+	    if (false && isConnected && session && selectedDismissal) {
       // 🔥 1. MAP SE ID NIKALEIN (Agar map mein nahi mila toh fallback ke liye name hi use karein)
       const incomingBatsmanId = session.playerIdMap?.[nextBatsman] || nextBatsman;
       const fielderId = selectedFielder 
@@ -1140,7 +1343,7 @@ const [currentBowler, setCurrentBowler] = useState(
           toast.error(err?.response?.data?.error || 'Failed to record wicket')
         );
     }
-    toast.success('Wicket recorded');
+    toast.success('Wicket selected');
   }}
   className="flex-1 p-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all"
 >

@@ -3,15 +3,15 @@ import { Trophy, Loader2, Info } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { toast } from '../../lib/toast';
+import { login, toAppRole, defaultRouteForRole } from '../../lib/authApi';
 
 type UserRole = 'viewer' | 'player' | 'scorer' | 'analyst' | 'club_admin' | 'super_admin';
 
 interface SignInProps {
-  onNavigate: (path: string, role?: UserRole) => void;
+  onNavigate: (path: string, role?: UserRole, displayName?: string) => void;
 }
 
-// Mock credentials for testing
-const mockCredentials = [
+const demoCredentials = [
   { email: 'viewer@cricket.com', password: 'viewer123', role: 'viewer' as UserRole, name: 'Viewer User' },
   { email: 'player@cricket.com', password: 'player123', role: 'player' as UserRole, name: 'Player User' },
   { email: 'scorer@cricket.com', password: 'scorer123', role: 'scorer' as UserRole, name: 'Scorer User' },
@@ -35,26 +35,19 @@ export function SignIn({ onNavigate }: SignInProps) {
     }
 
     setIsLoading(true);
-
-    // Simulate authentication delay
-    setTimeout(() => {
-      // Check against mock credentials
-      const user = mockCredentials.find(
-        (cred) => cred.email === email && cred.password === password
-      );
-
+    try {
+      const { user } = await login(email, password);
+      const role = toAppRole(user.role);
+      toast.success(`Welcome back, ${user.display_name}!`);
+      onNavigate(defaultRouteForRole(role), role, user.display_name);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Invalid email or password');
+    } finally {
       setIsLoading(false);
-
-      if (user) {
-        toast.success(`Welcome back, ${user.name}!`);
-        onNavigate('/dashboard', user.role);
-      } else {
-        toast.error('Invalid email or password');
-      }
-    }, 1500);
+    }
   };
 
-  const handleQuickLogin = (credential: typeof mockCredentials[0]) => {
+  const handleQuickLogin = (credential: typeof demoCredentials[0]) => {
     setEmail(credential.email);
     setPassword(credential.password);
     toast.info(`Filled credentials for ${credential.name}`);
@@ -64,9 +57,7 @@ export function SignIn({ onNavigate }: SignInProps) {
     <div className="min-h-screen bg-[#f9f9f9] flex items-center justify-center p-4">
       <div className="w-full max-w-4xl">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Left Side - Sign In Form */}
           <div className="space-y-6">
-            {/* Logo */}
             <div className="text-center">
               <div className="flex items-center justify-center gap-2 mb-4">
                 <Trophy className="text-[#e60023]" size={40} />
@@ -75,7 +66,6 @@ export function SignIn({ onNavigate }: SignInProps) {
               <p className="text-[#666666]">Sign in to your account</p>
             </div>
 
-            {/* Form */}
             <form onSubmit={handleSignIn} className="space-y-4">
               <Input
                 type="email"
@@ -94,20 +84,6 @@ export function SignIn({ onNavigate }: SignInProps) {
                 required
               />
 
-              <div className="flex items-center justify-between text-sm">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" className="rounded" />
-                  <span>Remember me</span>
-                </label>
-                <button
-                  type="button"
-                  onClick={() => onNavigate('/forgot-password')}
-                  className="text-[#e60023] hover:underline"
-                >
-                  Forgot password?
-                </button>
-              </div>
-
               <Button type="submit" variant="primary" className="w-full" disabled={isLoading}>
                 {isLoading ? (
                   <>
@@ -120,7 +96,6 @@ export function SignIn({ onNavigate }: SignInProps) {
               </Button>
             </form>
 
-            {/* Footer */}
             <div className="text-center text-sm">
               <span className="text-[#666666]">Don't have an account? </span>
               <button
@@ -132,7 +107,6 @@ export function SignIn({ onNavigate }: SignInProps) {
             </div>
           </div>
 
-          {/* Right Side - Demo Credentials */}
           <div className="bg-white rounded-xl p-6 border border-[#e0e0e0]">
             <div className="flex items-center gap-2 mb-4">
               <Info className="text-[#e60023]" size={20} />
@@ -140,11 +114,11 @@ export function SignIn({ onNavigate }: SignInProps) {
             </div>
 
             <p className="text-sm text-[#666666] mb-4">
-              Click on any role below to auto-fill credentials:
+              Click on any role below to auto-fill credentials (run <code>npm run seed</code> on the backend first):
             </p>
 
             <div className="space-y-2">
-              {mockCredentials.map((credential) => (
+              {demoCredentials.map((credential) => (
                 <button
                   key={credential.email}
                   onClick={() => handleQuickLogin(credential)}
@@ -163,50 +137,37 @@ export function SignIn({ onNavigate }: SignInProps) {
               ))}
             </div>
 
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-xs text-blue-800">
-                <strong>Note:</strong> All passwords are in the format: [role]123
-              </p>
-            </div>
+            <button
+              onClick={() => setShowCredentials(!showCredentials)}
+              className="text-sm text-[#e60023] hover:underline mt-4"
+            >
+              {showCredentials ? 'Hide' : 'Show'} Credentials Table
+            </button>
 
-            <div className="mt-4">
-              <button
-                onClick={() => setShowCredentials(!showCredentials)}
-                className="text-sm text-[#e60023] hover:underline"
-              >
-                {showCredentials ? 'Hide' : 'Show'} Credentials Table
-              </button>
-
-              {showCredentials && (
-                <div className="mt-3 overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-[#e0e0e0]">
-                        <th className="text-left py-2 font-semibold text-[#666666]">Role</th>
-                        <th className="text-left py-2 font-semibold text-[#666666]">Email</th>
-                        <th className="text-left py-2 font-semibold text-[#666666]">Password</th>
+            {showCredentials && (
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-[#e0e0e0]">
+                      <th className="text-left py-2 font-semibold text-[#666666]">Role</th>
+                      <th className="text-left py-2 font-semibold text-[#666666]">Email</th>
+                      <th className="text-left py-2 font-semibold text-[#666666]">Password</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {demoCredentials.map((cred) => (
+                      <tr key={cred.email} className="border-b border-[#f0f0f0]">
+                        <td className="py-2 font-medium text-[#1a1a1a]">{cred.role.replace('_', ' ')}</td>
+                        <td className="py-2 text-[#666666]">{cred.email}</td>
+                        <td className="py-2 text-[#666666]">{cred.password}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {mockCredentials.map((cred) => (
-                        <tr key={cred.email} className="border-b border-[#f0f0f0]">
-                          <td className="py-2 font-medium text-[#1a1a1a]">{cred.role.replace('_', ' ')}</td>
-                          <td className="py-2 text-[#666666]">{cred.email}</td>
-                          <td className="py-2 text-[#666666]">{cred.password}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Note */}
-        <p className="text-center text-xs text-[#999999] mt-6">
-          Note: This is a demo system. Supabase authentication to be connected later.
-        </p>
       </div>
     </div>
   );

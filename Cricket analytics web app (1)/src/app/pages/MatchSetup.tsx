@@ -1,24 +1,35 @@
-import { useState } from 'react';
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ArrowLeft, ArrowRight, Check, ShieldAlert, Users, Landmark } from 'lucide-react';
 import { toast } from '../../lib/toast';
-import { mockTeams, mockPlayers } from '../../data/mockData';
-import { initializeMatch, setLiveSession } from '../../lib/scorerApi';
+import { getMatchPreview, initializeMatch, setLiveSession } from '../../lib/scorerApi';
 
 interface MatchSetupProps {
   onNavigate: (path: string, id?: string) => void;
-  // Present when the wizard is backed by a real, assigned match — required to
-  // open a live innings against the DB. The mock wizard has no backing match.
   matchId?: string;
+}
+
+interface ServerPlayer {
+  id: string;
+  name: string;
+  role: string;
 }
 
 export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
   const [currentStep, setCurrentStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [adminMetadata, setAdminMetadata] = useState<any>(null);
 
-  // Step 1: Team Selection
+  // Pool lists directly backed by database response arrays
+  const [teamAPool, setTeamAPool] = useState<ServerPlayer[]>([]);
+  const [teamBPool, setTeamBPool] = useState<ServerPlayer[]>([]);
+
+  // Step 1: Team Selection Metadata
   const [teamA, setTeamA] = useState('');
   const [teamB, setTeamB] = useState('');
+  const [teamAId, setTeamAId] = useState('');
+  const [teamBId, setTeamBId] = useState('');
 
-  // Step 2: Playing XI
+  // Step 2: Playing XI Identity arrays
   const [teamAPlayers, setTeamAPlayers] = useState<string[]>([]);
   const [teamBPlayers, setTeamBPlayers] = useState<string[]>([]);
   const [teamACaptain, setTeamACaptain] = useState('');
@@ -26,31 +37,63 @@ export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
   const [teamAWicketKeeper, setTeamAWicketKeeper] = useState('');
   const [teamBWicketKeeper, setTeamBWicketKeeper] = useState('');
 
-  // Step 3: Toss
+  // Step 3: Toss Selection Parameters
   const [tossWinner, setTossWinner] = useState('');
   const [tossDecision, setTossDecision] = useState<'bat' | 'bowl' | ''>('');
 
-  // Step 4: Match Settings
+  // Step 4: UI Engine Configurations
+  const [wagonWheel, setWagonWheel] = useState(true);
+  const [commentaryType, setCommentaryType] = useState('auto');
+  const [nameDisplay, setNameDisplay] = useState('First Initial Last Name');
+
+  // Hidden State: Loaded from DB, sent back on creation
   const [matchType, setMatchType] = useState('T20');
   const [totalOvers, setTotalOvers] = useState('20');
   const [oversPerBowler, setOversPerBowler] = useState('4');
   const [venue, setVenue] = useState('');
   const [ground, setGround] = useState('');
   const [country, setCountry] = useState('');
-  const [wagonWheel, setWagonWheel] = useState(true);
-  const [nameDisplay, setNameDisplay] = useState<'full' | 'short'>('full');
 
-  // Step 5: Match Start
+  // Step 5: Live Initial Active Bowlers/Batters state hooks
   const [striker, setStriker] = useState('');
   const [nonStriker, setNonStriker] = useState('');
   const [openingBowler, setOpeningBowler] = useState('');
 
   const totalSteps = 5;
+  const stepsList = ['Schedule', 'Playing XI', 'Toss Field', 'Settings Config', 'Strike Deck'];
+
+  // FETCH: Load Assigned Match Administrative Parameters from Real DB Connection
+  useEffect(() => {
+    if (!matchId) return;
+
+    setLoading(true);
+    getMatchPreview(matchId)
+      .then((data) => {
+        setAdminMetadata(data);
+        setTeamA(data.team1_name);
+        setTeamB(data.team2_name);
+        setTeamAId(data.team1_id);
+        setTeamBId(data.team2_id);
+        setVenue(data.venue || '');
+        setGround(data.ground || '');
+        setCountry(data.country || 'India');
+        setMatchType(data.format || 'T20');
+        setTotalOvers(data.total_overs?.toString() || '20');
+        setOversPerBowler(data.overs_per_bowler?.toString() || '4');
+        setTeamAPool(data.team1_roster ?? []);
+        setTeamBPool(data.team2_roster ?? []);
+      })
+      .catch((err) => {
+        console.error("Match context synchronization error:", err);
+        toast.error("Could not fetch assigned match rosters from server.");
+      })
+      .finally(() => setLoading(false));
+  }, [matchId]);
 
   const canProceed = () => {
     switch (currentStep) {
       case 1:
-        return teamA && teamB && teamA !== teamB;
+        return teamA && teamB;
       case 2:
         return (
           teamAPlayers.length === 11 &&
@@ -63,65 +106,100 @@ export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
       case 3:
         return tossWinner && tossDecision;
       case 4:
-        return matchType && totalOvers && oversPerBowler && venue && ground && country;
+        return true; 
       case 5:
-        return striker && nonStriker && openingBowler;
+        return striker && nonStriker && openingBowler && striker !== nonStriker;
       default:
         return false;
     }
   };
 
-  // Resolve a display name back to its catalogue id (teams/players).
-  const teamIdFor = (name: string) => mockTeams.find((t) => t.name === name)?.id;
-  const playerIdFor = (name: string) => mockPlayers.find((p) => p.name === name)?.id;
+  const playerIdFor = (name: string, pool: ServerPlayer[]) => {
+    return pool.find((p) => p.name === name)?.id || name;
+  };
 
   const startMatch = async () => {
-    const battingTeamId = teamIdFor(battingTeam);
-    const fieldingTeamId = teamIdFor(bowlingTeam);
-
-    // Open the first innings against the DB when this wizard is backed by a real
-    // assigned match. Otherwise fall through to the local demo navigation.
-    if (matchId && battingTeamId && fieldingTeamId) {
+    if (matchId && teamAId && teamBId) {
       try {
+        // Automatically handles Local Derby tracking if both IDs match
+        const isLocalDerby = teamAId === teamBId;
+
         const res = await initializeMatch(matchId, {
-          batting_team_id: battingTeamId,
-          fielding_team_id: fieldingTeamId,
+          batting_team_id: battingTeam === teamA ? teamAId : teamBId,
+          fielding_team_id: bowlingTeam === teamA ? teamAId : teamBId,
           innings_number: 1,
-          striker_id: playerIdFor(striker),
-          non_striker_id: playerIdFor(nonStriker),
-          bowler_id: playerIdFor(openingBowler),
+          striker_id: playerIdFor(striker, battingTeam === teamA ? teamAPool : teamBPool),
+          non_striker_id: playerIdFor(nonStriker, battingTeam === teamA ? teamAPool : teamBPool),
+          bowler_id: playerIdFor(openingBowler, bowlingTeam === teamA ? teamAPool : teamBPool),
+          
+          toss_winner: tossWinner === teamA ? teamAId : teamBId,
+          toss_decision: tossDecision,
+          total_overs: parseInt(totalOvers),
+          overs_per_bowler: parseInt(oversPerBowler),
+          
+          playing_xi_a: teamAPlayers.map(n => playerIdFor(n, teamAPool)),
+          playing_xi_b: teamBPlayers.map(n => playerIdFor(n, teamBPool)),
+          captain_a: playerIdFor(teamACaptain, teamAPool),
+          captain_b: playerIdFor(teamBCaptain, teamBPool),
+          wicketkeeper_a: playerIdFor(teamAWicketKeeper, teamAPool),
+          wicketkeeper_b: playerIdFor(teamBWicketKeeper, teamBPool),
+
+          metadata: {
+            is_local_derby: isLocalDerby,
+            batting_team_label: battingTeam,
+            fielding_team_label: bowlingTeam,
+            wagon_wheel_enabled: wagonWheel,
+            commentary_type: commentaryType,
+            name_display_format: nameDisplay
+          }
+        } as any);
+
+        // 🔥 CRITICAL ADDITION: Generate the Player ID Map for the UI
+        const fullPlayerPool = [...teamAPool, ...teamBPool];
+        const generatedPlayerIdMap: { [key: string]: string } = {};
+        fullPlayerPool.forEach(player => {
+          generatedPlayerIdMap[player.name] = player.id;
         });
+
         setLiveSession({
           matchId,
           inningsId: res.innings.innings_id,
-          strikerId: res.striker?.player_id ?? playerIdFor(striker),
-          nonStrikerId: res.non_striker?.player_id ?? playerIdFor(nonStriker),
-          bowlerId: res.bowler?.player_id ?? playerIdFor(openingBowler),
+          strikerId: res.striker?.player_id || striker,
+          nonStrikerId: res.non_striker?.player_id || nonStriker,
+          bowlerId: res.bowler?.player_id || openingBowler,
+          playerNames: {
+            [res.striker?.player_id || 'striker']: striker,
+            [res.non_striker?.player_id || 'non-striker']: nonStriker,
+            [res.bowler?.player_id || 'bowler']: openingBowler
+          },         
+          battingRoster: battingTeam === teamA ? teamAPlayers : teamBPlayers,
+          fieldingRoster: bowlingTeam === teamA ? teamAPlayers : teamBPlayers,
+          
+          // Injecting the map so ScorerConsole can convert names to IDs instantly
+          playerIdMap: generatedPlayerIdMap 
         });
-        toast.success('Live innings started');
+
+        toast.success('Live database scoring context initialized!');
         onNavigate('/scorer', matchId);
         return;
       } catch (err: any) {
-        toast.error(err?.response?.data?.error || 'Failed to start live innings');
+        toast.error(err?.response?.data?.error || 'Failed to sync match setup config.');
         return;
       }
     }
 
-    // Demo mode (no backing match): proceed without hitting the DB.
-    toast.success('Match setup complete!');
+    toast.success('Match initialized locally (Demo Mode).');
     onNavigate('/scorer');
   };
 
   const handleNext = () => {
     if (!canProceed()) {
-      toast.error('Please complete all required fields');
+      toast.error('Please complete all required fields configuration values.');
       return;
     }
-
     if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1);
     } else {
-      // Final step - start match
       void startMatch();
     }
   };
@@ -130,7 +208,7 @@ export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
     } else {
-      onNavigate('/matches');
+      onNavigate('/scorer-dashboard');
     }
   };
 
@@ -138,18 +216,22 @@ export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
     if (team === 'A') {
       if (teamAPlayers.includes(playerName)) {
         setTeamAPlayers(teamAPlayers.filter(p => p !== playerName));
+        if (teamACaptain === playerName) setTeamACaptain('');
+        if (teamAWicketKeeper === playerName) setTeamAWicketKeeper('');
       } else if (teamAPlayers.length < 11) {
         setTeamAPlayers([...teamAPlayers, playerName]);
       } else {
-        toast.error('Maximum 11 players allowed');
+        toast.error('Maximum 11 players allowed.');
       }
     } else {
       if (teamBPlayers.includes(playerName)) {
         setTeamBPlayers(teamBPlayers.filter(p => p !== playerName));
+        if (teamBCaptain === playerName) setTeamBCaptain('');
+        if (teamBWicketKeeper === playerName) setTeamBWicketKeeper('');
       } else if (teamBPlayers.length < 11) {
         setTeamBPlayers([...teamBPlayers, playerName]);
       } else {
-        toast.error('Maximum 11 players allowed');
+        toast.error('Maximum 11 players allowed.');
       }
     }
   };
@@ -159,551 +241,268 @@ export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
   const bowlingTeam = battingTeam === teamA ? teamB : teamA;
   const bowlingPlayers = bowlingTeam === teamA ? teamAPlayers : teamBPlayers;
 
+  if (loading) return <div className="p-12 text-center text-gray-500 font-medium">Syncing administrative match token rosters...</div>;
+
   return (
-    <div className="min-h-screen bg-[#f9f9f9] py-6 px-4">
+    <div className="min-h-screen bg-[#f4f5f7] py-8 px-4 text-black">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-[#1a1a1a] mb-2">Match Setup</h1>
-          <p className="text-[#666666]">Configure your match settings in 5 easy steps</p>
+        
+        {/* Header Metadata Frame */}
+        <div className="mb-8 flex justify-between items-end">
+          <div>
+            <h1 className="text-3xl font-black text-gray-900 tracking-tight">Match Setup Controller</h1>
+            <p className="text-sm text-gray-500 mt-1">Configure parameters and squads for active server sync</p>
+          </div>
+          {matchId && (
+            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 shadow-sm hidden sm:block">
+              🔗 Linked to Instance ID: {matchId.substring(0, 8)}...
+            </span>
+          )}
         </div>
 
-        {/* Progress Bar */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            {[1, 2, 3, 4, 5].map((step) => (
-              <div key={step} className="flex items-center flex-1">
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all ${
-                    step < currentStep
-                      ? 'bg-green-600 text-white'
-                      : step === currentStep
-                      ? 'bg-[#e60023] text-white ring-4 ring-red-100'
-                      : 'bg-gray-200 text-gray-600'
-                  }`}
-                >
-                  {step < currentStep ? <Check size={20} /> : step}
+        {/* Timeline Bar */}
+        <div className="mb-8 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm relative overflow-hidden">
+          <div className="relative flex justify-between z-10 max-w-3xl mx-auto px-2">
+            <div className="absolute top-5 left-8 right-8 h-1 bg-gray-100 -z-10 transform -translate-y-1/2 rounded" />
+            <div 
+              className="absolute top-5 left-8 h-1 bg-emerald-600 -z-10 transform -translate-y-1/2 rounded transition-all duration-300" 
+              style={{ width: `calc(${((currentStep - 1) / (totalSteps - 1)) * 100}% - 4rem)` }}
+            />
+
+            {[1, 2, 3, 4, 5].map((step, index) => (
+              <div key={step} className="flex flex-col items-center gap-2 w-16 sm:w-20">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black transition-all shadow-sm ${
+                  step < currentStep ? 'bg-emerald-600 text-white' :
+                  step === currentStep ? 'bg-[#e60023] text-white ring-4 ring-red-100' : 'bg-gray-100 text-gray-400'
+                }`}>
+                  {step < currentStep ? <Check size={18} strokeWidth={3} /> : step}
                 </div>
-                {step < 5 && (
-                  <div
-                    className={`flex-1 h-1 mx-2 transition-all ${
-                      step < currentStep ? 'bg-green-600' : 'bg-gray-200'
-                    }`}
-                  />
-                )}
+                <span className={`text-[9px] sm:text-[11px] uppercase tracking-wider font-extrabold text-center ${step === currentStep ? 'text-[#e60023]' : 'text-gray-400'}`}>
+                  {stepsList[index]}
+                </span>
               </div>
             ))}
           </div>
-          <div className="flex items-center justify-between text-xs text-[#666666]">
-            <span>Teams</span>
-            <span>Playing XI</span>
-            <span>Toss</span>
-            <span>Settings</span>
-            <span>Start</span>
-          </div>
         </div>
 
-        {/* Step Content */}
-        <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
-          {/* Step 1: Team Selection */}
+        {/* Dynamic Wizard Steps Renderer Panel */}
+        <div className="bg-white rounded-3xl border border-gray-200 shadow-xl p-6 md:p-8 mb-6">
+          
+          {/* STEP 1: VERIFY TEAMS AND SCHEDULE */}
           {currentStep === 1 && (
-            <div>
-              <h2 className="text-2xl font-bold text-[#1a1a1a] mb-6">Step 1: Select Teams</h2>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium mb-3 text-[#1a1a1a]">
-                    Team A *
-                  </label>
-                  <select
-                    value={teamA}
-                    onChange={(e) => setTeamA(e.target.value)}
-                    className="w-full p-4 border-2 border-[#e0e0e0] rounded-xl focus:outline-none focus:border-[#e60023] text-lg"
-                  >
-                    <option value="">Select Team A</option>
-                    {mockTeams.map((team) => (
-                      <option key={team.id} value={team.name} disabled={team.name === teamB}>
-                        {team.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-3 text-[#1a1a1a]">
-                    Team B *
-                  </label>
-                  <select
-                    value={teamB}
-                    onChange={(e) => setTeamB(e.target.value)}
-                    className="w-full p-4 border-2 border-[#e0e0e0] rounded-xl focus:outline-none focus:border-[#e60023] text-lg"
-                  >
-                    <option value="">Select Team B</option>
-                    {mockTeams.map((team) => (
-                      <option key={team.id} value={team.name} disabled={team.name === teamA}>
-                        {team.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            <div className="space-y-6 animate-fadeIn">
+              <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
+                <Landmark className="text-[#e60023]" size={22} />
+                <h2 className="text-xl font-black text-gray-900">Step 1: Administrative Schedule Dispatch</h2>
               </div>
-
-              {teamA && teamB && (
-                <div className="mt-8 p-6 bg-green-50 border-2 border-green-200 rounded-xl">
-                  <p className="text-center text-lg font-semibold text-green-800">
-                    {teamA} vs {teamB}
-                  </p>
+              
+              {matchId ? (
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 text-center space-y-4">
+                  <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Locked Fixture Matches Matrix</p>
+                  <p className="text-2xl font-black text-gray-900">{teamA} <span className="text-red-500 text-lg font-normal">vs</span> {teamB}</p>
+                  <p className="text-xs text-gray-500 font-semibold bg-white border px-3 py-1.5 rounded-xl max-w-md mx-auto shadow-inner">📍 Operational Venue Locked: {venue} {ground ? `| ${ground}` : ''}</p>
+                </div>
+              ) : (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-xs font-bold text-yellow-800 flex items-center gap-2">
+                  <ShieldAlert size={18} /> Freelance Demo Setup active. Values chosen will not register against database.
                 </div>
               )}
             </div>
           )}
 
-          {/* Step 2: Playing XI */}
+          {/* STEP 2: DYNAMIC CHECKLIST SQUAD FOR PLAYING 11 */}
           {currentStep === 2 && (
-            <div>
-              <h2 className="text-2xl font-bold text-[#1a1a1a] mb-6">Step 2: Select Playing XI</h2>
+            <div className="space-y-6 animate-fadeIn">
+              <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
+                <Users className="text-[#e60023]" size={22} />
+                <h2 className="text-xl font-black text-gray-900">Step 2: Lock Active Playing XI Squads</h2>
+              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Team A Players */}
-                <div>
-                  <h3 className="text-lg font-semibold mb-4 text-[#1a1a1a]">
-                    {teamA} ({teamAPlayers.length}/11)
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Team A Checklist Block */}
+                <div className="space-y-4">
+                  <h3 className="font-extrabold text-gray-800 text-sm bg-gray-50 p-2.5 rounded-lg border flex justify-between">
+                    <span>{teamA} Pool</span>
+                    <span className="text-[#e60023] font-black">{teamAPlayers.length}/11 Selected</span>
                   </h3>
-                  <div className="space-y-2 mb-4 max-h-64 overflow-y-auto">
-                    {mockPlayers
-                      .filter((p) => p.team === teamA)
-                      .map((player) => (
-                        <button
-                          key={player.id}
-                          onClick={() => togglePlayerSelection('A', player.name)}
-                          className={`w-full p-3 rounded-lg text-left transition-all ${
-                            teamAPlayers.includes(player.name)
-                              ? 'bg-[#e60023] text-white font-semibold'
-                              : 'bg-[#f9f9f9] text-[#1a1a1a] hover:bg-[#f0f0f0]'
-                          }`}
-                        >
-                          {player.name} - {player.role}
-                        </button>
-                      ))}
+                  <div className="space-y-1 max-h-60 overflow-y-auto border border-gray-100 p-2 rounded-xl bg-gray-50/30">
+                    {teamAPool.map((p) => (
+                      <label key={p.id} className={`flex items-center gap-3 p-2.5 rounded-lg border text-xs font-bold cursor-pointer transition-all ${
+                        teamAPlayers.includes(p.name) ? 'bg-red-50 text-[#e60023] border-red-200' : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-100'
+                      }`}>
+                        <input type="checkbox" checked={teamAPlayers.includes(p.name)} onChange={() => togglePlayerSelection('A', p.name)} className="w-4 h-4 accent-[#e60023]" />
+                        <span className="flex-1 truncate">{p.name}</span><span className="text-[10px] text-gray-400 font-normal">({p.role})</span>
+                      </label>
+                    ))}
                   </div>
 
                   {teamAPlayers.length === 11 && (
-                    <>
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium mb-2">Captain *</label>
-                        <select
-                          value={teamACaptain}
-                          onChange={(e) => setTeamACaptain(e.target.value)}
-                          className="w-full p-3 border border-[#e0e0e0] rounded-lg"
-                        >
-                          <option value="">Select Captain</option>
-                          {teamAPlayers.map((player) => (
-                            <option key={player} value={player}>
-                              {player}
-                            </option>
-                          ))}
+                    <div className="grid grid-cols-2 gap-3 pt-2 animate-fadeIn">
+                      <div><label className="block text-[11px] font-bold text-gray-400 mb-1">Captain</label>
+                        <select value={teamACaptain} onChange={e => setTeamACaptain(e.target.value)} className="w-full text-xs p-2 border rounded-xl bg-white font-semibold outline-none focus:border-[#e60023]">
+                          <option value="">Select</option>{teamAPlayers.map(n => <option key={n} value={n}>{n}</option>)}
                         </select>
                       </div>
-
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Wicketkeeper *</label>
-                        <select
-                          value={teamAWicketKeeper}
-                          onChange={(e) => setTeamAWicketKeeper(e.target.value)}
-                          className="w-full p-3 border border-[#e0e0e0] rounded-lg"
-                        >
-                          <option value="">Select Wicketkeeper</option>
-                          {teamAPlayers.map((player) => (
-                            <option key={player} value={player}>
-                              {player}
-                            </option>
-                          ))}
+                      <div><label className="block text-[11px] font-bold text-gray-400 mb-1">Keeper</label>
+                        <select value={teamAWicketKeeper} onChange={e => setTeamAWicketKeeper(e.target.value)} className="w-full text-xs p-2 border rounded-xl bg-white font-semibold outline-none focus:border-[#e60023]">
+                          <option value="">Select</option>{teamAPlayers.map(n => <option key={n} value={n}>{n}</option>)}
                         </select>
                       </div>
-                    </>
+                    </div>
                   )}
                 </div>
 
-                {/* Team B Players */}
-                <div>
-                  <h3 className="text-lg font-semibold mb-4 text-[#1a1a1a]">
-                    {teamB} ({teamBPlayers.length}/11)
+                {/* Team B Checklist Block */}
+                <div className="space-y-4">
+                  <h3 className="font-extrabold text-gray-800 text-sm bg-gray-50 p-2.5 rounded-lg border flex justify-between">
+                    <span>{teamB} Pool</span>
+                    <span className="text-[#e60023] font-black">{teamBPlayers.length}/11 Selected</span>
                   </h3>
-                  <div className="space-y-2 mb-4 max-h-64 overflow-y-auto">
-                    {mockPlayers
-                      .filter((p) => p.team === teamB)
-                      .map((player) => (
-                        <button
-                          key={player.id}
-                          onClick={() => togglePlayerSelection('B', player.name)}
-                          className={`w-full p-3 rounded-lg text-left transition-all ${
-                            teamBPlayers.includes(player.name)
-                              ? 'bg-[#e60023] text-white font-semibold'
-                              : 'bg-[#f9f9f9] text-[#1a1a1a] hover:bg-[#f0f0f0]'
-                          }`}
-                        >
-                          {player.name} - {player.role}
-                        </button>
-                      ))}
+                  <div className="space-y-1 max-h-60 overflow-y-auto border border-gray-100 p-2 rounded-xl bg-gray-50/30">
+                    {teamBPool.map((p) => (
+                      <label key={p.id} className={`flex items-center gap-3 p-2.5 rounded-lg border text-xs font-bold cursor-pointer transition-all ${
+                        teamBPlayers.includes(p.name) ? 'bg-red-50 text-[#e60023] border-red-200' : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-100'
+                      }`}>
+                        <input type="checkbox" checked={teamBPlayers.includes(p.name)} onChange={() => togglePlayerSelection('B', p.name)} className="w-4 h-4 accent-[#e60023]" />
+                        <span className="flex-1 truncate">{p.name}</span><span className="text-[10px] text-gray-400 font-normal">({p.role})</span>
+                      </label>
+                    ))}
                   </div>
 
                   {teamBPlayers.length === 11 && (
-                    <>
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium mb-2">Captain *</label>
-                        <select
-                          value={teamBCaptain}
-                          onChange={(e) => setTeamBCaptain(e.target.value)}
-                          className="w-full p-3 border border-[#e0e0e0] rounded-lg"
-                        >
-                          <option value="">Select Captain</option>
-                          {teamBPlayers.map((player) => (
-                            <option key={player} value={player}>
-                              {player}
-                            </option>
-                          ))}
+                    <div className="grid grid-cols-2 gap-3 pt-2 animate-fadeIn">
+                      <div><label className="block text-[11px] font-bold text-gray-400 mb-1">Captain</label>
+                        <select value={teamBCaptain} onChange={e => setTeamBCaptain(e.target.value)} className="w-full text-xs p-2 border rounded-xl bg-white font-semibold outline-none focus:border-[#e60023]">
+                          <option value="">Select</option>{teamBPlayers.map(n => <option key={n} value={n}>{n}</option>)}
                         </select>
                       </div>
-
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Wicketkeeper *</label>
-                        <select
-                          value={teamBWicketKeeper}
-                          onChange={(e) => setTeamBWicketKeeper(e.target.value)}
-                          className="w-full p-3 border border-[#e0e0e0] rounded-lg"
-                        >
-                          <option value="">Select Wicketkeeper</option>
-                          {teamBPlayers.map((player) => (
-                            <option key={player} value={player}>
-                              {player}
-                            </option>
-                          ))}
+                      <div><label className="block text-[11px] font-bold text-gray-400 mb-1">Keeper</label>
+                        <select value={teamBWicketKeeper} onChange={e => setTeamBWicketKeeper(e.target.value)} className="w-full text-xs p-2 border rounded-xl bg-white font-semibold outline-none focus:border-[#e60023]">
+                          <option value="">Select</option>{teamBPlayers.map(n => <option key={n} value={n}>{n}</option>)}
                         </select>
                       </div>
-                    </>
+                    </div>
                   )}
                 </div>
               </div>
             </div>
           )}
 
-          {/* Step 3: Toss */}
+          {/* STEP 3: TOSS DECISION */}
           {currentStep === 3 && (
-            <div>
-              <h2 className="text-2xl font-bold text-[#1a1a1a] mb-6">Step 3: Toss</h2>
+            <div className="space-y-6 animate-fadeIn">
+              <h2 className="text-xl font-black text-gray-900 border-b pb-2">Step 3: Toss Records</h2>
+              <div className="space-y-4">
+                <label className="block text-sm font-bold text-gray-500">Who won the toss?</label>
+                <div className="grid grid-cols-2 gap-4">
+                  <button onClick={() => setTossWinner(teamA)} className={`p-5 rounded-2xl font-bold transition-all border ${tossWinner === teamA ? 'bg-[#e60023] text-white border-transparent shadow-md' : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border-gray-200'}`}>{teamA}</button>
+                  <button onClick={() => setTossWinner(teamB)} className={`p-5 rounded-2xl font-bold transition-all border ${tossWinner === teamB ? 'bg-[#e60023] text-white border-transparent shadow-md' : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border-gray-200'}`}>{teamB}</button>
+                </div>
+              </div>
 
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium mb-3 text-[#1a1a1a]">
-                    Toss Winner *
-                  </label>
+              {tossWinner && (
+                <div className="space-y-4 pt-4 border-t border-gray-100 animate-fadeIn">
+                  <label className="block text-sm font-bold text-gray-500">Toss Decision</label>
                   <div className="grid grid-cols-2 gap-4">
-                    <button
-                      onClick={() => setTossWinner(teamA)}
-                      className={`p-6 rounded-xl font-semibold text-lg transition-all ${
-                        tossWinner === teamA
-                          ? 'bg-[#e60023] text-white ring-4 ring-red-100'
-                          : 'bg-[#f9f9f9] text-[#1a1a1a] hover:bg-[#f0f0f0]'
-                      }`}
-                    >
-                      {teamA}
-                    </button>
-                    <button
-                      onClick={() => setTossWinner(teamB)}
-                      className={`p-6 rounded-xl font-semibold text-lg transition-all ${
-                        tossWinner === teamB
-                          ? 'bg-[#e60023] text-white ring-4 ring-red-100'
-                          : 'bg-[#f9f9f9] text-[#1a1a1a] hover:bg-[#f0f0f0]'
-                      }`}
-                    >
-                      {teamB}
-                    </button>
+                    <button onClick={() => setTossDecision('bat')} className={`p-5 rounded-2xl font-black text-base border transition-all ${tossDecision === 'bat' ? 'bg-emerald-600 text-white border-transparent shadow-md' : 'bg-gray-50 text-gray-700'}`}>BAT FIRST</button>
+                    <button onClick={() => setTossDecision('bowl')} className={`p-5 rounded-2xl font-black text-base border transition-all ${tossDecision === 'bowl' ? 'bg-blue-600 text-white border-transparent shadow-md' : 'bg-gray-50 text-gray-700'}`}>BOWL FIRST</button>
                   </div>
                 </div>
-
-                {tossWinner && (
-                  <div>
-                    <label className="block text-sm font-medium mb-3 text-[#1a1a1a]">
-                      Decision *
-                    </label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <button
-                        onClick={() => setTossDecision('bat')}
-                        className={`p-6 rounded-xl font-semibold text-lg transition-all ${
-                          tossDecision === 'bat'
-                            ? 'bg-green-600 text-white ring-4 ring-green-100'
-                            : 'bg-[#f9f9f9] text-[#1a1a1a] hover:bg-[#f0f0f0]'
-                        }`}
-                      >
-                        Bat First
-                      </button>
-                      <button
-                        onClick={() => setTossDecision('bowl')}
-                        className={`p-6 rounded-xl font-semibold text-lg transition-all ${
-                          tossDecision === 'bowl'
-                            ? 'bg-blue-600 text-white ring-4 ring-blue-100'
-                            : 'bg-[#f9f9f9] text-[#1a1a1a] hover:bg-[#f0f0f0]'
-                        }`}
-                      >
-                        Bowl First
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {tossWinner && tossDecision && (
-                  <div className="p-6 bg-green-50 border-2 border-green-200 rounded-xl">
-                    <p className="text-center text-lg font-semibold text-green-800">
-                      {tossWinner} won the toss and elected to {tossDecision} first
-                    </p>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           )}
 
-          {/* Step 4: Match Settings */}
+          {/* STEP 4: UI CONFIGURATIONS ENGINE */}
           {currentStep === 4 && (
-            <div>
-              <h2 className="text-2xl font-bold text-[#1a1a1a] mb-6">Step 4: Match Settings</h2>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-6 animate-fadeIn">
+              <h2 className="text-xl font-black text-gray-900 border-b pb-2">Step 4: UI Engine Configurations</h2>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm font-bold">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Match Type *</label>
-                  <select
-                    value={matchType}
-                    onChange={(e) => setMatchType(e.target.value)}
-                    className="w-full p-3 border border-[#e0e0e0] rounded-lg"
+                  <label className="block text-gray-500 mb-1">Wagon-Wheel Tracking</label>
+                  <select 
+                    value={wagonWheel ? 'enabled' : 'disabled'} 
+                    onChange={e => setWagonWheel(e.target.value === 'enabled')} 
+                    className="w-full p-3 border rounded-xl bg-white outline-none focus:border-[#e60023]"
                   >
-                    <option value="T20">T20</option>
-                    <option value="ODI">ODI</option>
-                    <option value="Test">Test</option>
+                    <option value="enabled">Enabled (Track batting directions)</option>
+                    <option value="disabled">Disabled (Standard numerical scoring)</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Total Overs *</label>
-                  <input
-                    type="number"
-                    value={totalOvers}
-                    onChange={(e) => setTotalOvers(e.target.value)}
-                    className="w-full p-3 border border-[#e0e0e0] rounded-lg"
-                    min="1"
-                  />
+                  <label className="block text-gray-500 mb-1">Commentary Module Engine</label>
+                  <select 
+                    value={commentaryType} 
+                    onChange={e => setCommentaryType(e.target.value)} 
+                    className="w-full p-3 border rounded-xl bg-white outline-none focus:border-[#e60023]"
+                  >
+                    <option value="auto">Auto-Generated System Sync</option>
+                    <option value="manual">Manual Entry Required</option>
+                    <option value="none">Disabled (No Commentary)</option>
+                  </select>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-2">Overs Per Bowler *</label>
-                  <input
-                    type="number"
-                    value={oversPerBowler}
-                    onChange={(e) => setOversPerBowler(e.target.value)}
-                    className="w-full p-3 border border-[#e0e0e0] rounded-lg"
-                    min="1"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">Venue *</label>
-                  <input
-                    type="text"
-                    value={venue}
-                    onChange={(e) => setVenue(e.target.value)}
-                    placeholder="Enter venue name"
-                    className="w-full p-3 border border-[#e0e0e0] rounded-lg"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">Ground *</label>
-                  <input
-                    type="text"
-                    value={ground}
-                    onChange={(e) => setGround(e.target.value)}
-                    placeholder="Enter ground name"
-                    className="w-full p-3 border border-[#e0e0e0] rounded-lg"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">Country *</label>
-                  <input
-                    type="text"
-                    value={country}
-                    onChange={(e) => setCountry(e.target.value)}
-                    placeholder="Enter country"
-                    className="w-full p-3 border border-[#e0e0e0] rounded-lg"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">Wagon Wheel</label>
-                  <div className="flex items-center gap-4">
-                    <button
-                      onClick={() => setWagonWheel(true)}
-                      className={`flex-1 p-3 rounded-lg font-medium transition-all ${
-                        wagonWheel
-                          ? 'bg-green-600 text-white'
-                          : 'bg-[#f9f9f9] text-[#1a1a1a] hover:bg-[#f0f0f0]'
-                      }`}
-                    >
-                      Enabled
-                    </button>
-                    <button
-                      onClick={() => setWagonWheel(false)}
-                      className={`flex-1 p-3 rounded-lg font-medium transition-all ${
-                        !wagonWheel
-                          ? 'bg-red-600 text-white'
-                          : 'bg-[#f9f9f9] text-[#1a1a1a] hover:bg-[#f0f0f0]'
-                      }`}
-                    >
-                      Disabled
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">Name Display</label>
-                  <div className="flex items-center gap-4">
-                    <button
-                      onClick={() => setNameDisplay('full')}
-                      className={`flex-1 p-3 rounded-lg font-medium transition-all ${
-                        nameDisplay === 'full'
-                          ? 'bg-[#e60023] text-white'
-                          : 'bg-[#f9f9f9] text-[#1a1a1a] hover:bg-[#f0f0f0]'
-                      }`}
-                    >
-                      Full Name
-                    </button>
-                    <button
-                      onClick={() => setNameDisplay('short')}
-                      className={`flex-1 p-3 rounded-lg font-medium transition-all ${
-                        nameDisplay === 'short'
-                          ? 'bg-[#e60023] text-white'
-                          : 'bg-[#f9f9f9] text-[#1a1a1a] hover:bg-[#f0f0f0]'
-                      }`}
-                    >
-                      Short Name
-                    </button>
-                  </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-gray-500 mb-1">Player UI Display Name Format</label>
+                  <select 
+                    value={nameDisplay} 
+                    onChange={e => setNameDisplay(e.target.value)} 
+                    className="w-full p-3 border rounded-xl bg-white outline-none focus:border-[#e60023]"
+                  >
+                    <option value="First Initial Last Name">First Initial Last Name (e.g., J Bumrah)</option>
+                    <option value="First Name Last Name">First Name Last Name (e.g., Jasprit Bumrah)</option>
+                    <option value="First Name Last Initial">First Name Last Initial (e.g., Jasprit B)</option>
+                  </select>
+                  <p className="text-[10px] text-gray-400 font-semibold mt-1.5 ml-1">
+                    This format dictates how player names appear across the scoring console, scorecard, and analytics views.
+                  </p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Step 5: Match Start */}
+          {/* STEP 5: INITIAL INNING OPENERS DECK */}
           {currentStep === 5 && (
-            <div>
-              <h2 className="text-2xl font-bold text-[#1a1a1a] mb-6">Step 5: Start Match</h2>
-
-              <div className="mb-6 p-6 bg-blue-50 border-2 border-blue-200 rounded-xl">
-                <p className="text-center text-lg font-semibold text-blue-800">
-                  {battingTeam} will bat first
-                </p>
-              </div>
-
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium mb-3 text-[#1a1a1a]">
-                    Opening Batsmen - Select Striker *
-                  </label>
-                  <select
-                    value={striker}
-                    onChange={(e) => setStriker(e.target.value)}
-                    className="w-full p-4 border-2 border-[#e0e0e0] rounded-xl text-lg"
-                  >
-                    <option value="">Select Striker</option>
-                    {battingPlayers.map((player) => (
-                      <option key={player} value={player} disabled={player === nonStriker}>
-                        {player}
-                      </option>
-                    ))}
+            <div className="space-y-6 animate-fadeIn">
+              <h2 className="text-xl font-black text-gray-900 border-b pb-2">Step 5: Operational Launch Deck</h2>
+              <div className="bg-red-50/50 p-4 rounded-xl border text-center font-bold text-sm text-[#e60023] mb-4">🏏 Batting First: {battingTeam} | 🥎 Bowling: {bowlingTeam}</div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-sm font-bold">
+                <div><label className="block text-gray-500 mb-1">Select Striker Batsman *</label>
+                  <select value={striker} onChange={e => setStriker(e.target.value)} className="w-full p-3 border rounded-xl bg-white font-semibold outline-none focus:border-[#e60023]">
+                    <option value="">Select Striker</option>{battingPlayers.map(n => <option key={n} value={n} disabled={n === nonStriker}>{n}</option>)}
                   </select>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-3 text-[#1a1a1a]">
-                    Opening Batsmen - Select Non-Striker *
-                  </label>
-                  <select
-                    value={nonStriker}
-                    onChange={(e) => setNonStriker(e.target.value)}
-                    className="w-full p-4 border-2 border-[#e0e0e0] rounded-xl text-lg"
-                  >
-                    <option value="">Select Non-Striker</option>
-                    {battingPlayers.map((player) => (
-                      <option key={player} value={player} disabled={player === striker}>
-                        {player}
-                      </option>
-                    ))}
+                <div><label className="block text-gray-500 mb-1">Select Non-Striker *</label>
+                  <select value={nonStriker} onChange={e => setNonStriker(e.target.value)} className="w-full p-3 border rounded-xl bg-white font-semibold outline-none focus:border-[#e60023]">
+                    <option value="">Select Non-Striker</option>{battingPlayers.map(n => <option key={n} value={n} disabled={n === striker}>{n}</option>)}
                   </select>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-3 text-[#1a1a1a]">
-                    Opening Bowler *
-                  </label>
-                  <select
-                    value={openingBowler}
-                    onChange={(e) => setOpeningBowler(e.target.value)}
-                    className="w-full p-4 border-2 border-[#e0e0e0] rounded-xl text-lg"
-                  >
-                    <option value="">Select Opening Bowler</option>
-                    {bowlingPlayers.map((player) => (
-                      <option key={player} value={player}>
-                        {player}
-                      </option>
-                    ))}
+                <div><label className="block text-gray-500 mb-1">Select Opening Bowler *</label>
+                  <select value={openingBowler} onChange={e => setOpeningBowler(e.target.value)} className="w-full p-3 border rounded-xl bg-white font-semibold outline-none focus:border-[#e60023]">
+                    <option value="">Select Bowler</option>{bowlingPlayers.map(n => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </div>
-
-                {striker && nonStriker && openingBowler && (
-                  <div className="p-6 bg-green-50 border-2 border-green-200 rounded-xl">
-                    <h3 className="font-semibold text-green-800 mb-3 text-center">Match Ready!</h3>
-                    <div className="space-y-2 text-sm text-green-800">
-                      <p><strong>Striker:</strong> {striker}</p>
-                      <p><strong>Non-Striker:</strong> {nonStriker}</p>
-                      <p><strong>Opening Bowler:</strong> {openingBowler}</p>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           )}
+
         </div>
 
-        {/* Navigation Buttons */}
-        <div className="flex items-center justify-between">
-          <button
-            onClick={handleBack}
-            className="px-6 py-3 bg-gray-200 text-gray-800 rounded-xl font-semibold hover:bg-gray-300 transition-all flex items-center gap-2"
-          >
-            <ArrowLeft size={20} />
-            {currentStep === 1 ? 'Cancel' : 'Back'}
+        {/* BOTTOM NAVIGATION ACTION RUN BAR */}
+        <div className="flex justify-between items-center">
+          <button onClick={handleBack} className="px-6 py-3 bg-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-300 transition-all flex items-center gap-1.5 text-sm">
+            <ArrowLeft size={16} />{currentStep === 1 ? 'Discard Setup' : 'Back'}
           </button>
-
-          <div className="text-sm text-[#666666]">
-            Step {currentStep} of {totalSteps}
-          </div>
-
-          <button
-            onClick={handleNext}
-            disabled={!canProceed()}
-            className="px-6 py-3 bg-[#e60023] text-white rounded-xl font-semibold hover:bg-[#cc001e] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-          >
-            {currentStep === totalSteps ? (
-              <>
-                <Check size={20} />
-                Start Match
-              </>
-            ) : (
-              <>
-                Next
-                <ArrowRight size={20} />
-              </>
-            )}
+          
+          <span className="text-xs font-bold text-gray-400">Step {currentStep} / {totalSteps}</span>
+          
+          <button onClick={handleNext} disabled={!canProceed()} className="px-6 py-3 bg-[#e60023] text-white font-bold rounded-xl disabled:opacity-40 hover:bg-red-700 transition-all flex items-center gap-1.5 text-sm shadow-md">
+            {currentStep === totalSteps ? (<><Check size={16} strokeWidth={3} /> Launch Scoring Console</>) : (<>Next <ArrowRight size={16} /></>)}
           </button>
         </div>
+
       </div>
     </div>
   );

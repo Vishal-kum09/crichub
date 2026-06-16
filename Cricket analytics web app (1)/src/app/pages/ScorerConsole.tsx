@@ -57,6 +57,10 @@ interface Bowler {
 }
 
 export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
+  // 🔥 FETCH SESSION FIRST: We must get this first so we can inject the real names
+  const [session] = useState(() => getLiveSession());
+  const isConnected = Boolean(session && matchId);
+
   // Match state
   const [isLive, setIsLive] = useState(false);
   const [activeTab, setActiveTab] = useState<'scoring' | 'scorecard' | 'commentary'>('scoring');
@@ -73,24 +77,44 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
   const [currentExtraType, setCurrentExtraType] = useState<string | null>(null);
   const [isWicket, setIsWicket] = useState(false);
 
-  // Players state
-  const [striker, setStriker] = useState('Rohit Sharma');
-  const [nonStriker, setNonStriker] = useState('Virat Kohli');
-  const [currentBowler, setCurrentBowler] = useState('Jasprit Bumrah');
+  
+  // 🔥 REAL PLAYERS STATE: Replaced mock data with session variables
+  // Around line 60 in ScorerConsole.tsx
+// Assuming you update your scorerApi/session structure to include these names
+  const [striker, setStriker] = useState(
+  session?.playerNames?.[session?.strikerId || ''] || 'Striker 1'
+);
+const [nonStriker, setNonStriker] = useState(
+  session?.playerNames?.[session?.nonStrikerId || ''] || 'Non-Striker'
+);
+const [currentBowler, setCurrentBowler] = useState(
+  session?.playerNames?.[session?.bowlerId || ''] || 'Opening Bowler'
+);
+  const [previousBowler, setPreviousBowler] = useState<string | null>(null);
 
   // Ball history
   const [ballHistory, setBallHistory] = useState<BallEvent[]>([]);
   const [undoStack, setUndoStack] = useState<BallEvent[]>([]);
 
-  // Batsmen data
+  // Batsmen data - Initialized with real identities
   const [batsmen, setBatsmen] = useState<Batsman[]>([
-    { name: 'Rohit Sharma', runs: 0, balls: 0, fours: 0, sixes: 0, isOut: false },
-    { name: 'Virat Kohli', runs: 0, balls: 0, fours: 0, sixes: 0, isOut: false },
-  ]);
-
-  // Bowlers data
+    { 
+      name: session?.playerNames?.[session?.strikerId || ''] || 'Striker 1', 
+      runs: 0, balls: 0, fours: 0, sixes: 0, isOut: false 
+    },
+    { 
+      name: session?.playerNames?.[session?.nonStrikerId || ''] || 'Non-Striker', 
+      runs: 0, balls: 0, fours: 0, sixes: 0, isOut: false 
+    },]);
+    const [battingRoster] = useState<string[]>(session?.battingRoster || []);
+    const [fieldingRoster] = useState<string[]>(session?.fieldingRoster || []);
+    const [selectedNextBowler, setSelectedNextBowler] = useState('');
+  // Bowlers data - Initialized with real identities
   const [bowlers, setBowlers] = useState<Bowler[]>([
-    { name: 'Jasprit Bumrah', overs: 0, balls: 0, runs: 0, wickets: 0, maidens: 0 },
+    { 
+      name: session?.playerNames?.[session?.bowlerId || ''] || 'Opening Bowler', 
+      overs: 0, balls: 0, runs: 0, wickets: 0, maidens: 0 
+    },
   ]);
 
   // Extras breakdown
@@ -113,13 +137,6 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
   const [selectedFielder, setSelectedFielder] = useState('');
   const [nextBatsman, setNextBatsman] = useState('');
 
-  // Live DB session — present when MatchSetup initialized a real innings.
-  // matchId prop identifies the match; the session carries the innings + ids.
-  const [session] = useState(() => getLiveSession());
-  const isConnected = Boolean(session && matchId);
-
-  // Mirror the authoritative innings state from the backend into the local
-  // scoreboard so the UI reflects what was actually committed to the DB.
   const syncFromInnings = (innings: InningsState) => {
     setScore(innings.total_runs);
     setWickets(innings.total_wickets);
@@ -134,15 +151,9 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
     });
   };
 
-  // ── Crash guard + offline queue ──────────────────────────────────────────
-  // Deliveries that failed to reach the backend (network error) are queued here
-  // and replayed on the next successful request. connLostToast holds the id of
-  // the non-dismissable "connection lost" banner so we can clear it on recovery.
   const pendingDeliveries = useRef<any[]>([]);
   const connLostToast = useRef<string | number | null>(null);
 
-  // Persist a snapshot of the live scoreboard to sessionStorage so a refresh or
-  // crash mid-innings can be recovered. Keyed by match id.
   const saveSession = (innings: InningsState) => {
     if (!matchId) return;
     sessionStorage.setItem(SCORER_SESSION_KEY, JSON.stringify({
@@ -165,7 +176,6 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
 
   const clearSession = () => sessionStorage.removeItem(SCORER_SESSION_KEY);
 
-  // Restore a saved session for THIS match on mount; clear it on unmount.
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem(SCORER_SESSION_KEY);
@@ -185,7 +195,6 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Replay any queued deliveries in order once connectivity is back.
   const flushPendingDeliveries = async () => {
     if (!isConnected || !session || pendingDeliveries.current.length === 0) return;
     const queue = [...pendingDeliveries.current];
@@ -196,7 +205,6 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
         syncFromInnings(res.innings);
         saveSession(res.innings);
       } catch (err: any) {
-        // Still offline — requeue the rest and stop.
         if (!err?.response) { pendingDeliveries.current.push(payload); }
       }
     }
@@ -207,35 +215,30 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
     }
   };
 
-  // Calculate run rate
   const runRate = overs + balls / 6 > 0 ? (score / (overs + balls / 6)).toFixed(2) : '0.00';
 
-  // Handle run scoring
   const handleRunClick = (runs: number) => {
     if (!isLive) return;
     setCurrentRuns(runs);
   };
 
-  // Handle extras
   const handleExtraClick = (extraType: string) => {
     if (!isLive) return;
     setCurrentExtraType(currentExtraType === extraType ? null : extraType);
 
     if (extraType === 'wide' || extraType === 'no-ball') {
-      setCurrentExtras(1); // Automatic 1 run
+      setCurrentExtras(1);
     } else {
-      setCurrentExtras(0); // Bye/Leg-bye have no automatic run
+      setCurrentExtras(0);
     }
   };
 
-  // Record the ball
   const recordBall = () => {
     if (!isLive) return;
 
     let totalRuns = currentRuns + currentExtras;
     const isLegalDelivery = currentExtraType !== 'wide' && currentExtraType !== 'no-ball';
 
-    // Create ball event
     const ballEvent: BallEvent = {
       over: overs,
       ball: balls,
@@ -251,41 +254,26 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
       timestamp: new Date(),
     };
 
-    // Update score
     setScore(score + totalRuns);
-
-    // Update batsman stats
     updateBatsmanStats(striker, currentRuns, isLegalDelivery);
-
-    // Update bowler stats
     updateBowlerStats(currentBowler, totalRuns, isWicket, isLegalDelivery);
 
-    // Update extras
     if (currentExtraType) {
       updateExtras(currentExtraType, currentExtras + currentRuns);
     }
 
-    // Add to history
     setBallHistory([ballEvent, ...ballHistory]);
-    setUndoStack([]); // Clear redo stack
+    setUndoStack([]);
 
-    // Progress ball if legal delivery
     if (isLegalDelivery && !isWicket) {
       progressBall();
-
-      // Change strike on odd runs
       if (currentRuns % 2 !== 0) {
         swapStrike();
       }
     }
 
-    // Persist to the backend when connected to a real innings. The backend is
-    // the source of truth, so the local scoreboard is reconciled from its
-    // response (which keeps the over/ball counters exact even under extras).
     if (isConnected && session) {
       const extraType = toExtraType(currentExtraType);
-      // For byes/leg-byes the console stores the runs in currentRuns; for
-      // wides the penalty is folded into currentExtras (1 + additional).
       const runsOffBat = extraType === 'NB' || extraType === 'None' ? currentRuns : 0;
       const extraRuns =
         extraType === 'WD' ? Math.max(0, currentExtras - 1)
@@ -304,16 +292,15 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
       apiRecordBall(matchId!, payload)
         .then((res) => {
           syncFromInnings(res.innings);
-          saveSession(res.innings);           // crash-recovery snapshot
-          void flushPendingDeliveries();      // replay anything queued offline
+          saveSession(res.innings);
+          void flushPendingDeliveries();
           if (res.innings_complete) {
-            clearSession();                    // innings over — discard session
+            clearSession();
             toast.success('Innings complete');
           }
         })
         .catch((err) => {
           if (!err?.response) {
-            // Network error (no response) — queue locally and warn persistently.
             pendingDeliveries.current.push(payload);
             if (connLostToast.current == null) {
               connLostToast.current = toast.persist('Connection lost — deliveries queued locally');
@@ -324,7 +311,6 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
         });
     }
 
-    // Reset current ball
     resetCurrentBall();
     toast.success('Ball recorded');
   };
@@ -399,8 +385,8 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
     if (balls === 5) {
       setOvers(overs + 1);
       setBalls(0);
-      setShowBowlerChangeDialog(true); // End of over - change bowler
-      swapStrike(); // Strike changes at end of over
+      setShowBowlerChangeDialog(true);
+      swapStrike();
     } else {
       setBalls(balls + 1);
     }
@@ -421,19 +407,11 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
 
   const undoLastBall = () => {
     if (ballHistory.length === 0) return;
-
     const lastBall = ballHistory[0];
-
-    // Move to undo stack
     setUndoStack([lastBall, ...undoStack]);
-
-    // Remove from history
     setBallHistory(ballHistory.slice(1));
-
-    // Reverse score
     setScore(score - lastBall.runs);
 
-    // Reverse ball count
     if (balls === 0) {
       setOvers(Math.max(0, overs - 1));
       setBalls(5);
@@ -441,38 +419,27 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
       setBalls(balls - 1);
     }
 
-    // Reverse the last delivery in the DB and reconcile from the restored state.
     if (isConnected && session) {
       apiUndoBall(matchId!, session.inningsId)
         .then((res) => syncFromInnings(res.innings))
         .catch((err) => toast.error(err?.response?.data?.error || 'Failed to undo'));
     }
-
     toast.success('Ball undone');
   };
 
   const redoLastBall = () => {
     if (undoStack.length === 0) return;
-
     const ballToRedo = undoStack[0];
-
-    // Move back to history
     setBallHistory([ballToRedo, ...ballHistory]);
-
-    // Remove from undo stack
     setUndoStack(undoStack.slice(1));
-
-    // Restore score
     setScore(score + ballToRedo.runs);
 
-    // Restore ball count
     if (balls === 5) {
       setOvers(overs + 1);
       setBalls(0);
     } else {
       setBalls(balls + 1);
     }
-
     toast.success('Ball redone');
   };
 
@@ -623,49 +590,77 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
         <div className="space-y-6">
           {/* Current Players */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white rounded-lg shadow-sm p-6 border border-[#e0e0e0]">
-              <p className="text-xs text-[#666666] mb-3 uppercase tracking-wide">Batsmen</p>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border-2 border-green-500">
-                  <div>
-                    <span className="font-semibold text-[#1a1a1a]">{striker}*</span>
-                    <p className="text-xs text-[#666666]">On Strike</p>
+            {/* Batsmen Block */}
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-[#e0e0e0] flex flex-col justify-between">
+              <div>
+                <p className="text-xs text-[#666666] mb-3 uppercase tracking-wide">Batsmen</p>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border-2 border-green-500">
+                    <div>
+                      <span className="font-semibold text-[#1a1a1a]">{striker}*</span>
+                      <p className="text-xs text-[#666666]">On Strike</p>
+                    </div>
+                    <span className="text-lg font-bold tabular-nums">
+                      {batsmen.find(b => b.name === striker)?.runs || 0} ({batsmen.find(b => b.name === striker)?.balls || 0})
+                    </span>
                   </div>
-                  <span className="text-lg font-bold tabular-nums">
-                    {batsmen.find(b => b.name === striker)?.runs || 0} ({batsmen.find(b => b.name === striker)?.balls || 0})
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-[#f9f9f9] rounded-lg">
-                  <div>
-                    <span className="font-semibold text-[#1a1a1a]">{nonStriker}</span>
-                    <p className="text-xs text-[#666666]">Non-Striker</p>
+                  <div className="flex items-center justify-between p-3 bg-[#f9f9f9] rounded-lg">
+                    <div>
+                      <span className="font-semibold text-[#1a1a1a]">{nonStriker}</span>
+                      <p className="text-xs text-[#666666]">Non-Striker</p>
+                    </div>
+                    <span className="text-lg font-bold tabular-nums">
+                      {batsmen.find(b => b.name === nonStriker)?.runs || 0} ({batsmen.find(b => b.name === nonStriker)?.balls || 0})
+                    </span>
                   </div>
-                  <span className="text-lg font-bold tabular-nums">
-                    {batsmen.find(b => b.name === nonStriker)?.runs || 0} ({batsmen.find(b => b.name === nonStriker)?.balls || 0})
-                  </span>
                 </div>
               </div>
               <button
                 onClick={swapStrike}
                 disabled={!isLive}
-                className="w-full mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                className="w-full mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
               >
                 Change Strike
               </button>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm p-6 border border-[#e0e0e0]">
-              <p className="text-xs text-[#666666] mb-3 uppercase tracking-wide">Current Bowler</p>
-              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border-2 border-blue-500">
-                <div>
-                  <span className="font-semibold text-[#1a1a1a]">{currentBowler}</span>
-                  <p className="text-xs text-[#666666]">Bowling</p>
+            {/* 🔥 NEW UI: Current & Previous Bowler Block */}
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-[#e0e0e0] flex flex-col justify-between">
+              <div>
+                <p className="text-xs text-[#666666] mb-3 uppercase tracking-wide">Current Bowler</p>
+                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border-2 border-blue-500">
+                  <div>
+                    <span className="font-semibold text-[#1a1a1a]">{currentBowler}</span>
+                    <p className="text-xs text-[#666666]">Bowling</p>
+                  </div>
+                  <span className="text-lg font-bold tabular-nums">
+                    {(bowlers.find(b => b.name === currentBowler)?.overs || 0)}.{Math.abs(bowlers.find(b => b.name === currentBowler)?.balls ?? 0) % 6}-
+                    {bowlers.find(b => b.name === currentBowler)?.runs || 0}-
+                    {bowlers.find(b => b.name === currentBowler)?.wickets || 0}
+                  </span>
                 </div>
-                <span className="text-lg font-bold tabular-nums">
-                  {bowlers.find(b => b.name === currentBowler)?.overs || 0}.{bowlers.find(b => b.name === currentBowler)?.balls || 0}-
-                  {bowlers.find(b => b.name === currentBowler)?.runs || 0}-
-                  {bowlers.find(b => b.name === currentBowler)?.wickets || 0}
-                </span>
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <p className="text-xs text-[#666666] mb-3 uppercase tracking-wide">Previous Bowler</p>
+                {previousBowler ? (
+                  <div className="flex items-center justify-between p-3 bg-[#f9f9f9] rounded-lg">
+                    <div>
+                      <span className="font-semibold text-[#1a1a1a]">{previousBowler}</span>
+                      <p className="text-xs text-[#666666]">Last Over</p>
+                    </div>
+                    <span className="text-lg font-bold tabular-nums text-gray-500">
+                      {/* Previous Bowler Stats */}
+                      {(bowlers.find(b => b.name === previousBowler)?.overs || 0)}.{Math.abs(bowlers.find(b => b.name === previousBowler)?.balls ?? 0) % 6}-
+                      {bowlers.find(b => b.name === previousBowler)?.runs || 0}-
+                      {bowlers.find(b => b.name === previousBowler)?.wickets || 0}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-[68px] p-3 bg-[#f9f9f9] rounded-lg border border-dashed border-gray-300">
+                    <span className="text-sm font-medium text-gray-400">No previous bowler</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1088,56 +1083,69 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
               {(selectedDismissal === 'Caught' || selectedDismissal === 'Run Out' || selectedDismissal === 'Stumped') && (
                 <div>
                   <label className="block text-sm font-medium mb-2">Fielder</label>
-                  <input
-                    type="text"
+                <select
                     value={selectedFielder}
-                    onChange={(e) => setSelectedFielder(e.target.value)}
-                    placeholder="Enter fielder name"
-                    className="w-full p-3 border border-[#e0e0e0] rounded-lg"
-                  />
-                </div>
-              )}
+                        onChange={(e) => setSelectedFielder(e.target.value)}
+                        className="w-full p-3 border border-[#e0e0e0] rounded-lg">
+                        <option value="">Select Fielder (Optional)</option>
+                        {fieldingRoster.map(name => (
+                        <option key={name} value={name}>{name}</option>))}
+                </select>
+                      </div>)}
 
               <div>
                 <label className="block text-sm font-medium mb-2">Next Batsman</label>
-                <input
-                  type="text"
-                  value={nextBatsman}
-                  onChange={(e) => setNextBatsman(e.target.value)}
-                  placeholder="Enter next batsman name"
-                  className="w-full p-3 border border-[#e0e0e0] rounded-lg"
-                />
-              </div>
+                <select
+                    value={nextBatsman}
+                        onChange={(e) => setNextBatsman(e.target.value)}
+                           className="w-full p-3 border border-[#e0e0e0] rounded-lg">
+                      <option value="">Select next batsman</option>
+                      {battingRoster
+      // Jo out ho chuke hain ya strike par hain, unhe filter karein
+                    .filter(name => name !== striker && name !== nonStriker) 
+                    .map(name => (
+                        <option key={name} value={name}>{name}</option>))}
+                    </select>
+                  </div>
 
               <div className="flex gap-3 pt-4">
                 <button
-                  onClick={() => {
-                    setIsWicket(true);
-                    setWickets(wickets + 1);
-                    setShowWicketDialog(false);
-                    // Run the 4-step wicket pipeline against the DB when connected.
-                    if (isConnected && session && selectedDismissal) {
-                      apiWicketWizard(matchId!, {
-                        innings_id: session.inningsId,
-                        dismissed_player_id: session.strikerId!,
-                        dismissal_type: selectedDismissal as DismissalType,
-                        fielder_id: selectedFielder || undefined,
-                        incoming_batsman_id: nextBatsman || session.nonStrikerId!,
-                      })
-                        .then((res) => {
-                          syncFromInnings(res.innings);
-                          if (res.innings_complete) toast.success('All out — innings complete');
-                        })
-                        .catch((err) =>
-                          toast.error(err?.response?.data?.error || 'Failed to record wicket')
-                        );
-                    }
-                    toast.success('Wicket recorded');
-                  }}
-                  className="flex-1 p-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all"
-                >
-                  Record Wicket
-                </button>
+  onClick={() => {
+    setIsWicket(true);
+    setWickets(wickets + 1);
+    setShowWicketDialog(false);
+    
+    if (isConnected && session && selectedDismissal) {
+      // 🔥 1. MAP SE ID NIKALEIN (Agar map mein nahi mila toh fallback ke liye name hi use karein)
+      const incomingBatsmanId = session.playerIdMap?.[nextBatsman] || nextBatsman;
+      const fielderId = selectedFielder 
+        ? (session.playerIdMap?.[selectedFielder] || selectedFielder) 
+        : undefined;
+
+      // 🔥 2. API KO IDs BHEJEIN
+      apiWicketWizard(matchId!, {
+        innings_id: session.inningsId,
+        dismissed_player_id: session.strikerId!, // Note: Isko bhi dynamic karna hoga baad mein
+        dismissal_type: selectedDismissal as DismissalType,
+        fielder_id: fielderId,
+        incoming_batsman_id: incomingBatsmanId,
+      })
+        .then((res) => {
+          syncFromInnings(res.innings);
+          // Naye batsman ki ID ko session mein update karein
+          session.strikerId = incomingBatsmanId;
+          if (res.innings_complete) toast.success('All out — innings complete');
+        })
+        .catch((err) =>
+          toast.error(err?.response?.data?.error || 'Failed to record wicket')
+        );
+    }
+    toast.success('Wicket recorded');
+  }}
+  className="flex-1 p-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all"
+>
+  Record Wicket
+</button>
                 <button
                   onClick={() => setShowWicketDialog(false)}
                   className="flex-1 p-3 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300 transition-all"
@@ -1181,30 +1189,62 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
       )}
 
       {/* Bowler Change Dialog */}
+      {/* Bowler Change Dialog */}
       {showBowlerChangeDialog && (
         <>
           <div className="fixed inset-0 bg-black/50 z-40" />
           <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-2xl shadow-2xl z-50 p-6">
             <h3 className="text-xl font-semibold mb-4">End of Over - Change Bowler</h3>
             <p className="text-sm text-[#666666] mb-4">Select the bowler for the next over</p>
-            <input
-              type="text"
-              placeholder="Enter bowler name"
-              className="w-full p-3 border border-[#e0e0e0] rounded-lg mb-4"
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  setCurrentBowler((e.target as HTMLInputElement).value);
-                  setShowBowlerChangeDialog(false);
-                  toast.success('Bowler changed');
-                }
-              }}
-            />
-            <button
-              onClick={() => setShowBowlerChangeDialog(false)}
-              className="w-full p-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all"
+            
+            {/* 🔥 NEW DROPDOWN INSTEAD OF TEXT INPUT */}
+            <select
+              className="w-full p-3 border border-[#e0e0e0] rounded-lg mb-4 bg-white"
+              value={selectedNextBowler}
+              onChange={(e) => setSelectedNextBowler(e.target.value)}
             >
-              Continue
-            </button>
+              <option value="">Select next bowler</option>
+              {fieldingRoster
+                // Puraane bowler ko hide karein (consecutive overs not allowed)
+                .filter(name => name !== currentBowler)
+                .map(name => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+
+            <button
+  onClick={() => {
+    if (!selectedNextBowler) {
+      toast.error('Please select the next bowler');
+      return;
+    }
+    
+    // Logic to track previous bowler & register the new one
+    setPreviousBowler(currentBowler);
+    setCurrentBowler(selectedNextBowler);
+    
+    // 🔥 CRITICAL FIX: Backend ke liye session ki Bowler ID update karein
+    if (session) {
+      const newBowlerId = session.playerIdMap?.[selectedNextBowler] || selectedNextBowler;
+      session.bowlerId = newBowlerId; 
+    }
+    
+    // Ensure the new bowler exists in stats array
+    setBowlers(prev => {
+      if (!prev.find(b => b.name === selectedNextBowler)) {
+        return [...prev, { name: selectedNextBowler, overs: 0, balls: 0, runs: 0, wickets: 0, maidens: 0 }];
+      }
+      return prev;
+    });
+
+    setShowBowlerChangeDialog(false);
+    setSelectedNextBowler(''); // Next over ke liye state clear karein
+    toast.success('Bowler changed');
+  }}
+  className="w-full p-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all"
+>
+  Continue
+</button>
           </div>
         </>
       )}

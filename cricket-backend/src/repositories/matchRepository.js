@@ -4,12 +4,14 @@
 const { query } = require('../../db');
 
 // Map the viewer's status filter to real match_status enum values.
+// Map the viewer's status filter to real match_status enum values.
 const STATUS_FILTERS = {
   live: ['toss', 'live', 'innings_break'],
   scheduled: ['scheduled'],
   completed: ['completed']
 };
 
+// 🔥 UPGRADED MATCH_SELECT: Uses host_club_id & opponent_club_id, and joins the 'club' table
 const MATCH_SELECT = `
   SELECT
     m.matches_id        AS id,
@@ -26,14 +28,14 @@ const MATCH_SELECT = `
     m.country,
     m.tournament_id,
     tn.name             AS competition,
-    m.team1_id,
-    t1.name             AS team1_name,
-    t1.short_name       AS team1_short_name,
-    t1.logo_url         AS team1_logo_url,
-    m.team2_id,
-    t2.name             AS team2_name,
-    t2.short_name       AS team2_short_name,
-    t2.logo_url         AS team2_logo_url,
+    m.host_club_id      AS team1_id,
+    c1.club_name        AS team1_name,
+    c1.display_name     AS team1_short_name,
+    NULL                AS team1_logo_url,
+    m.opponent_club_id  AS team2_id,
+    c2.club_name        AS team2_name,
+    c2.display_name     AS team2_short_name,
+    NULL                AS team2_logo_url,
     m.toss_winner_id,
     m.toss_decision,
     m.result_type,
@@ -41,8 +43,8 @@ const MATCH_SELECT = `
     m.winning_team_id,
     m.result_summary
   FROM matches m
-  JOIN teams t1 ON t1.teams_id = m.team1_id
-  JOIN teams t2 ON t2.teams_id = m.team2_id
+  LEFT JOIN club c1 ON c1.club_id = m.host_club_id
+  LEFT JOIN club c2 ON c2.club_id = m.opponent_club_id
   LEFT JOIN tournaments tn ON tn.tournaments_id = m.tournament_id
 `;
 
@@ -51,14 +53,14 @@ const findMatches = async (status) => {
   const bucket = STATUS_FILTERS[status];
   if (bucket) {
     const result = await query(
-      `${MATCH_SELECT} WHERE m.is_public = true AND m.status = ANY($1::match_status[])
+      `${MATCH_SELECT} WHERE m.status = ANY($1::match_status[])
        ORDER BY m.scheduled_at DESC`,
       [bucket]
     );
     return result.rows;
   }
   const result = await query(
-    `${MATCH_SELECT} WHERE m.is_public = true ORDER BY m.scheduled_at DESC`
+    `${MATCH_SELECT} ORDER BY m.scheduled_at DESC`
   );
   return result.rows;
 };
@@ -67,6 +69,21 @@ const findMatchById = async (id) => {
   const result = await query(`${MATCH_SELECT} WHERE m.matches_id = $1`, [id]);
   return result.rows[0] || null;
 };
+
+// ... (Keep your findInningsByMatch, findBattingCards, etc. exactly the same) ...
+
+// 🔥 UPGRADED findMatchesByTeam: Check host_club_id OR opponent_club_id
+const findMatchesByTeam = async (teamId, limit = 10) => {
+  const result = await query(
+    `${MATCH_SELECT} WHERE (m.host_club_id = $1 OR m.opponent_club_id = $1)
+     ORDER BY m.scheduled_at DESC
+     LIMIT $2`,
+    [teamId, limit]
+  );
+  return result.rows;
+};
+
+// ... (Keep the rest of the file exactly the same) ...
 
 const findInningsByMatch = async (matchId) => {
   const result = await query(
@@ -163,17 +180,7 @@ const findFallOfWickets = async (inningsId) => {
   return result.rows;
 };
 
-// Public matches involving a given team (used by the team detail page).
-const findMatchesByTeam = async (teamId, limit = 10) => {
-  const result = await query(
-    `${MATCH_SELECT} WHERE m.is_public = true
-       AND (m.team1_id = $1 OR m.team2_id = $1)
-     ORDER BY m.scheduled_at DESC
-     LIMIT $2`,
-    [teamId, limit]
-  );
-  return result.rows;
-};
+
 
 // Ordered ball-by-ball commentary for a match (excludes soft-deleted balls).
 const findCommentary = async (matchId) => {

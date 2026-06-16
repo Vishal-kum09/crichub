@@ -1,577 +1,378 @@
-import { useState } from 'react';
-import { Trophy, ArrowLeft, Check } from 'lucide-react';
-import { Button } from '../components/Button';
-import { Input } from '../components/Input';
+import { useState, useEffect } from 'react';
+import { api } from '../../lib/api';
 import { toast } from '../../lib/toast';
+import { Trophy, Mail, Lock, User, Building, Phone, Loader2, ArrowLeft, ShieldCheck, CheckCircle2, Shield } from 'lucide-react';
 
 interface SignUpProps {
   onNavigate: (path: string) => void;
 }
 
-type SignUpType = 'individual' | 'club';
-type UserRole = 'player' | 'scorer' | 'analyst' | 'umpire';
+interface ClubOption {
+  id: number;
+  name: string;
+}
 
 export function SignUp({ onNavigate }: SignUpProps) {
-  const [signUpType, setSignUpType] = useState<SignUpType | null>(null);
-  const [step, setStep] = useState(1);
-
-  // Individual sign-up fields
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [hasClubAffiliation, setHasClubAffiliation] = useState<boolean | null>(null);
-  const [selectedClub, setSelectedClub] = useState('');
-  const [selectedRole, setSelectedRole] = useState<UserRole | ''>('');
+  const [isClubRegistration, setIsClubRegistration] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState<'form' | 'otp' | 'success'>('form');
   const [otpCode, setOtpCode] = useState('');
 
-  // Club sign-up fields
+  // General Form States
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [displayName, setDisplayName] = useState('');
+
+  // Club Affiliation & Role Specific States
+  const [isAffiliatedWithClub, setIsAffiliatedWithClub] = useState(false);
+  const [clubsList, setClubsList] = useState<ClubOption[]>([]);
+  const [selectedClubId, setSelectedClubId] = useState<string>(''); 
+  const [selectedRole, setSelectedRole] = useState<string>(''); 
+
+  // Dynamic Player Specific Metadata States
+  const [dob, setDob] = useState('');
+  const [battingStyle, setBattingStyle] = useState('');
+  const [bowlingStyle, setBowlingStyle] = useState('');
+  const [primaryRole, setPrimaryRole] = useState('');
+  const [jerseyNumber, setJerseyNumber] = useState('');
+  const [nationality, setNationality] = useState('Indian');
+
+  // Club Creation Explicit States
   const [clubName, setClubName] = useState('');
   const [homeGround, setHomeGround] = useState('');
-  const [clubContact, setClubContact] = useState('');
-  const [clubEmail, setClubEmail] = useState('');
-  const [country, setCountry] = useState('');
-  const [clubDisplayName, setClubDisplayName] = useState('');
-  const [ownerName, setOwnerName] = useState('');
+  const [clubInitials, setClubInitials] = useState('');
+  const [country, setCountry] = useState('India');
 
-  // Mock clubs list
-  const clubs = [
-    'Mumbai Indians Cricket Academy',
-    'Chennai Super Kings Academy',
-    'Royal Challengers Bangalore Club',
-    'Kolkata Knight Riders Academy',
-    'Delhi Capitals Cricket Club',
-  ];
+  // Retrieve approved clubs on layout mount
+  useEffect(() => {
+    api.get('/api/auth/clubs')
+      .then(res => {
+        setClubsList(res.data.clubs ?? []);
+      })
+      .catch(() => console.warn("Failed to fetch club directory attributes."));
+  }, []);
 
-  const roles: { value: UserRole; label: string }[] = [
-    { value: 'player', label: 'Player' },
-    { value: 'scorer', label: 'Scorer' },
-    { value: 'analyst', label: 'Analyst' },
-    { value: 'umpire', label: 'Umpire' },
-  ];
+  const handleInitiateSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  const handleIndividualNext = () => {
-    if (step === 1) {
-      // Validate core credentials
-      if (!firstName.trim() || !lastName.trim() || !displayName.trim()) {
-        toast.error('Please enter your full name and display name');
+    if (!email || !password || !firstName || !lastName) {
+      toast.error('Please fill in all mandatory fields.');
+      return;
+    }
+
+    if (isAffiliatedWithClub) {
+      if (!selectedClubId) {
+        toast.error('Please select an associated Club from the dropdown list.');
         return;
       }
-      if (!email.trim() || !email.includes('@')) {
-        toast.error('Please enter a valid email address');
+      if (!selectedRole) {
+        toast.error('Please assign your account operational Role.');
         return;
       }
-      if (!phone.trim() || phone.length < 10) {
-        toast.error('Please enter a valid phone number');
-        return;
-      }
-      if (password.length < 8) {
-        toast.error('Password must be at least 8 characters long');
-        return;
-      }
-      if (password !== confirmPassword) {
-        toast.error('Passwords do not match');
-        return;
-      }
-      setStep(2);
-    } else if (step === 2) {
-      // Validate club affiliation selection
-      if (hasClubAffiliation === null) {
-        toast.error('Please select if you are affiliated with a club');
-        return;
-      }
-      if (hasClubAffiliation) {
-        if (!selectedClub) {
-          toast.error('Please select your club');
-          return;
-        }
-        if (!selectedRole) {
-          toast.error('Please select your role');
+      if (selectedRole === 'Player') {
+        if (!dob || !battingStyle || !primaryRole) {
+          toast.error('Please fill in all mandatory Player profile specifications.');
           return;
         }
       }
-      setStep(3);
-    } else if (step === 3) {
-      // Validate OTP
-      if (otpCode.length !== 6) {
-        toast.error('Please enter the 6-digit OTP sent to your phone');
-        return;
+    }
+
+    setLoading(true);
+    try {
+      await api.post('/api/auth/otp/send', { email });
+      toast.success('Verification OTP dispatched to your email address!');
+      setStep('otp');
+    } catch (err: any) {
+      console.error('OTP Dispatch Failure:', err);
+      toast.error(err?.response?.data?.error || 'Failed to dispatch verification parameters.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyAndRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (otpCode.length !== 6) {
+      toast.error('Please enter a valid 6-digit verification code.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await api.post('/api/auth/otp/verify', { email, code: otpCode });
+
+      if (isClubRegistration) {
+        const payload = {
+          club: {
+            name: clubName,
+            home_ground: homeGround || undefined,
+            contact_number: phone || undefined,
+            email: email,
+            country: country,
+            display_initials: clubInitials || undefined,
+            owner_name: `${firstName} ${lastName}`
+          },
+          admin: {
+            first_name: firstName,
+            last_name: lastName,
+            email: email,
+            password: password,
+            phone: phone || undefined,
+            display_name: displayName || `${firstName}`
+          }
+        };
+        await api.post('/api/auth/register/club', payload);
+        setStep('success'); 
+      } else {
+        const payload = {
+          first_name: firstName,
+          last_name: lastName,
+          email: email,
+          password: password,
+          phone: phone || undefined,
+          display_name: displayName || `${firstName} ${lastName}`,
+          club_id: isAffiliatedWithClub && selectedClubId !== '' ? Number(selectedClubId) : undefined,
+          account_role: isAffiliatedWithClub ? selectedRole : 'Viewer',
+          player_profile: isAffiliatedWithClub && selectedRole === 'Player' ? {
+            date_of_birth: dob,
+            batting_style: battingStyle,
+            bowling_style: bowlingStyle || undefined,
+            primary_role: primaryRole,
+            jersey_number: jerseyNumber ? Number(jerseyNumber) : undefined,
+            nationality: nationality
+          } : undefined
+        };
+        
+        await api.post('/api/auth/register', payload);
+
+        if (isAffiliatedWithClub) {
+          setStep('success');
+        } else {
+          toast.success('Registration successful! Account is ready.');
+          onNavigate('/signin');
+        }
       }
-      toast.success('OTP verified successfully!');
-      setStep(4); // Pending approval state
+    } catch (err: any) {
+      console.error('Registration Processing Exception:', err);
+      toast.error(err?.response?.data?.error || 'OTP verification sequence invalid or registration failed.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleClubSignUp = () => {
-    if (!clubName.trim() || !homeGround.trim() || !clubContact.trim() || !clubEmail.trim() || !country.trim() || !clubDisplayName.trim()) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-    if (!clubEmail.includes('@')) {
-      toast.error('Please enter a valid email address');
-      return;
-    }
-    toast.success('Club registration submitted for Super Admin approval!');
-    setStep(4); // Pending approval state
-  };
-
-  // Type selection screen
-  if (!signUpType) {
+  if (step === 'success') {
     return (
-      <div className="min-h-screen bg-[#f9f9f9] flex items-center justify-center p-4">
-        <div className="w-full max-w-2xl space-y-8">
-          {/* Logo */}
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <Trophy className="text-[#e60023]" size={40} />
-              <h1 className="text-3xl font-semibold">CricketHub</h1>
-            </div>
-            <p className="text-[#666666]">Choose your registration type</p>
+      <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center p-4 text-black animate-fadeIn">
+        <div className="max-w-md w-full bg-white border border-gray-200 rounded-3xl shadow-2xl p-6 md:p-8 text-center space-y-6">
+          <div className="w-16 h-16 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto border border-green-100 shadow-sm">
+            <CheckCircle2 size={36} />
           </div>
-
-          {/* Type Selection Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <button
-              onClick={() => setSignUpType('individual')}
-              className="bg-white rounded-xl p-6 border-2 border-[#e0e0e0] hover:border-[#e60023] transition-all text-left group"
-            >
-              <div className="w-12 h-12 bg-[#e60023]/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-[#e60023]/20 transition-colors">
-                <Trophy size={24} className="text-[#e60023]" />
-              </div>
-              <h3 className="text-xl font-semibold text-[#1a1a1a] mb-2">Individual</h3>
-              <p className="text-sm text-[#666666]">
-                Register as a Player, Scorer, Analyst, or Umpire
-              </p>
-            </button>
-
-            <button
-              onClick={() => setSignUpType('club')}
-              className="bg-white rounded-xl p-6 border-2 border-[#e0e0e0] hover:border-[#e60023] transition-all text-left group"
-            >
-              <div className="w-12 h-12 bg-[#e60023]/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-[#e60023]/20 transition-colors">
-                <Trophy size={24} className="text-[#e60023]" />
-              </div>
-              <h3 className="text-xl font-semibold text-[#1a1a1a] mb-2">Club / Academy</h3>
-              <p className="text-sm text-[#666666]">
-                Register your cricket club or academy
-              </p>
-            </button>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight">Registration Submitted!</h2>
+            <p className="text-sm text-gray-500 leading-relaxed font-semibold">
+              {isClubRegistration ? (
+                <span>Bhai, your club registration request will be verified by the Super Admin. You will receive a notification once approved!</span>
+              ) : (
+                <span>Bhai, your request will be verified by the club admin. Until then, enjoy <span className="text-[#e60023] font-bold">Viewer services</span>. You will receive a notification once your request is approved!</span>
+              )}
+            </p>
           </div>
-
-          {/* Footer */}
-          <div className="text-center text-sm">
-            <span className="text-[#666666]">Already have an account? </span>
-            <button
-              onClick={() => onNavigate('/signin')}
-              className="text-[#e60023] hover:underline"
-            >
-              Sign in
-            </button>
-          </div>
+          <button onClick={() => onNavigate('/signin')} className="w-full py-3 bg-black hover:bg-gray-800 text-white font-bold rounded-xl shadow-md transition-all text-sm uppercase tracking-wider cursor-pointer">Start Enjoying Viewers App</button>
         </div>
       </div>
     );
   }
 
-  // Individual Sign-Up Flow
-  if (signUpType === 'individual') {
-    // Pending Approval State
-    if (step === 4) {
-      return (
-        <div className="min-h-screen bg-[#f9f9f9] flex items-center justify-center p-4">
-          <div className="w-full max-w-md space-y-6">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Check className="text-green-600" size={32} />
-              </div>
-              <h2 className="text-2xl font-semibold text-[#1a1a1a] mb-2">Registration Submitted!</h2>
-              <p className="text-[#666666] mb-4">
-                Your registration will be looked after. Until then, enjoy the web services.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl p-6 border border-[#e0e0e0]">
-              <h3 className="font-semibold text-[#1a1a1a] mb-3">What's Next?</h3>
-              <ul className="space-y-2 text-sm text-[#666666]">
-                <li className="flex items-start gap-2">
-                  <span className="text-[#e60023] mt-0.5">•</span>
-                  <span>Your {hasClubAffiliation && selectedClub ? 'club admin' : 'account'} will review your registration</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-[#e60023] mt-0.5">•</span>
-                  <span>You can access all viewer features while waiting</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-[#e60023] mt-0.5">•</span>
-                  <span>Full {selectedRole || 'user'} features will unlock upon approval</span>
-                </li>
-              </ul>
-            </div>
-
-            <Button
-              variant="primary"
-              className="w-full"
-              onClick={() => onNavigate('/signin')}
-            >
-              Continue to Sign In
-            </Button>
-          </div>
-        </div>
-      );
-    }
-
+  if (step === 'otp') {
     return (
-      <div className="min-h-screen bg-[#f9f9f9] flex items-center justify-center p-4">
-        <div className="w-full max-w-md space-y-6">
-          {/* Back Button */}
-          <button
-            onClick={() => step === 1 ? setSignUpType(null) : setStep(step - 1)}
-            className="flex items-center gap-2 text-[#e60023] hover:underline"
-          >
-            <ArrowLeft size={18} />
-            <span>Back</span>
-          </button>
-
-          {/* Logo */}
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <Trophy className="text-[#e60023]" size={40} />
-              <h1 className="text-3xl font-semibold">CricketHub</h1>
+      <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center p-4 text-black">
+        <div className="max-w-md w-full bg-white border border-gray-200 rounded-3xl shadow-xl p-6 md:p-8 space-y-6">
+          <div className="text-center space-y-2">
+            <div className="w-12 h-12 bg-red-50 text-[#e60023] rounded-2xl flex items-center justify-center mx-auto border border-red-100"><ShieldCheck size={24} /></div>
+            <h2 className="text-xl font-black text-gray-900 tracking-tight">Enter Verification Code</h2>
+            <p className="text-xs text-gray-400 font-semibold">We have sent an authentication token link to <br/><span className="text-gray-700 font-bold">{email}</span></p>
+          </div>
+          <form onSubmit={handleVerifyAndRegister} className="space-y-4 font-semibold text-sm text-gray-600">
+            <div className="space-y-1">
+              <label>6-Digit OTP Code</label>
+              <input type="text" maxLength={6} value={otpCode} onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))} className="w-full text-center tracking-[10px] font-black text-2xl py-3 bg-gray-50 border rounded-xl text-black focus:outline-none" placeholder="000000" />
             </div>
-            <p className="text-[#666666]">Individual Registration - Step {step} of 3</p>
-          </div>
+            <button type="submit" disabled={loading} className="w-full py-3 bg-[#e60023] text-white font-bold rounded-xl shadow-md flex items-center justify-center gap-2 text-base cursor-pointer">{loading ? <Loader2 className="animate-spin" size={20} /> : 'Verify & Submit Registry'}</button>
+            <button type="button" onClick={() => setStep('form')} className="w-full text-center text-xs text-gray-400 hover:text-black font-bold pt-2 cursor-pointer">← Edit Registration Details</button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
-          {/* Progress Bar */}
-          <div className="flex gap-2">
-            <div className={`flex-1 h-1 rounded ${step >= 1 ? 'bg-[#e60023]' : 'bg-[#e0e0e0]'}`} />
-            <div className={`flex-1 h-1 rounded ${step >= 2 ? 'bg-[#e60023]' : 'bg-[#e0e0e0]'}`} />
-            <div className={`flex-1 h-1 rounded ${step >= 3 ? 'bg-[#e60023]' : 'bg-[#e0e0e0]'}`} />
-          </div>
+  return (
+    <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center p-4 lg:p-8 text-black">
+      <div className="max-w-2xl w-full bg-white border border-gray-200 rounded-3xl shadow-xl p-6 md:p-8 space-y-6">
+        
+        <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+          <button onClick={() => onNavigate('/signin')} className="text-gray-400 hover:text-black transition-colors flex items-center gap-1 text-xs font-bold cursor-pointer"><ArrowLeft size={16} /> Back to Login</button>
+          <div className="flex items-center gap-2 text-[#e60023]"><Trophy size={20} /><span className="font-black tracking-tight">CricketHub</span></div>
+        </div>
 
-          {/* Step 1: Core Credentials */}
-          {step === 1 && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <Input
-                  type="text"
-                  placeholder="First name"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  pill
-                  required
-                />
-                <Input
-                  type="text"
-                  placeholder="Last name"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  pill
-                  required
-                />
+        <div className="text-center space-y-1">
+          <h2 className="text-2xl font-black text-gray-900 tracking-tight">Create your Account</h2>
+          <p className="text-xs text-gray-400 font-semibold">Join the network to manage or score real fixtures</p>
+        </div>
+
+        <div className="flex bg-gray-100 p-1 rounded-xl max-w-sm mx-auto">
+          <button type="button" onClick={() => { setIsClubRegistration(false); setStep('form'); }} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${!isClubRegistration ? 'bg-white shadow text-black' : 'text-gray-500'}`}>Individual User</button>
+          <button type="button" onClick={() => { setIsClubRegistration(true); setStep('form'); }} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${isClubRegistration ? 'bg-white shadow text-black' : 'text-gray-500'}`}>Register Club</button>
+        </div>
+
+        <form onSubmit={handleInitiateSignUp} className="space-y-4 text-sm font-semibold text-gray-600">
+          {isClubRegistration && (
+            <div className="bg-red-50/40 p-4 rounded-2xl border border-red-100/60 space-y-3">
+              <h4 className="text-xs font-black uppercase text-[#e60023] tracking-wider mb-1 flex items-center gap-1.5"><Building size={14} /> Club Metadata Specifications</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1"><label>Club Name *</label><input type="text" value={clubName} onChange={e => setClubName(e.target.value)} className="w-full p-2.5 bg-white border rounded-xl text-black font-normal" placeholder="e.g. Jamnagar Strikers" /></div>
+                <div className="space-y-1"><label>Club Initials</label><input type="text" value={clubInitials} onChange={e => setClubInitials(e.target.value)} className="w-full p-2.5 bg-white border rounded-xl text-black font-normal" placeholder="e.g. JS" /></div>
+                <div className="space-y-1"><label>Home Ground Venue</label><input type="text" value={homeGround} onChange={e => setHomeGround(e.target.value)} className="w-full p-2.5 bg-white border rounded-xl text-black font-normal" placeholder="e.g. Cricket Stadium" /></div>
+                <div className="space-y-1"><label>Country</label><input type="text" value={country} onChange={e => setCountry(e.target.value)} className="w-full p-2.5 bg-white border rounded-xl text-black font-normal" /></div>
               </div>
-              <Input
-                type="text"
-                placeholder="Display name"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                pill
-                required
-              />
-              <Input
-                type="email"
-                placeholder="Email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                pill
-                required
-              />
-              <Input
-                type="tel"
-                placeholder="Phone number"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                pill
-                required
-              />
-              <Input
-                type="password"
-                placeholder="Password (min 8 characters)"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                pill
-                required
-              />
-              <Input
-                type="password"
-                placeholder="Confirm password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                pill
-                required
-              />
-
-              <Button variant="primary" className="w-full" onClick={handleIndividualNext}>
-                Next
-              </Button>
             </div>
           )}
 
-          {/* Step 2: Club Affiliation */}
-          {step === 2 && (
-            <div className="space-y-4">
-              <div className="bg-white rounded-xl p-4 border border-[#e0e0e0]">
-                <p className="text-sm font-semibold text-[#1a1a1a] mb-3">Are you affiliated with a club?</p>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setHasClubAffiliation(true)}
-                    className={`flex-1 py-2 px-4 rounded-lg border-2 transition-all ${
-                      hasClubAffiliation === true
-                        ? 'border-[#e60023] bg-[#e60023]/10 text-[#e60023]'
-                        : 'border-[#e0e0e0] text-[#666666] hover:border-[#e60023]'
-                    }`}
-                  >
-                    Yes
-                  </button>
-                  <button
-                    onClick={() => setHasClubAffiliation(false)}
-                    className={`flex-1 py-2 px-4 rounded-lg border-2 transition-all ${
-                      hasClubAffiliation === false
-                        ? 'border-[#e60023] bg-[#e60023]/10 text-[#e60023]'
-                        : 'border-[#e0e0e0] text-[#666666] hover:border-[#e60023]'
-                    }`}
-                  >
-                    No
-                  </button>
-                </div>
-              </div>
+          <div className="space-y-3">
+            <h4 className="text-xs font-black uppercase text-gray-400 tracking-wider flex items-center gap-1.5"><User size={14} /> Account Details</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1"><label>First Name *</label><input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full p-2.5 bg-gray-50 border rounded-xl text-black font-normal" placeholder="Vishal" /></div>
+              <div className="space-y-1"><label>Last Name *</label><input type="text" value={lastName} onChange={e => setLastName(e.target.value)} className="w-full p-2.5 bg-gray-50 border rounded-xl text-black font-normal" placeholder="Singh" /></div>
+            </div>
 
-              {hasClubAffiliation === true && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-[#666666] mb-2">Select Your Club</label>
-                    <select
-                      value={selectedClub}
-                      onChange={(e) => setSelectedClub(e.target.value)}
-                      className="w-full px-4 py-3 border border-[#e0e0e0] rounded-full focus:outline-none focus:border-[#e60023] transition-colors bg-white"
-                    >
-                      <option value="">Choose a club...</option>
-                      {clubs.map((club) => (
-                        <option key={club} value={club}>{club}</option>
-                      ))}
-                    </select>
-                  </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1"><label>Email Address *</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-2.5 bg-gray-50 border rounded-xl text-black font-normal" placeholder="name@example.com" /></div>
+              <div className="space-y-1"><label>Contact Phone Number</label><input type="text" value={phone} onChange={e => setPhone(e.target.value)} className="w-full p-2.5 bg-gray-50 border rounded-xl text-black font-normal" placeholder="98765xxxxx" /></div>
+            </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-[#666666] mb-2">Select Your Role</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {roles.map((role) => (
-                        <button
-                          key={role.value}
-                          onClick={() => setSelectedRole(role.value)}
-                          className={`py-2 px-4 rounded-lg border-2 transition-all ${
-                            selectedRole === role.value
-                              ? 'border-[#e60023] bg-[#e60023]/10 text-[#e60023]'
-                              : 'border-[#e0e0e0] text-[#666666] hover:border-[#e60023]'
-                          }`}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1"><label>Password (Min 8 Characters) *</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-2.5 bg-gray-50 border rounded-xl text-black font-normal" placeholder="••••••••" /></div>
+              <div className="space-y-1"><label>Public Profile Display Name</label><input type="text" value={displayName} onChange={e => setDisplayName(e.target.value)} className="w-full p-2.5 bg-gray-50 border rounded-xl text-black font-normal" placeholder="e.g. Vishal_Singh" /></div>
+            </div>
+
+            {!isClubRegistration && (
+              <div className="pt-2 space-y-4 border-t border-gray-100 mt-4">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={isAffiliatedWithClub}
+                    onChange={e => {
+                      setIsAffiliatedWithClub(e.target.checked);
+                      if (!e.target.checked) {
+                        setSelectedClubId('');
+                        setSelectedRole('');
+                      }
+                    }}
+                    className="w-4 h-4 text-[#e60023] focus:ring-[#e60023] border-gray-300 rounded"
+                  />
+                  <span className="text-xs font-black text-gray-700 uppercase tracking-wide">Are you affiliated with a club?</span>
+                </label>
+
+                {isAffiliatedWithClub && (
+                  <div className="space-y-4 p-4 bg-gray-50 border border-gray-200 rounded-2xl animate-fadeIn text-black">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-xs font-black text-gray-400 uppercase">Select Associated Club *</label>
+                        <select
+                          value={selectedClubId}
+                          onChange={e => setSelectedClubId(e.target.value)}
+                          className="w-full p-2.5 bg-white border border-gray-300 rounded-xl font-medium focus:border-[#e60023] text-gray-900 cursor-pointer"
                         >
-                          {role.label}
-                        </button>
-                      ))}
+                          <option value="">-- Choose Approved Club --</option>
+                          {clubsList.map(club => <option key={club.id} value={club.id}>{club.name}</option>)}
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-xs font-black text-gray-400 uppercase">Select Requested Account Role *</label>
+                        <select
+                          value={selectedRole}
+                          onChange={e => setSelectedRole(e.target.value)}
+                          className="w-full p-2.5 bg-white border border-gray-300 rounded-xl font-bold focus:border-[#e60023] text-gray-900 cursor-pointer"
+                        >
+                          <option value="">-- Choose Role --</option>
+                          <option value="Scorer">🏏 Scorer</option>
+                          <option value="Player">🛡️ Player</option>
+                          <option value="Analyst">📊 Analyst</option>
+                        </select>
+                      </div>
                     </div>
+
+                    {/* PLAYER SPECIFIC FORM METADATA FIELDS */}
+                    {selectedRole === 'Player' && (
+                      <div className="pt-3 border-t border-gray-200 mt-2 space-y-3 bg-white p-4 rounded-xl border animate-slideDown">
+                        <h5 className="text-xs font-black text-[#e60023] uppercase tracking-wider flex items-center gap-1"><Shield size={14}/> Player Performance Profile Parameters</h5>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-500">Date of Birth *</label>
+                            <input type="date" value={dob} onChange={e => setDob(e.target.value)} className="w-full p-2.5 bg-gray-50 border rounded-xl text-black font-normal" />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-500">Jersey Number</label>
+                            <input type="number" value={jerseyNumber} onChange={e => setJerseyNumber(e.target.value)} className="w-full p-2.5 bg-gray-50 border rounded-xl text-black font-normal" placeholder="e.g. 18" />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-500">Batting Style *</label>
+                            <select value={battingStyle} onChange={e => setBattingStyle(e.target.value)} className="w-full p-2.5 bg-gray-50 border rounded-xl text-black font-normal">
+                              <option value="">-- Select Batting --</option>
+                              <option value="right_hand">Right Hand Bat</option>
+                              <option value="left_hand">Left Hand Bat</option>
+                            </select>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-500">Primary Role *</label>
+                            <select value={primaryRole} onChange={e => setPrimaryRole(e.target.value)} className="w-full p-2.5 bg-gray-50 border rounded-xl text-black font-normal">
+                              <option value="">-- Select Role --</option>
+                              <option value="batter">Batter</option>
+                              <option value="bowler">Bowler</option>
+                              <option value="all_rounder">All Rounder</option>
+                              <option value="wicket_keeper">Wicket Keeper</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-500">Bowling Style</label>
+                            <select value={bowlingStyle} onChange={e => setBowlingStyle(e.target.value)} className="w-full p-2.5 bg-gray-50 border rounded-xl text-black font-normal">
+                              <option value="">-- Select Bowling --</option>
+                              <option value="right_arm_fast">Right Arm Fast</option>
+                              <option value="left_arm_fast">Left Arm Fast</option>
+                              <option value="right_arm_off_spin">Right Arm Off Spin</option>
+                              <option value="left_arm_off_spin">Left Arm Off Spin</option>
+                              <option value="right_arm_leg_spin">Right Arm Leg Spin</option>
+                              <option value="left_arm_unorthodox_spin_chinaman">Left Arm Unorthodox (Chinaman)</option>
+                            </select>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-500">Nationality</label>
+                            <input type="text" value={nationality} onChange={e => setNationality(e.target.value)} className="w-full p-2.5 bg-gray-50 border rounded-xl text-black font-normal" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </>
-              )}
-
-              {hasClubAffiliation === false && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-blue-800">
-                    You will be registered as a Viewer. You can request role upgrades later from the platform administrators.
-                  </p>
-                </div>
-              )}
-
-              <Button variant="primary" className="w-full" onClick={handleIndividualNext}>
-                Next
-              </Button>
-            </div>
-          )}
-
-          {/* Step 3: OTP Verification */}
-          {step === 3 && (
-            <div className="space-y-4">
-              <div className="bg-white rounded-xl p-6 border border-[#e0e0e0] text-center">
-                <p className="text-sm text-[#666666] mb-4">
-                  We've sent a 6-digit verification code to
-                </p>
-                <p className="font-semibold text-[#1a1a1a] mb-4">{phone}</p>
-                <Input
-                  type="text"
-                  placeholder="Enter 6-digit OTP"
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  pill
-                  required
-                  className="text-center text-2xl tracking-widest"
-                  maxLength={6}
-                />
-                <button className="text-sm text-[#e60023] hover:underline mt-3">
-                  Resend OTP
-                </button>
+                )}
               </div>
-
-              <Button variant="primary" className="w-full" onClick={handleIndividualNext}>
-                Verify & Complete
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // Club Sign-Up Flow
-  if (signUpType === 'club') {
-    // Pending Approval State
-    if (step === 4) {
-      return (
-        <div className="min-h-screen bg-[#f9f9f9] flex items-center justify-center p-4">
-          <div className="w-full max-w-md space-y-6">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Check className="text-green-600" size={32} />
-              </div>
-              <h2 className="text-2xl font-semibold text-[#1a1a1a] mb-2">Club Registration Submitted!</h2>
-              <p className="text-[#666666] mb-4">
-                Your club registration has been sent to the Super Admin for approval.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl p-6 border border-[#e0e0e0]">
-              <h3 className="font-semibold text-[#1a1a1a] mb-3">What's Next?</h3>
-              <ul className="space-y-2 text-sm text-[#666666]">
-                <li className="flex items-start gap-2">
-                  <span className="text-[#e60023] mt-0.5">•</span>
-                  <span>Super Admin will review your club registration</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-[#e60023] mt-0.5">•</span>
-                  <span>You can access viewer features while waiting</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-[#e60023] mt-0.5">•</span>
-                  <span>Full Club Admin features will unlock upon approval</span>
-                </li>
-              </ul>
-            </div>
-
-            <Button
-              variant="primary"
-              className="w-full"
-              onClick={() => onNavigate('/signin')}
-            >
-              Continue to Sign In
-            </Button>
+            )}
           </div>
-        </div>
-      );
-    }
 
-    return (
-      <div className="min-h-screen bg-[#f9f9f9] flex items-center justify-center p-4">
-        <div className="w-full max-w-md space-y-6">
-          {/* Back Button */}
-          <button
-            onClick={() => setSignUpType(null)}
-            className="flex items-center gap-2 text-[#e60023] hover:underline"
-          >
-            <ArrowLeft size={18} />
-            <span>Back</span>
+          <button type="submit" disabled={loading} className="w-full mt-4 py-3 bg-[#e60023] text-white font-bold rounded-xl shadow-md flex items-center justify-center gap-2 text-base cursor-pointer">
+            {loading ? <Loader2 className="animate-spin" size={20} /> : 'Send Verification OTP'}
           </button>
-
-          {/* Logo */}
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <Trophy className="text-[#e60023]" size={40} />
-              <h1 className="text-3xl font-semibold">CricketHub</h1>
-            </div>
-            <p className="text-[#666666]">Club / Academy Registration</p>
-          </div>
-
-          {/* Form */}
-          <div className="space-y-4">
-            <Input
-              type="text"
-              placeholder="Club / Academy name"
-              value={clubName}
-              onChange={(e) => setClubName(e.target.value)}
-              pill
-              required
-            />
-            <Input
-              type="text"
-              placeholder="Home ground"
-              value={homeGround}
-              onChange={(e) => setHomeGround(e.target.value)}
-              pill
-              required
-            />
-            <Input
-              type="tel"
-              placeholder="Contact number"
-              value={clubContact}
-              onChange={(e) => setClubContact(e.target.value)}
-              pill
-              required
-            />
-            <Input
-              type="email"
-              placeholder="Email address"
-              value={clubEmail}
-              onChange={(e) => setClubEmail(e.target.value)}
-              pill
-              required
-            />
-            <Input
-              type="text"
-              placeholder="Country"
-              value={country}
-              onChange={(e) => setCountry(e.target.value)}
-              pill
-              required
-            />
-            <Input
-              type="text"
-              placeholder="Display name"
-              value={clubDisplayName}
-              onChange={(e) => setClubDisplayName(e.target.value)}
-              pill
-              required
-            />
-            <Input
-              type="text"
-              placeholder="Owner name (optional)"
-              value={ownerName}
-              onChange={(e) => setOwnerName(e.target.value)}
-              pill
-            />
-
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800">
-                Your registration will be sent to the Super Admin for approval.
-              </p>
-            </div>
-
-            <Button variant="primary" className="w-full" onClick={handleClubSignUp}>
-              Submit Registration
-            </Button>
-          </div>
-        </div>
+        </form>
       </div>
-    );
-  }
-
-  return null;
+    </div>
+  );
 }

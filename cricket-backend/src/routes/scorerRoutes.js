@@ -13,6 +13,14 @@ router.use(authenticate, requireApproved, requireRole('Scorer'));
 
 // Fixture list for the scorer dashboard (declared before :id paths).
 router.get('/matches/assigned', ctrl.assignedMatches);
+router.get('/assigned-matches', ctrl.assignedMatches);
+router.get('/my-completed-matches', ctrl.completedMatches);
+
+// Match setup preview (rosters + metadata).
+router.get('/matches/:id/preview', ctrl.matchPreview);
+
+// 🟢 ADDED: Fetch the current live scorecard calculations (runs, balls, overs, wickets)
+router.get('/matches/:id/live', ctrl.getLiveState); 
 
 // Live scoring lifecycle.
 router.post('/matches/:id/initialize', ctrl.initialize);

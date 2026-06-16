@@ -1,53 +1,28 @@
-// Super-admin controllers. No tenant binding (platform-wide). UUID path params
-// are validated up front so a malformed id is a clean 404, not a Postgres 500.
-const superAdminService = require('../services/superAdminService');
-const { AppError } = require('../middlewares/errorHandler');
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const isUuid = (id) => typeof id === 'string' && UUID_RE.test(id);
+const { query } = require('../../db');
 
 const getClubs = async (req, res, next) => {
-  try {
-    const clubs = await superAdminService.listClubs();
-    res.json({ count: clubs.length, clubs });
-  } catch (err) { next(err); }
+  const result = await query('SELECT * FROM club');
+  res.json(result.rows);
 };
 
 const getClubMembers = async (req, res, next) => {
-  try {
-    if (!isUuid(req.params.id)) throw new AppError('Club not found', 404);
-    const result = await superAdminService.getClubMembers(req.params.id);
-    res.json(result);
-  } catch (err) { next(err); }
+  const result = await query('SELECT * FROM users WHERE club_id = $1', [req.params.id]);
+  res.json(result.rows);
 };
 
 const getPendingApprovals = async (req, res, next) => {
-  try {
-    const approvals = await superAdminService.listPendingApprovals();
-    res.json({ count: approvals.length, approvals });
-  } catch (err) { next(err); }
+  const result = await query('SELECT * FROM club WHERE is_approved = false');
+  res.json(result.rows);
 };
 
 const approveClub = async (req, res, next) => {
-  try {
-    if (!isUuid(req.params.id)) throw new AppError('Club not found', 404);
-    const result = await superAdminService.approveClub(req.params.id);
-    res.json(result);
-  } catch (err) { next(err); }
+  await query('UPDATE club SET is_approved = true WHERE club_id = $1', [req.params.id]);
+  res.json({ success: true });
 };
 
 const deleteDataAudit = async (req, res, next) => {
-  try {
-    if (!isUuid(req.params.match_id)) throw new AppError('Match not found', 404);
-    const result = await superAdminService.deleteMatchAudit(req.user.user_id, req.params.match_id);
-    res.json(result);
-  } catch (err) { next(err); }
+  await query('DELETE FROM matches WHERE match_id = $1', [req.params.match_id]);
+  res.json({ success: true });
 };
 
-module.exports = {
-  getClubs,
-  getClubMembers,
-  getPendingApprovals,
-  approveClub,
-  deleteDataAudit
-};
+module.exports = { getClubs, getClubMembers, getPendingApprovals, approveClub, deleteDataAudit };

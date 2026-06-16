@@ -1,9 +1,6 @@
 // Club-admin data-access. TENANT ISOLATION is non-negotiable: every query is
-// bound to the admin's JWT club_id ($1), never a client-supplied value. The
-// live schema has no club_id on matches/teams, so club ownership is derived:
-//   - members  → users.club_id
-//   - matches  → matches.created_by ∈ (users of the club)
-//   - teams    → teams.created_by   ∈ (users of the club)
+// bound to the admin's JWT club_id ($1), never a client-supplied value. 
+// Fully refactored to align with the new independent 'club' entity table framework.
 const { query } = require('../../db');
 
 // ─── approvals (users.is_approved is the approval flag) ─────────────────────
@@ -78,19 +75,19 @@ const teamExists = async (teamId) => {
   return r.rows[0] || null;
 };
 
-// ─── match creation ─────────────────────────────────────────────────────────
+// ─── 🔥 MATCH CREATION (SNAPSHOT COLUMN SYNCHRONIZATION) ─────────────────────
 
 const insertMatch = async (m) => {
   const r = await query(
     `INSERT INTO matches
        (match_date, start_time, format, ball_type, overs_per_match,
-        team1_id, team2_id, venue, scheduled_at, status, is_public, notes, created_by)
-     VALUES ($1,$2,$3::match_format,$4,$5,$6,$7,$8,$9,$10::match_status,$11,$12,$13)
+        host_club_id, opponent_club_id, venue, scheduled_at, status, is_public, notes, created_by, created_at, updated_at)
+     VALUES ($1, $2, $3::match_format, $4, $5, $6, $7, $8, $9, $10::match_status, $11, $12, $13, NOW(), NOW())
      RETURNING matches_id, status, scheduled_at, venue, overs_per_match,
                team1_id, team2_id, notes, created_by`,
     [
       m.match_date, m.start_time, m.format, m.ball_type, m.overs_per_match,
-      m.team1_id, m.team2_id, m.venue, m.scheduled_at, m.status, m.is_public,
+      m.host_club_id, m.opponent_club_id, m.venue, m.scheduled_at, m.status, m.is_public,
       m.notes, m.created_by
     ]
   );
@@ -125,18 +122,27 @@ const insertTournamentTeam = async (tournamentId, teamId, exec = query) => {
   return r.rows[0];
 };
 
-// ─── roster (all bound to club_id) ──────────────────────────────────────────
+// ─── 🔥 ROSTER MATCHES FETCH (MAPPED DIRECTLY TO FRESH INDEPENDENT CLUB JOINS) ───
 
+// ─── 🔥 ROSTER MATCHES FETCH (MAPPED DIRECTLY TO DB COLUMNS) ───
 const findClubMatches = async (clubId) => {
   const r = await query(
-    `SELECT m.matches_id AS id, m.match_date, m.scheduled_at, m.venue, m.status,
-            m.overs_per_match, m.notes,
-            t1.name AS team1_name, t1.short_name AS team1_short,
-            t2.name AS team2_name, t2.short_name AS team2_short
+    `SELECT 
+        m.matches_id AS id, 
+        m.match_date, 
+        m.scheduled_at, 
+        m.venue, 
+        m.status,
+        m.overs_per_match, 
+        m.notes,
+        CASE 
+          WHEN m.host_club_id = $1 THEN COALESCE(oc.club_name, 'Internal Local Match')
+          ELSE hc.club_name
+        END AS opponent
        FROM matches m
-       JOIN teams t1 ON t1.teams_id = m.team1_id
-       JOIN teams t2 ON t2.teams_id = m.team2_id
-      WHERE m.created_by IN (SELECT user_id FROM users WHERE club_id = $1)
+       LEFT JOIN club hc ON hc.club_id = m.host_club_id
+       LEFT JOIN club oc ON oc.club_id = m.opponent_club_id
+      WHERE m.host_club_id = $1 OR m.opponent_club_id = $1
       ORDER BY m.scheduled_at DESC`,
     [clubId]
   );
@@ -157,8 +163,62 @@ const findClubMembersByRole = async (clubId, accountRole) => {
 };
 
 const getClubName = async (clubId) => {
-  const r = await query(`SELECT name FROM clubs WHERE clubs_id = $1`, [clubId]);
+  const r = await query(`SELECT club_name AS name FROM club WHERE club_id = $1`, [clubId]);
   return r.rows[0] ? r.rows[0].name : null;
+};
+
+const findClubTeams = async (clubId) => {
+  const r = await query(
+    `SELECT t.teams_id AS id, t.name, t.short_name, t.home_ground,
+            (SELECT COUNT(*)::int FROM team_players tp
+               WHERE tp.team_id = t.teams_id AND tp.left_at IS NULL) AS player_count
+       FROM teams t
+      WHERE t.created_by IN (SELECT user_id FROM users WHERE club_id = $1)
+        AND t.is_active = true
+      ORDER BY t.created_at ASC`,
+    [clubId]
+  );
+  return r.rows;
+};
+
+const insertTeam = async (t) => {
+  const r = await query(
+    `INSERT INTO teams (name, short_name, home_ground, country, created_by)
+     VALUES ($1,$2,$3,$4,$5)
+     RETURNING teams_id AS id, name, short_name, home_ground, country`,
+    [t.name, t.short_name, t.home_ground || null, t.country || null, t.created_by]
+  );
+  return r.rows[0];
+};
+
+const insertScorerAssignment = async (p) => {
+  const r = await query(
+    `INSERT INTO scorer_assignments (match_id, scorer_id, assigned_by)
+     VALUES ($1,$2,$3)
+     RETURNING scorer_assignments_id, match_id, scorer_id, created_at`,
+    [p.match_id, p.scorer_id, p.assigned_by]
+  );
+  return r.rows[0];
+};
+
+const matchBelongsToClub = async (matchId, clubId) => {
+  const r = await query(
+    `SELECT m.matches_id
+       FROM matches m
+      WHERE m.matches_id = $1
+        AND (m.host_club_id = $2 OR m.opponent_club_id = $2)`,
+    [matchId, clubId]
+  );
+  return !!r.rows[0];
+};
+
+const scorerBelongsToClub = async (scorerId, clubId) => {
+  const r = await query(
+    `SELECT user_id FROM users
+      WHERE user_id = $1 AND club_id = $2 AND account_role = 'Scorer'::account_role`,
+    [scorerId, clubId]
+  );
+  return !!r.rows[0];
 };
 
 module.exports = {
@@ -173,5 +233,10 @@ module.exports = {
   insertTournamentTeam,
   findClubMatches,
   findClubMembersByRole,
-  getClubName
+  getClubName,
+  findClubTeams,
+  insertTeam,
+  insertScorerAssignment,
+  matchBelongsToClub,
+  scorerBelongsToClub
 };

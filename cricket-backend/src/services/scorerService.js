@@ -9,7 +9,6 @@ const { AppError } = require('../middlewares/errorHandler');
 
 // ─── Enum mapping ───────────────────────────────────────────────────────────
 
-// Frontend extra_type -> live-schema delivery_type enum.
 const DELIVERY_TYPE = {
   None: 'legal',
   NB: 'no_ball',
@@ -18,8 +17,6 @@ const DELIVERY_TYPE = {
   B: 'bye'
 };
 
-// Wizard dismissal_type -> live-schema dismissal_type enum. Bowler-credited
-// dismissals are flagged so the bowler's wicket tally only moves when earned.
 const DISMISSAL = {
   Bowled:                 { type: 'bowled', creditsBowler: true },
   Caught:                 { type: 'caught', creditsBowler: true },
@@ -28,8 +25,6 @@ const DISMISSAL = {
   Stumped:                { type: 'stumped', creditsBowler: true },
   'Hit Wicket':           { type: 'hit_wicket', creditsBowler: true },
   'Obstructing the Field':{ type: 'obstructing_field', creditsBowler: false }
-  // 'Retired Hurt' is handled separately — it is not a true dismissal and has
-  // no live-schema enum value (no wicket is credited, no dismissal row).
 };
 
 const phaseFor = (overNumber, oversPerMatch) => {
@@ -40,18 +35,15 @@ const phaseFor = (overNumber, oversPerMatch) => {
 };
 
 // ─── Core scoring math ──────────────────────────────────────────────────────
-// Given the validated ball input, produce every delta the delivery causes.
-// Implemented exactly per the scoring spec — do not "simplify" these.
 const ballMath = (deliveryType, runsOffBat, extraRuns) => {
-  // Defaults describe a standard, legal delivery.
   const m = {
     deliveryType,
     runsBatter: 0,
     runsExtras: 0,
-    runsTotal: 0,          // team score delta
-    countsOver: false,     // legal ball → advances the over / bowler balls
-    batterFaces: false,    // batter's balls_faced increments
-    bowlerConceded: 0,     // runs charged to the bowler
+    runsTotal: 0,
+    countsOver: false,
+    batterFaces: false,
+    bowlerConceded: 0,
     extras: { wides: 0, no_balls: 0, leg_byes: 0, byes: 0, penalties: 0, total: 0 },
     isFour: false,
     isSix: false,
@@ -71,27 +63,25 @@ const ballMath = (deliveryType, runsOffBat, extraRuns) => {
       break;
 
     case 'no_ball':
-      // team_score += 1 (penalty) + runs_off_bat; over does NOT advance.
       m.runsBatter = runsOffBat;
       m.runsExtras = 1;
       m.runsTotal = 1 + runsOffBat;
       m.countsOver = false;
       m.batterFaces = true;
       m.bowlerConceded = 1 + runsOffBat;
-      m.extras.no_balls = 1;       // count of no balls (+1)
+      m.extras.no_balls = 1;
       m.extras.total = 1;
       m.isFour = runsOffBat === 4;
       m.isSix = runsOffBat === 6;
       break;
 
     case 'wide':
-      // team_score += 1 (penalty) + extra_runs; batter does NOT face it.
       m.runsExtras = 1 + extraRuns;
       m.runsTotal = 1 + extraRuns;
       m.countsOver = false;
       m.batterFaces = false;
       m.bowlerConceded = 1 + extraRuns;
-      m.extras.wides = 1 + extraRuns; // wide runs (1 + extra)
+      m.extras.wides = 1 + extraRuns;
       m.extras.total = 1 + extraRuns;
       break;
 
@@ -100,7 +90,7 @@ const ballMath = (deliveryType, runsOffBat, extraRuns) => {
       m.runsTotal = extraRuns;
       m.countsOver = true;
       m.batterFaces = true;
-      m.bowlerConceded = 0;          // not charged to the bowler
+      m.bowlerConceded = 0;
       m.extras.leg_byes = extraRuns;
       m.extras.total = extraRuns;
       m.isDot = extraRuns === 0;
@@ -118,7 +108,6 @@ const ballMath = (deliveryType, runsOffBat, extraRuns) => {
       break;
 
     case 'penalty':
-      // Penalty runs are awarded to the side; not a faced ball, not charged.
       m.runsExtras = extraRuns;
       m.runsTotal = extraRuns;
       m.extras.penalties = extraRuns;
@@ -131,17 +120,12 @@ const ballMath = (deliveryType, runsOffBat, extraRuns) => {
   return m;
 };
 
-// How many runs the batters physically ran (drives manual-strike rotation).
 const runsRan = (delivery) =>
   (delivery.delivery_type === 'legal' || delivery.delivery_type === 'no_ball')
     ? delivery.runs_batter
     : delivery.runs_extras;
 
 // ─── Crease resolution ──────────────────────────────────────────────────────
-// The ball payload carries only the innings + outcome, so the engine works out
-// who is on strike, who is at the other end and who is bowling from server-side
-// state: the last live delivery plus the not-out batting cards. Explicit ids in
-// the input always win (the console can drive these directly).
 const resolveCrease = async (db, inningsId, overrides = {}) => {
   const last = await repo.getLastDelivery(db, inningsId);
   const active = await repo.getActiveBatters(db, inningsId);
@@ -149,12 +133,11 @@ const resolveCrease = async (db, inningsId, overrides = {}) => {
   let strikerId, nonStrikerId, bowlerId;
 
   if (!last) {
-    // Opening state: batting positions 1 & 2, the single seeded bowler.
     strikerId = active[0] ? active[0].player_id : null;
     nonStrikerId = active[1] ? active[1].player_id : null;
     const bf = await db.query(
       `SELECT player_id FROM bowling_figures WHERE innings_id = $1
-        ORDER BY balls_bowled DESC LIMIT 1`,
+         ORDER BY balls_bowled DESC LIMIT 1`,
       [inningsId]
     );
     bowlerId = bf.rows[0] ? bf.rows[0].player_id : null;
@@ -164,8 +147,6 @@ const resolveCrease = async (db, inningsId, overrides = {}) => {
     nonStrikerId = swap ? last.batter_id : last.non_striker_id;
     bowlerId = last.bowler_id;
 
-    // If a batter from the last ball has since been dismissed, the freshly
-    // seated batter takes that end.
     const activeIds = new Set(active.map((a) => a.player_id));
     const incoming = active.find(
       (a) => a.player_id !== last.batter_id && a.player_id !== last.non_striker_id
@@ -205,15 +186,31 @@ const presentInningsState = (inn) => ({
   }
 });
 
-const presentBatter = (card) =>
-  card && {
-    player_id: card.player_id,
-    runs: card.runs_scored,
-    balls_faced: card.balls_faced,
-    fours: card.fours,
-    sixes: card.sixes,
-    is_dismissed: card.is_dismissed
+const presentBatter = (card) => {
+  if (!card) return null;
+  
+  // Extract the values safely from whatever the database returned
+  const runsValue = Number(card.runs ?? card.runs_scored ?? card.runsScored ?? 0);
+  const ballsValue = Number(card.balls ?? card.balls_faced ?? card.ballsFaced ?? 0);
+
+  return {
+    player_id: card.player_id ?? card.playerId,
+    player_name: card.player_name ?? card.playerName, // just in case
+    
+    // Provide ALL naming variations so the frontend never gets undefined
+    runs: runsValue,
+    runs_scored: runsValue,
+    runsScored: runsValue,
+    
+    balls: ballsValue,
+    balls_faced: ballsValue,
+    ballsFaced: ballsValue,
+    
+    fours: Number(card.fours ?? 0),
+    sixes: Number(card.sixes ?? 0),
+    is_dismissed: !!(card.is_dismissed ?? card.isDismissed)
   };
+};
 
 const presentBowler = (fig) =>
   fig && {
@@ -224,23 +221,65 @@ const presentBowler = (fig) =>
     wickets: fig.wickets
   };
 
-// ─── initialize ─────────────────────────────────────────────────────────────
-// Open a new innings for a match and seat the opening pair + bowler. Returns
-// the innings id the console then sends with every ball.
+// ─── 🔥 INITIALIZE (UPGRADED WITH TEAMS RESOLUTION BRIDGE) ───────────────────
 const initialize = async (matchId, input) => {
   return withTransaction(async (client) => {
     const match = await repo.getMatch(client, matchId);
     if (!match) throw new AppError('Match not found', 404);
 
+    // 1. Process local derby metadata and save UI configs to notes
+    let combinedNotes = match.notes || '';
+    if (input.metadata) {
+      if (input.metadata.is_local_derby) {
+        combinedNotes = `[Active Derby Run] Batting label: ${input.metadata.batting_team_label || 'A'}. ${combinedNotes}`;
+      }
+      // Stringify UI Engine configs so Scorer Console can read them later
+      combinedNotes = `${combinedNotes} | Configs: WW=${input.metadata.wagon_wheel_enabled ? '1' : '0'}, Comm=${input.metadata.commentary_type}, NameFmt=${input.metadata.name_display_format}`;
+      
+      await client.query(`UPDATE matches SET notes = $1 WHERE matches_id = $2`, [combinedNotes, matchId]);
+    }
+
+    // 2. Resolve or Create the Teams entries to satisfy the Foreign Key constraint
+    const resolveTeamId = async (clubId, teamLabel) => {
+      // Look for a team created by ANY user belonging to this club
+      let tRes = await client.query(
+        `SELECT teams_id FROM teams WHERE created_by IN (SELECT user_id FROM users WHERE club_id = $1) LIMIT 1`, 
+        [clubId]
+      );
+      
+      if (tRes.rows.length === 0) {
+        // Find a user from this club to attach as the "creator" of the team
+        let userRes = await client.query(`SELECT user_id FROM users WHERE club_id = $1 LIMIT 1`, [clubId]);
+        const creatorId = userRes.rows.length > 0 ? userRes.rows[0].user_id : '00000000-0000-0000-0000-000000000000';
+        
+        // Insert without using the non-existent club_id column
+        tRes = await client.query(
+          `INSERT INTO teams (name, short_name, created_by, is_active, created_at) 
+             VALUES ($1, $2, $3, true, NOW()) RETURNING teams_id`,
+          [teamLabel, teamLabel.substring(0, 3).toUpperCase(), creatorId]
+        );
+      }
+      return tRes.rows[0].teams_id;
+    };
+
+    const finalBattingTeamId = await resolveTeamId(input.batting_team_id, input.metadata?.batting_team_label || 'Batting Team');
+    const finalFieldingTeamId = await resolveTeamId(input.fielding_team_id, input.metadata?.fielding_team_label || 'Fielding Team');
+
+    // 3. Update Match with Toss Info (using the resolved team IDs)
+    const finalTossWinnerId = input.toss_winner === input.batting_team_id ? finalBattingTeamId : finalFieldingTeamId;
+    await client.query(
+      `UPDATE matches SET toss_winner_id = $1, toss_decision = $2, status = 'live', started_at = COALESCE(started_at, now()), updated_at = now() WHERE matches_id = $3`, 
+      [finalTossWinnerId, input.toss_decision, matchId]
+    );
+
+    // 4. Create the Innings using the valid teams_id
     const innings = await repo.createInnings(client, {
       matchId,
       inningsNumber: input.innings_number,
-      battingTeamId: input.batting_team_id,
-      fieldingTeamId: input.fielding_team_id,
+      battingTeamId: finalBattingTeamId,
+      fieldingTeamId: finalFieldingTeamId,
       targetRuns: input.target_runs
     });
-
-    await repo.setMatchStatus(client, matchId, 'live');
 
     let striker = null;
     let nonStriker = null;
@@ -262,6 +301,11 @@ const initialize = async (matchId, input) => {
     return {
       innings: presentInningsState(innings),
       overs_per_match: match.overs_per_match,
+      playerNames: {
+         [input.striker_id]: striker ? await repo.getPlayerName(client, input.striker_id) : null,
+         [input.non_striker_id]: nonStriker ? await repo.getPlayerName(client, input.non_striker_id) : null,
+         [input.bowler_id]: bowler ? await repo.getPlayerName(client, input.bowler_id) : null
+      },
       striker: presentBatter(striker),
       non_striker: presentBatter(nonStriker),
       bowler: presentBowler(bowler)
@@ -301,12 +345,10 @@ const recordBall = async (matchId, input) => {
 
     const m = ballMath(deliveryType, input.runs_off_bat, input.extra_runs);
 
-    // Ball coordinates are derived from legal balls already bowled.
     const legalBefore = innings.total_balls;
     const overNumber = Math.floor(legalBefore / 6) + 1;
     const ballInOver = (legalBefore % 6) + 1;
 
-    // Ensure the participants have rows, then locate/create the over.
     await repo.ensureBattingCard(client, input.innings_id, crease.strikerId, {
       cameInAtOver: overNumber - 1
     });
@@ -337,7 +379,7 @@ const recordBall = async (matchId, input) => {
       bowlerId: crease.bowlerId,
       batterId: crease.strikerId,
       nonStrikerId: crease.nonStrikerId,
-      deliveryType,
+      deliveryType: deliveryType,
       runsBatter: m.runsBatter,
       runsExtras: m.runsExtras,
       runsTotal: m.runsTotal,
@@ -357,10 +399,9 @@ const recordBall = async (matchId, input) => {
       });
     }
 
-    // Innings totals.
     const updatedInnings = await repo.applyInningsDelta(client, input.innings_id, {
       runs: m.runsTotal,
-      wickets: 0, // wickets are applied by the wicket wizard
+      wickets: 0,
       balls: m.countsOver ? 1 : 0,
       wides: m.extras.wides,
       no_balls: m.extras.no_balls,
@@ -370,7 +411,6 @@ const recordBall = async (matchId, input) => {
       total_extras: m.extras.total
     });
 
-    // Batter tally.
     await repo.bumpBattingCard(client, input.innings_id, crease.strikerId, {
       runs: m.runsBatter,
       balls: m.batterFaces ? 1 : 0,
@@ -379,7 +419,6 @@ const recordBall = async (matchId, input) => {
       dots: deliveryType === 'legal' && input.runs_off_bat === 0 ? 1 : 0
     });
 
-    // Bowler tally.
     await repo.bumpBowlingFigure(client, input.innings_id, crease.bowlerId, {
       balls: m.countsOver ? 1 : 0,
       runs: m.bowlerConceded,
@@ -390,11 +429,32 @@ const recordBall = async (matchId, input) => {
       sixes: m.isSix ? 1 : 0
     });
 
-    // Over tally + cumulative snapshot.
+    await repo.bumpBatterOverStats(client, input.innings_id, crease.strikerId, overNumber, {
+      runs: m.runsBatter,
+      balls: m.batterFaces ? 1 : 0,
+      fours: m.isFour ? 1 : 0,
+      sixes: m.isSix ? 1 : 0
+    });
+
+    await repo.bumpBowlerOverStats(client, input.innings_id, crease.bowlerId, overNumber, {
+      runs: m.bowlerConceded,
+      wides: m.extras.wides,
+      no_balls: m.extras.no_balls,
+      fours: m.isFour ? 1 : 0,
+      sixes: m.isSix ? 1 : 0,
+      dots: m.isDot ? 1 : 0
+    });
+
+    await repo.bumpBowlingSpell(client, input.innings_id, crease.bowlerId, overNumber, {
+      runs: m.bowlerConceded,
+      balls: m.countsOver ? 1 : 0
+    });
+
     const runRate =
       updatedInnings.total_balls > 0
         ? Number(((updatedInnings.total_runs * 6) / updatedInnings.total_balls).toFixed(2))
         : 0;
+
     await repo.updateOverAggregates(client, over.overs_id, {
       runs: m.runsTotal,
       legal_balls: m.countsOver ? 1 : 0,
@@ -408,9 +468,13 @@ const recordBall = async (matchId, input) => {
       runRate
     });
 
-    // Over / innings completion.
     const overCompleted = m.countsOver && updatedInnings.total_balls % 6 === 0;
     const oversCompleted = Math.floor(updatedInnings.total_balls / 6);
+
+    if (overCompleted) {
+      await repo.checkAndMarkMaidenOver(client, input.innings_id, crease.bowlerId, overNumber);
+    }
+
     let inningsComplete = false;
     let finalInnings = updatedInnings;
     if (
@@ -421,13 +485,19 @@ const recordBall = async (matchId, input) => {
       inningsComplete = true;
     }
 
-    // Sequential reads — they share the one transaction client, which cannot
-    // run queries concurrently.
+    // Fetch the updated records cleanly inside the transaction
     const strikerCard = await repo.getBattingCard(client, input.innings_id, crease.strikerId);
     const nonStrikerCard = crease.nonStrikerId
       ? await repo.getBattingCard(client, input.innings_id, crease.nonStrikerId)
       : null;
     const bowlerFig = await repo.getBowlingFigure(client, input.innings_id, crease.bowlerId);
+
+    // =================================================================
+    // 🏏 TRANSLATE DATABASE NAMES TO MATCH FRONTEND BatterState INTERFACE
+    // =================================================================
+    const strikerState = strikerCard ? presentBatter(strikerCard) : null;
+
+    const nonStrikerState = nonStrikerCard ? presentBatter(nonStrikerCard) : null;
 
     return {
       response: {
@@ -444,8 +514,8 @@ const recordBall = async (matchId, input) => {
           is_wicket: !!input.is_wicket
         },
         innings: presentInningsState(finalInnings),
-        striker: presentBatter(strikerCard),
-        non_striker: presentBatter(nonStrikerCard),
+        striker: strikerState,          // <-- Fixed to use the newly mapped state
+        non_striker: nonStrikerState,   // <-- Fixed to use the newly mapped state
         bowler: presentBowler(bowlerFig),
         over_completed: overCompleted,
         innings_complete: inningsComplete
@@ -460,7 +530,6 @@ const recordBall = async (matchId, input) => {
     };
   });
 
-  // Logged only after the transaction has COMMITTED.
   logger.info('SCORING_CONSOLE_MUTATION', {
     context: 'SCORING_CONSOLE_MUTATION',
     match_id: result.log.match_id,
@@ -476,8 +545,6 @@ const recordBall = async (matchId, input) => {
   return result.response;
 };
 
-// Resolve the active in-progress innings of a match (used by wizard/undo which
-// only receive the match id in the path).
 const resolveActiveInnings = async (client, matchId, inningsId) => {
   if (inningsId) {
     const inn = await repo.lockInnings(client, inningsId);
@@ -486,8 +553,8 @@ const resolveActiveInnings = async (client, matchId, inningsId) => {
   }
   const r = await client.query(
     `SELECT innings_id FROM innings
-      WHERE match_id = $1 AND status = 'in_progress'
-      ORDER BY innings_number DESC LIMIT 1`,
+       WHERE match_id = $1 AND status = 'in_progress'
+       ORDER BY innings_number DESC LIMIT 1`,
     [matchId]
   );
   if (!r.rows[0]) throw new AppError('No in-progress innings for this match', 404);
@@ -498,7 +565,6 @@ const resolveActiveInnings = async (client, matchId, inningsId) => {
 const wicketWizard = async (matchId, input) => {
   return withTransaction(async (client) => {
     const innings = await resolveActiveInnings(client, matchId, input.innings_id);
-
     const last = await repo.getLastDelivery(client, innings.innings_id);
     if (!last) throw new AppError('No delivery to attach the dismissal to', 400);
 
@@ -509,7 +575,6 @@ const wicketWizard = async (matchId, input) => {
     let updatedInnings = innings;
 
     if (retiredHurt) {
-      // Not a true dismissal: the batter leaves the crease, no wicket credited.
       await repo.setBattingDismissed(client, innings.innings_id, input.dismissed_player_id, {
         isDismissed: true,
         dismissedAtOver: overAtFall
@@ -532,7 +597,6 @@ const wicketWizard = async (matchId, input) => {
         wicketNumber
       });
 
-      // Flag the delivery + dismissed batter, credit the bowler, bump the over.
       await client.query(
         `UPDATE deliveries SET is_wicket = true WHERE deliveries_id = $1`,
         [last.deliveries_id]
@@ -544,6 +608,8 @@ const wicketWizard = async (matchId, input) => {
       });
       if (mapped.creditsBowler) {
         await repo.bumpBowlingFigure(client, innings.innings_id, last.bowler_id, { wickets: 1 });
+        await repo.bumpBowlerOverStats(client, innings.innings_id, last.bowler_id, last.over_number, { wickets: 1 });
+        await repo.bumpBowlingSpell(client, innings.innings_id, last.bowler_id, last.over_number, { wickets: 1 });
       }
       await repo.updateOverAggregates(client, last.over_id, {
         wickets: 1,
@@ -557,7 +623,6 @@ const wicketWizard = async (matchId, input) => {
       updatedInnings = await repo.applyInningsDelta(client, innings.innings_id, { wickets: 1 });
     }
 
-    // Seat the incoming batsman at the dismissed batter's position.
     const dismissedCard = await repo.getBattingCard(
       client, innings.innings_id, input.dismissed_player_id
     );
@@ -566,7 +631,6 @@ const wicketWizard = async (matchId, input) => {
       cameInAtOver: overAtFall
     });
 
-    // Innings completion on the 10th wicket.
     let inningsComplete = false;
     if (!retiredHurt && updatedInnings.total_wickets >= 10) {
       updatedInnings = await repo.setInningsStatus(client, innings.innings_id, 'completed');
@@ -591,8 +655,6 @@ const wicketWizard = async (matchId, input) => {
 };
 
 // ─── undo ───────────────────────────────────────────────────────────────────
-// Reverse every mutation the last live delivery caused, then delete the row —
-// all in one transaction. Reversal is derived from the stored delivery record.
 const undo = async (matchId, input) => {
   return withTransaction(async (client) => {
     const innings = await resolveActiveInnings(client, matchId, input.innings_id);
@@ -602,7 +664,6 @@ const undo = async (matchId, input) => {
     const m = ballMath(last.delivery_type, last.runs_batter, last.runs_extras);
     const dismissal = await repo.getDismissalForDelivery(client, last.deliveries_id);
 
-    // Reverse the bowler's wicket credit (if any) and the dismissed batter flag.
     let wicketDelta = 0;
     if (dismissal) {
       wicketDelta = 1;
@@ -612,13 +673,13 @@ const undo = async (matchId, input) => {
         dismissedAtOver: null
       });
       if (dismissal.bowler_id) {
-        await repo.bumpBowlingFigure(client, innings.innings_id, dismissal.bowler_id, {
-          wickets: -1
-        });
+        await repo.bumpBowlingFigure(client, innings.innings_id, dismissal.bowler_id, { wickets: -1 });
+        await repo.bumpBowlerOverStats(client, innings.innings_id, dismissal.bowler_id, last.over_number, { wickets: -1 });
+        await repo.bumpBowlingSpell(client, innings.innings_id, dismissal.bowler_id, last.over_number, { wickets: -1 });
       }
     }
+    await repo.checkAndUnmarkMaidenOver(client, innings.innings_id, last.bowler_id, last.over_number);
 
-    // Reverse the batter tally.
     await repo.bumpBattingCard(client, innings.innings_id, last.batter_id, {
       runs: -last.runs_batter,
       balls: m.batterFaces ? -1 : 0,
@@ -627,7 +688,13 @@ const undo = async (matchId, input) => {
       dots: last.delivery_type === 'legal' && last.runs_batter === 0 ? -1 : 0
     });
 
-    // Reverse the bowler tally.
+    await repo.bumpBatterOverStats(client, innings.innings_id, last.batter_id, last.over_number, {
+      runs: -last.runs_batter,
+      balls: m.batterFaces ? -1 : 0,
+      fours: last.is_boundary_four ? -1 : 0,
+      sixes: last.is_boundary_six ? -1 : 0
+    });
+
     await repo.bumpBowlingFigure(client, innings.innings_id, last.bowler_id, {
       balls: m.countsOver ? -1 : 0,
       runs: -m.bowlerConceded,
@@ -638,7 +705,20 @@ const undo = async (matchId, input) => {
       sixes: last.is_boundary_six ? -1 : 0
     });
 
-    // Reverse the over tally; drop the over row if it ends up empty.
+    await repo.bumpBowlerOverStats(client, innings.innings_id, last.bowler_id, last.over_number, {
+      runs: -m.bowlerConceded,
+      fours: last.is_boundary_four ? -1 : 0,
+      sixes: last.is_boundary_six ? -1 : 0,
+      dots: m.isDot ? -1 : 0,
+      wides: -m.extras.wides,
+      no_balls: -m.extras.no_balls
+    });
+
+    await repo.bumpBowlingSpell(client, innings.innings_id, last.bowler_id, last.over_number, {
+      runs: -m.bowlerConceded,
+      balls: m.countsOver ? -1 : 0
+    });
+
     await repo.updateOverAggregates(client, last.over_id, {
       runs: -last.runs_total,
       wickets: -wicketDelta,
@@ -653,13 +733,12 @@ const undo = async (matchId, input) => {
       runRate: 0
     });
 
-    // Delete child rows, then the delivery itself.
     await repo.deleteExtrasForDelivery(client, last.deliveries_id);
     if (dismissal) await repo.deleteDismissalForDelivery(client, last.deliveries_id);
     await repo.deleteDelivery(client, last.deliveries_id);
     await repo.deleteOverIfEmpty(client, last.over_id);
+    await repo.deleteEmptyOverStatsAndSpells(client, innings.innings_id, last.over_number);
 
-    // Finally reverse the innings totals (restores the pre-delivery snapshot).
     const restored = await repo.applyInningsDelta(client, innings.innings_id, {
       runs: -last.runs_total,
       wickets: -wicketDelta,
@@ -672,7 +751,6 @@ const undo = async (matchId, input) => {
       total_extras: -m.extras.total
     });
 
-    // If the innings had been auto-completed, scoring it back re-opens it.
     let reopened = restored;
     if (restored.status === 'completed') {
       reopened = await repo.setInningsStatus(client, innings.innings_id, 'in_progress');
@@ -686,25 +764,104 @@ const undo = async (matchId, input) => {
   });
 };
 
-// ─── assigned matches ───────────────────────────────────────────────────────
+const presentAssignedMatch = (r) => ({
+  id: r.id,
+  match_date: r.match_date,
+  start_time: r.start_time,
+  scheduled_at: r.scheduled_at,
+  status: r.status,
+  format: r.format,
+  overs_per_match: r.overs_per_match,
+  venue: r.venue || '',
+  team1_name: r.team1_name,
+  team1_short_name: r.team1_short_name,
+  team2_name: r.team2_name,
+  team2_short_name: r.team2_short_name,
+  accepted: r.accepted_at != null,
+  assigned_at: r.assigned_at
+});
+
+// ─── 🔥 PREVIEW ROSTER SEGREGATION ENGINE ─────────────────────────────────────────
 const getAssignedMatches = async (scorerId) => {
   const rows = await repo.findAssignedMatches(scorerId);
+  return rows.map(presentAssignedMatch);
+};
+
+const getCompletedMatches = async (scorerId) => {
+  const rows = await repo.findCompletedMatchesForScorer(scorerId);
   return rows.map((r) => ({
     id: r.id,
-    match_date: r.match_date,
-    start_time: r.start_time,
-    scheduled_at: r.scheduled_at,
-    status: r.status,
-    format: r.format,
-    overs_per_match: r.overs_per_match,
-    venue: r.venue || '',
     team1_name: r.team1_name,
-    team1_short_name: r.team1_short_name,
     team2_name: r.team2_name,
+    team1_short_name: r.team1_short_name,
     team2_short_name: r.team2_short_name,
-    accepted: r.accepted_at != null,
-    assigned_at: r.assigned_at
+    format: r.format,
+    venue: r.venue || '',
+    date: r.match_date || r.scheduled_at,
+    status: 'Completed',
+    result_summary: r.result_summary || undefined,
+    team1_score: r.team1_score || undefined,
+    team2_score: r.team2_score || undefined
   }));
+};
+
+const getMatchPreview = async (scorerId, matchId) => {
+  const assigned = await repo.scorerHasAssignment(scorerId, matchId);
+  if (!assigned) throw new AppError('You are not assigned to this match', 403);
+
+  const match = await repo.getMatchPreviewRow(matchId);
+  if (!match) throw new AppError('Match not found', 404);
+
+  let team1Roster = await repo.findTeamRoster(match.team1_id);
+  let team2Roster = await repo.findTeamRoster(match.team2_id);
+
+  if (match.team1_id === match.team2_id) {
+    const rawPool = [...team1Roster];
+    team1Roster = rawPool.filter((_, idx) => idx % 2 === 0);
+    team2Roster = rawPool.filter((_, idx) => idx % 2 !== 0);
+  }
+
+  return {
+    match_id: match.matches_id,
+    team1_id: match.team1_id,
+    team2_id: match.team2_id,
+    team1_name: match.team1_id === match.team2_id ? `${match.team1_name} (A)` : match.team1_name,
+    team2_name: match.team1_id === match.team2_id ? `${match.team2_name} (B)` : match.team2_name,
+    venue: match.venue || '',
+    ground: match.city || match.venue || '',
+    country: match.country || '',
+    format: match.format,
+    total_overs: match.overs_per_match,
+    overs_per_bowler: match.overs_per_match ? Math.floor(match.overs_per_match / 5) : 4,
+    status: match.status,
+    team1_roster: team1Roster,
+    team2_roster: team2Roster
+  };
+};
+
+const getLiveMatchState = async (matchId) => {
+  // 1. Fetch the active match and innings state from your database/repository
+  // (Look at how you fetch these at the top of your recordBall function!)
+  const activeInnings = await scorerRepository.getCurrentInnings(matchId);
+  
+  if (!activeInnings) {
+    return { ok: false, message: "No active innings found for this match." };
+  }
+
+  // 2. Fetch the active players using the IDs stored in the innings state
+  const strikerCard = await scorerRepository.getBatterCard(activeInnings.innings_id, activeInnings.striker_id);
+  const nonStrikerCard = await scorerRepository.getBatterCard(activeInnings.innings_id, activeInnings.non_striker_id);
+  const bowlerFig = await scorerRepository.getBowlerFigures(activeInnings.innings_id, activeInnings.bowler_id);
+
+  // 3. Format and return the data using your updated presentBatter function!
+  return {
+    ok: true,
+    match_id: matchId,
+    innings: presentInningsState(activeInnings),
+    striker: presentBatter(strikerCard),
+    non_striker: presentBatter(nonStrikerCard),
+    bowler: presentBowler(bowlerFig)
+  };
 };
 
 module.exports = {
@@ -713,8 +870,10 @@ module.exports = {
   wicketWizard,
   undo,
   getAssignedMatches,
-  // exported for unit testing
+  getCompletedMatches,
+  getMatchPreview,
   ballMath,
   DELIVERY_TYPE,
-  DISMISSAL
+  DISMISSAL,
+  getLiveMatchState
 };

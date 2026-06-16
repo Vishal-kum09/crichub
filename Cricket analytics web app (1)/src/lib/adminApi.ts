@@ -125,35 +125,93 @@ export async function getRosterScorers(): Promise<RosterMember[]> {
   return data.scorers as RosterMember[];
 }
 
-// ─── super-admin endpoints ───────────────────────────────────────────────────
+// ─── super-admin endpoints (FIXED ALIGNMENT FOR FRESH ARCTITECTURE 🚀) ───────────────────────────
 
 export async function getClubs(): Promise<ClubSummary[]> {
   const { data } = await api.get('/api/super-admin/clubs');
-  return data.clubs as ClubSummary[];
+  return data as ClubSummary[];
 }
 
 export async function getClubMembers(clubId: string): Promise<ClubMember[]> {
   const { data } = await api.get(`/api/super-admin/clubs/${clubId}/members`);
-  return data.members as ClubMember[];
+  return data as ClubMember[];
 }
 
 export async function getSuperPendingApprovals(): Promise<PendingClub[]> {
   const { data } = await api.get('/api/super-admin/approvals/pending');
-  return data.approvals as PendingClub[];
+  return data as PendingClub[];
 }
 
 export async function approveClub(clubId: string): Promise<void> {
   await api.put(`/api/super-admin/clubs/${clubId}/approve`);
 }
 
+// 🔥 MATCH WIZARD DROPDOWN FIX: Safely extracts and normalizes payload regardless of database column key variations
+export async function getGlobalApprovedClubs(): Promise<any[]> {
+  const { data } = await api.get('/api/auth/clubs');
+  
+  let rawArray: any[] = [];
+  if (Array.isArray(data)) rawArray = data;
+  else if (data && Array.isArray(data.clubs)) rawArray = data.clubs;
+  else if (data && Array.isArray(data.data)) rawArray = data.data;
+
+  // Normalize object structures on structural transfer layer so UI loop never hits an undefined key
+  return rawArray.map((club: any) => ({
+    id: club.club_id || club.id || club.clubs_id,
+    name: club.club_name || club.name
+  }));
+}
+
 export async function deleteMatchAudit(matchId: string): Promise<void> {
   await api.delete(`/api/super-admin/data-audit/${matchId}`);
 }
 
-// Capitalize a lowercased role for the assigned_role enum (player -> Player).
+export interface ClubTeam {
+  id: string;
+  name: string;
+  short_name: string;
+  home_ground: string;
+  player_count: number;
+}
+
+export async function getClubTeams(): Promise<ClubTeam[]> {
+  const { data } = await api.get('/api/club-admin/teams');
+  return data.teams as ClubTeam[];
+}
+
+export async function createTeam(payload: {
+  name: string;
+  short_name?: string;
+  home_ground?: string;
+  country?: string;
+}): Promise<{ team_id: string }> {
+  const { data } = await api.post('/api/club-admin/teams', payload);
+  return data;
+}
+
+export async function assignScorerToMatch(matchId: string, scorerId: string): Promise<void> {
+  await api.post('/api/club-admin/assign-scorer', { match_id: matchId, scorer_id: scorerId });
+}
+
 export function toAssignedRole(role: string): AssignedRole {
   const map: Record<string, AssignedRole> = {
     player: 'Player', scorer: 'Scorer', analyst: 'Analyst', umpire: 'Umpire',
   };
   return map[role.toLowerCase()] || 'Player';
+}
+
+// 🔥 ADMIN SQUAD ENGINE: Allows Club Admin to register a player directly into the system database
+export async function createPlayerDirectByAdmin(payload: {
+  first_name: string;
+  last_name: string;
+  display_name: string;
+  email: string;
+  phone?: string;
+}): Promise<any> {
+  // Sets standard account parameters directly; matches with central validation layers
+  const { data } = await api.post('/api/club-admin/players/direct-register', {
+    ...payload,
+    account_role: 'Player'
+  });
+  return data;
 }

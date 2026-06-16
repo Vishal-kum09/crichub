@@ -12,16 +12,15 @@ const { errorHandler } = require('./src/middlewares/errorHandler');
 const { healthCheck } = require('./src/controllers/healthController');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+
+const PORT = process.env.PORT || 8080;
 
 // ─── Security & Parsing Middleware ───────────────────────────────────────────
 
-// Helmet sets secure HTTP headers (HSTS, X-Content-Type-Options, frameguard,
-// etc.) automatically.
+// Helmet sets secure HTTP headers
 app.use(helmet());
 
-// CORS: in production lock to the deployed frontend origin (set FRONTEND_ORIGIN
-// to the Cloud Run frontend URL); in development allow the local Vite dev server.
+// CORS configuration
 app.use(cors({
   origin: process.env.NODE_ENV === 'production'
     ? (process.env.FRONTEND_ORIGIN || 'https://cricket-frontend-REPLACE-nw.a.run.app')
@@ -31,16 +30,17 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-app.use(express.json({ limit: '10kb' })); // Prevent payload bloat attacks
+app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // ─── Request Logging ─────────────────────────────────────────────────────────
 
 app.use(requestLogger);
 
-// ─── Rate Limiting ────────────────────────────────────────────────────────────
+// ─── Rate Limiting ───────────────────────────────────────────────────────────
 
 const WINDOW = 15 * 60 * 1000; // 15 minutes
+
 const limiter = (max, message) => rateLimit({
   windowMs: WINDOW,
   max,
@@ -49,44 +49,60 @@ const limiter = (max, message) => rateLimit({
   legacyHeaders: false
 });
 
-const globalLimiter = limiter(200, 'Too many requests, please try again later');
-const authLimiter = limiter(20, 'Too many authentication attempts, please try again later');
-const loginLimiter = limiter(10, 'Too many login attempts, please try again later');
-const otpLimiter = limiter(5, 'Too many OTP requests, please try again later');
+const globalLimiter = limiter(
+  200,
+  'Too many requests, please try again later'
+);
 
-// Order matters — express runs every matching limiter. The most specific
-// (login, otp) are registered before the broader /api/auth and /api buckets, so
-// a login request is capped by the strictest applicable limit.
-app.use('/api', globalLimiter);                 // all /api          → 200 / 15m
-app.use('/api/auth', authLimiter);              // all /api/auth/*   → 20  / 15m
-app.use('/api/auth/login', loginLimiter);       // login             → 10  / 15m
-app.use('/api/auth/otp/send', otpLimiter);      // otp send          → 5   / 15m
+const authLimiter = limiter(
+  20,
+  'Too many authentication attempts, please try again later'
+);
 
-// ─── Routes ───────────────────────────────────────────────────────────────────
+const loginLimiter = limiter(
+  10,
+  'Too many login attempts, please try again later'
+);
 
-// Phase 0: Health check
+const otpLimiter = limiter(
+  5,
+  'Too many OTP requests, please try again later'
+);
+
+// Apply limiters
+app.use('/api', globalLimiter);
+app.use('/api/auth', authLimiter);
+app.use('/api/auth/login', loginLimiter);
+app.use('/api/auth/otp/send', otpLimiter);
+
+// ─── Routes ──────────────────────────────────────────────────────────────────
+
+// Health check
 app.get('/health', healthCheck);
 
-// Phase 2+: Auth routes
+// Auth routes
 app.use('/api/auth', require('./src/routes/authRoutes'));
 
-// Phase 3+: Viewer routes
+// Viewer routes
 app.use('/api/viewer', require('./src/routes/viewerRoutes'));
 
-// Phase 4+: Scorer routes
+// Scorer routes
 app.use('/api/scorer', require('./src/routes/scorerRoutes'));
 
-// Phase 5+: Club Admin routes
+// Club Admin routes
 app.use('/api/club-admin', require('./src/routes/clubAdminRoutes'));
 
-// Phase 5+: Super Admin routes
+// Super Admin routes
 app.use('/api/super-admin', require('./src/routes/superAdminRoutes'));
 
-// Phase 6+: Player routes
+// Player routes
 app.use('/api/player', require('./src/routes/playerRoutes'));
 
-// Phase 6+: Analyst routes
+// Analyst routes
 app.use('/api/analyst', require('./src/routes/analystRoutes'));
+
+// Add this line where your other app.use('/api/...', ...) routes are:
+app.use('/api/notifications', require('./src/routes/notificationRoutes')); // Adjust the path if your routes folder is not inside 'src'
 
 // ─── 404 Handler ─────────────────────────────────────────────────────────────
 
@@ -98,7 +114,7 @@ app.use((req, res) => {
   });
 });
 
-// ─── Global Error Handler ─────────────────────────────────────────────────────
+// ─── Global Error Handler ────────────────────────────────────────────────────
 
 app.use(errorHandler);
 
@@ -109,20 +125,26 @@ const start = async () => {
     // Verify DB before accepting traffic
     await testConnection();
 
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       logger.info('CricketHub backend started', {
         port: PORT,
         environment: process.env.NODE_ENV,
         database: process.env.DB_NAME,
         db_host: process.env.DB_HOST
       });
+
+      console.log(`Server is running on port ${PORT}`);
     });
+
   } catch (err) {
-    logger.error('Failed to start server', { error: err.message });
+    logger.error('Failed to start server', {
+      error: err.message
+    });
+
     process.exit(1);
   }
 };
 
 start();
 
-module.exports = app; // Export for Jest tests
+module.exports = app;

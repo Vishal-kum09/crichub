@@ -9,8 +9,10 @@ import {
   Menu,
   X,
   ClipboardEdit,
+  ClipboardList,
   BarChart3,
   Star,
+  Bell,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -25,7 +27,7 @@ interface SidebarProps {
 export function Sidebar({ currentPath, onNavigate, userRole }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
 
-  // All navigation items with role restrictions
+  // All navigation items with precise role restrictions matrix mapping
   const allNavItems = [
     {
       icon: LayoutDashboard,
@@ -43,7 +45,13 @@ export function Sidebar({ currentPath, onNavigate, userRole }: SidebarProps) {
       icon: ClipboardEdit,
       label: 'Scorer Console',
       path: '/scorer',
-      roles: ['scorer', 'club_admin', 'super_admin'] as UserRole[]
+      roles: ['scorer'] as UserRole[]
+    },
+    {
+      icon: ClipboardList,
+      label: 'Assigned Matches',
+      path: '/assigned-matches',
+      roles: ['scorer'] as UserRole[]
     },
     {
       icon: Star,
@@ -55,19 +63,19 @@ export function Sidebar({ currentPath, onNavigate, userRole }: SidebarProps) {
       icon: BarChart3,
       label: 'Analytics',
       path: '/nv-play-analytics',
-      roles: ['analyst', 'super_admin'] as UserRole[]
+      roles: ['analyst', 'super_admin', 'club_admin'] as UserRole[]
     },
     {
       icon: Users,
       label: 'Teams',
       path: '/teams',
-      roles: ['viewer', 'player', 'scorer', 'analyst', 'club_admin', 'super_admin'] as UserRole[]
+      roles: ['viewer', 'super_admin'] as UserRole[]
     },
     {
       icon: UserCircle,
       label: 'Players',
       path: '/players',
-      roles: ['viewer', 'player', 'scorer', 'analyst', 'club_admin', 'super_admin'] as UserRole[]
+      roles: ['super_admin'] as UserRole[]
     },
     {
       icon: Shield,
@@ -80,6 +88,12 @@ export function Sidebar({ currentPath, onNavigate, userRole }: SidebarProps) {
       label: 'Super Admin',
       path: '/super-admin',
       roles: ['super_admin'] as UserRole[]
+    },
+    { 
+      icon: Bell,
+      label: 'Notifications', 
+      path: '/notifications', 
+      roles: ['viewer', 'player', 'scorer', 'analyst', 'club_admin', 'super_admin'] as UserRole[]
     },
     {
       icon: Settings,
@@ -120,7 +134,7 @@ export function Sidebar({ currentPath, onNavigate, userRole }: SidebarProps) {
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar Layout Canvas */}
       <aside
         className={cn(
           'fixed top-0 left-0 h-screen bg-[#1a1a1a] text-white transition-transform duration-300 z-40',
@@ -129,7 +143,7 @@ export function Sidebar({ currentPath, onNavigate, userRole }: SidebarProps) {
         )}
       >
         <div className="flex flex-col h-full">
-          {/* Logo */}
+          {/* Logo Frame */}
           <div className="p-6 border-b border-[#2a2a2a]">
             <div className="flex items-center gap-2">
               <Trophy className="text-[#e60023]" size={28} />
@@ -137,8 +151,8 @@ export function Sidebar({ currentPath, onNavigate, userRole }: SidebarProps) {
             </div>
           </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 p-4">
+          {/* Dynamic Navigation Stack Loop */}
+          <nav className="flex-1 p-4 overflow-y-auto">
             <ul className="space-y-1">
               {navItems.map((item) => {
                 const Icon = item.icon;
@@ -152,15 +166,15 @@ export function Sidebar({ currentPath, onNavigate, userRole }: SidebarProps) {
                         setIsOpen(false);
                       }}
                       className={cn(
-                        'w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
-                        'hover:bg-[#e60023]/10 relative',
-                        isActive && 'bg-[#e60023]/10 text-white'
+                        'w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-sm font-medium',
+                        'hover:bg-[#e60023]/10 relative text-left',
+                        isActive && 'bg-[#e60023]/10 text-white font-semibold'
                       )}
                     >
                       {isActive && (
                         <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#e60023] rounded-r" />
                       )}
-                      <Icon size={20} />
+                      <Icon size={20} className={isActive ? 'text-[#e60023]' : 'text-gray-400'} />
                       <span>{item.label}</span>
                     </button>
                   </li>
@@ -169,15 +183,15 @@ export function Sidebar({ currentPath, onNavigate, userRole }: SidebarProps) {
             </ul>
           </nav>
 
-          {/* User Profile */}
+          {/* User Profile Container Badge Frame */}
           <div className="p-4 border-t border-[#2a2a2a]">
             <div className="flex items-center gap-3 px-4 py-3">
-              <div className="w-10 h-10 rounded-full bg-[#e60023] flex items-center justify-center">
-                <span className="font-semibold">AC</span>
+              <div className="w-10 h-10 rounded-full bg-[#e60023] flex items-center justify-center shadow-md">
+                <span className="font-bold text-sm">VK</span>
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium">Admin Coach</p>
-                <p className="text-xs text-[#999999]">{roleDisplayNames[userRole]}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold truncate">Vishal Kumar Singh</p>
+                <p className="text-xs text-[#999999] font-semibold">{roleDisplayNames[userRole]}</p>
               </div>
             </div>
           </div>

@@ -171,13 +171,11 @@ const presentScorecard = (match, innings) => ({
   innings
 });
 
-// dashboardRepository.getKpis row -> KPI counts. total_clubs has no backing
-// table in the live schema, so it is reported as 0.
 const presentKpis = (row) => ({
   total_matches: num(row.total_matches),
   live_matches: num(row.live_matches),
   total_players: num(row.total_players),
-  total_clubs: 0,
+  total_clubs: num(row.total_clubs),
   total_teams: num(row.total_teams)
 });
 

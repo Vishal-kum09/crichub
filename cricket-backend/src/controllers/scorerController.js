@@ -36,6 +36,7 @@ const WicketWizardSchema = z.object({
   innings_id: uuid.optional()
 });
 
+// 🔥 DYNAMICALLY EXTENDED TO SUPPORT METADATA FOR LOCAL MATCH IDENTITIES
 const InitializeSchema = z.object({
   batting_team_id: uuid,
   fielding_team_id: uuid,
@@ -43,7 +44,14 @@ const InitializeSchema = z.object({
   target_runs: z.number().int().min(0).optional(),
   striker_id: uuid.optional(),
   non_striker_id: uuid.optional(),
-  bowler_id: uuid.optional()
+  bowler_id: uuid.optional(),
+  
+  // Scorer Console custom labels pass-through for internal club teams
+  metadata: z.object({
+    is_local_derby: z.boolean().default(false),
+    batting_team_label: z.string().optional(),
+    fielding_team_label: z.string().optional()
+  }).optional()
 });
 
 const UndoSchema = z.object({ innings_id: uuid.optional() }).default({});
@@ -97,13 +105,43 @@ const assignedMatches = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const completedMatches = async (req, res, next) => {
+  try {
+    const matches = await scorerService.getCompletedMatches(req.user.user_id);
+    res.status(200).json({ count: matches.length, matches });
+  } catch (err) { next(err); }
+};
+
+const matchPreview = async (req, res, next) => {
+  try {
+    if (!isUuid(req.params.id)) throw new AppError('Match not found', 404);
+    const preview = await scorerService.getMatchPreview(req.user.user_id, req.params.id);
+    res.status(200).json(preview);
+  } catch (err) { next(err); }
+};
+
+const getLiveState = async (req, res, next) => {
+  try {
+    if (!isUuid(req.params.id)) throw new AppError('Match not found', 404);
+    
+    // Call the service method to get the fully calculated scorecard
+    const liveState = await scorerService.getLiveMatchState(req.params.id);
+    
+    res.status(200).json(liveState);
+  } catch (err) { 
+    next(err); 
+  }
+};
+
 module.exports = {
   initialize,
+  getLiveState,
   recordBall,
   wicketWizard,
   undo,
   assignedMatches,
-  // exported for testing / reuse
+  completedMatches,
+  matchPreview,
   BallInputSchema,
   WicketWizardSchema,
   InitializeSchema

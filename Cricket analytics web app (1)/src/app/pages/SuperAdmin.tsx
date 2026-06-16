@@ -15,14 +15,21 @@ export function SuperAdmin() {
   const [activeTab, setActiveTab] = useState<'clubs' | 'notifications' | 'data-management'>('clubs');
   const [selectedClub, setSelectedClub] = useState<string | null>(null);
 
-  // Live data — loaded from the backend (empty until fetched / on error).
-  const [clubs, setClubs] = useState<ClubSummary[]>([]);
-  const [clubMembers, setClubMembers] = useState<ClubMember[]>([]);
-  const [pendingRegistrations, setPendingRegistrations] = useState<PendingClub[]>([]);
+  // Live data — loaded safely using empty arrays as default fallbacks
+  const [clubs, setClubs] = useState<any[]>([]);
+  const [clubMembers, setClubMembers] = useState<any[]>([]);
+  const [pendingRegistrations, setPendingRegistrations] = useState<any[]>([]);
 
-  const loadClubs = () => { getClubs().then(setClubs).catch(() => setClubs([])); };
+  const loadClubs = () => { 
+    getClubs()
+      .then((data) => setClubs(Array.isArray(data) ? data : []))
+      .catch(() => setClubs([])); 
+  };
+  
   const loadPending = () => {
-    getSuperPendingApprovals().then(setPendingRegistrations).catch(() => setPendingRegistrations([]));
+    getSuperPendingApprovals()
+      .then((data) => setPendingRegistrations(Array.isArray(data) ? data : []))
+      .catch(() => setPendingRegistrations([]));
   };
 
   useEffect(() => { loadClubs(); loadPending(); }, []);
@@ -30,15 +37,17 @@ export function SuperAdmin() {
   // Fetch members whenever a club is drilled into.
   useEffect(() => {
     if (!selectedClub) { setClubMembers([]); return; }
-    getClubMembers(selectedClub).then(setClubMembers).catch(() => setClubMembers([]));
+    getClubMembers(selectedClub)
+      .then((data) => setClubMembers(Array.isArray(data) ? data : []))
+      .catch(() => setClubMembers([]));
   }, [selectedClub]);
 
   const handleApproveClub = async (id: string) => {
-    const club = pendingRegistrations.find(r => r.id === id);
+    const club = pendingRegistrations?.find(r => (r.club_id || r.id) === id);
     try {
       await apiApproveClub(id);
-      setPendingRegistrations(prev => prev.filter(r => r.id !== id));
-      toast.success(`${club?.name} approved successfully!`);
+      setPendingRegistrations(prev => prev.filter(r => (r.club_id || r.id) !== id));
+      toast.success(`${club?.name || 'Club'} approved successfully!`);
       loadClubs();
     } catch (err: any) {
       toast.error(err?.response?.data?.error || 'Failed to approve club');
@@ -46,9 +55,9 @@ export function SuperAdmin() {
   };
 
   const handleRejectClub = (id: string) => {
-    const club = pendingRegistrations.find(r => r.id === id);
-    setPendingRegistrations(prev => prev.filter(r => r.id !== id));
-    toast.error(`${club?.name} registration rejected`);
+    const club = pendingRegistrations?.find(r => (r.club_id || r.id) === id);
+    setPendingRegistrations(prev => prev.filter(r => (r.club_id || r.id) !== id));
+    toast.error(`${club?.name || 'Club'} registration rejected`);
   };
 
   return (
@@ -108,46 +117,49 @@ export function SuperAdmin() {
           <h2 className="text-xl font-semibold text-[#1a1a1a] mb-4">All Registered Clubs</h2>
 
           <div className="grid grid-cols-1 gap-4">
-            {clubs.map((club) => (
-              <div
-                key={club.id}
-                className="border border-[#e0e0e0] rounded-lg p-4 hover:border-purple-600 transition-colors cursor-pointer"
-                onClick={() => setSelectedClub(club.id)}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <Building2 className="text-purple-600" size={24} />
-                      <h3 className="font-semibold text-[#1a1a1a] text-lg">{club.name}</h3>
-                      <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded">
-                        {club.status}
-                      </span>
+            {clubs?.map((club) => {
+              const targetId = club.id || club.club_id;
+              return (
+                <div
+                  key={targetId}
+                  className="border border-[#e0e0e0] rounded-lg p-4 hover:border-purple-600 transition-colors cursor-pointer"
+                  onClick={() => setSelectedClub(targetId)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <Building2 className="text-purple-600" size={24} />
+                        <h3 className="font-semibold text-[#1a1a1a] text-lg">{club.name}</h3>
+                        <span className={`px-2 py-1 text-xs font-semibold rounded ${club.is_approved ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                          {club.is_approved ? 'Active' : 'Pending'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-[#666666] mt-3">
+                        <div>
+                          <p className="text-xs text-[#999999]">Location</p>
+                          <p className="font-medium text-[#1a1a1a]">{club.location || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-[#999999]">Members</p>
+                          <p className="font-medium text-[#1a1a1a]">{club.members ?? 0}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-[#999999]">Matches</p>
+                          <p className="font-medium text-[#1a1a1a]">{club.matches ?? 0}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-[#999999]">Registered</p>
+                          <p className="font-medium text-[#1a1a1a]">
+                            {club.registered_date ? new Date(club.registered_date).toLocaleDateString() : 'N/A'}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-[#666666] mt-3">
-                      <div>
-                        <p className="text-xs text-[#999999]">Location</p>
-                        <p className="font-medium text-[#1a1a1a]">{club.location}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-[#999999]">Members</p>
-                        <p className="font-medium text-[#1a1a1a]">{club.members}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-[#999999]">Matches</p>
-                        <p className="font-medium text-[#1a1a1a]">{club.matches}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-[#999999]">Registered</p>
-                        <p className="font-medium text-[#1a1a1a]">
-                          {new Date(club.registeredDate).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
+                    <ChevronRight className="text-[#666666]" size={20} />
                   </div>
-                  <ChevronRight className="text-[#666666]" size={20} />
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -166,10 +178,10 @@ export function SuperAdmin() {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-2xl font-semibold text-[#1a1a1a]">
-                  {clubs.find(c => c.id === selectedClub)?.name}
+                  {clubs.find(c => (c.id || c.club_id) === selectedClub)?.name}
                 </h2>
                 <p className="text-[#666666] mt-1">
-                  {clubs.find(c => c.id === selectedClub)?.location}
+                  {clubs.find(c => (c.id || c.club_id) === selectedClub)?.location || 'India'}
                 </p>
               </div>
               <div className="flex gap-2">
@@ -195,14 +207,14 @@ export function SuperAdmin() {
                   </tr>
                 </thead>
                 <tbody>
-                  {clubMembers.map((member) => (
-                    <tr key={member.id} className="border-b border-[#f0f0f0] hover:bg-[#f9f9f9]">
-                      <td className="py-3 px-4 font-medium text-[#1a1a1a]">{member.name}</td>
-                      <td className="py-3 px-4 text-[#666666]">{member.role}</td>
+                  {clubMembers?.map((member) => (
+                    <tr key={member.user_id} className="border-b border-[#f0f0f0] hover:bg-[#f9f9f9]">
+                      <td className="py-3 px-4 font-medium text-[#1a1a1a]">{member.display_name}</td>
+                      <td className="py-3 px-4 text-[#666666]">{member.account_role}</td>
                       <td className="py-3 px-4 text-[#666666]">{member.email}</td>
                       <td className="py-3 px-4">
-                        <span className="px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-800">
-                          {member.status}
+                        <span className={`px-2 py-1 rounded text-xs font-semibold ${member.is_approved ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                          {member.is_approved ? 'Approved' : 'Pending'}
                         </span>
                       </td>
                       <td className="py-3 px-4">
@@ -232,52 +244,55 @@ export function SuperAdmin() {
         <div className="bg-white rounded-xl p-6 border border-[#e0e0e0]">
           <h2 className="text-xl font-semibold text-[#1a1a1a] mb-4">Pending Club Registrations</h2>
 
-          {pendingRegistrations.length === 0 ? (
+          {pendingRegistrations?.length === 0 ? (
             <div className="text-center py-12">
               <Bell className="mx-auto mb-4 text-[#e0e0e0]" size={48} />
               <p className="text-[#666666]">No pending registrations</p>
             </div>
           ) : (
             <div className="space-y-4">
-              {pendingRegistrations.map((registration) => (
-                <div key={registration.id} className="border border-[#e0e0e0] rounded-lg p-4">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <Building2 className="text-purple-600" size={24} />
-                        <h3 className="font-semibold text-[#1a1a1a] text-lg">{registration.name}</h3>
-                        <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-semibold rounded">
-                          {registration.type}
-                        </span>
+              {pendingRegistrations?.map((registration) => {
+                const clubUid = registration.club_id || registration.id;
+                return (
+                  <div key={clubUid} className="border border-[#e0e0e0] rounded-lg p-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <Building2 className="text-purple-600" size={24} />
+                          <h3 className="font-semibold text-[#1a1a1a] text-lg">{registration.name}</h3>
+                          <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-semibold rounded">
+                            {registration.display_name || 'Club'}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-[#666666] mt-3">
+                          <p>Admin: <span className="font-medium text-[#1a1a1a]">{registration.admin_name}</span></p>
+                          <p>Email: <span className="font-medium text-[#1a1a1a]">{registration.email}</span></p>
+                          <p>Location: <span className="font-medium text-[#1a1a1a]">{registration.location || registration.country || 'India'}</span></p>
+                          <p>Applied: <span className="font-medium text-[#1a1a1a]">
+                            {registration.applied_date ? new Date(registration.applied_date).toLocaleDateString() : 'N/A'}
+                          </span></p>
+                        </div>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-[#666666] mt-3">
-                        <p>Admin: <span className="font-medium text-[#1a1a1a]">{registration.admin}</span></p>
-                        <p>Email: <span className="font-medium text-[#1a1a1a]">{registration.email}</span></p>
-                        <p>Location: <span className="font-medium text-[#1a1a1a]">{registration.location}</span></p>
-                        <p>Applied: <span className="font-medium text-[#1a1a1a]">
-                          {new Date(registration.date).toLocaleDateString()}
-                        </span></p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleApproveClub(clubUid)}
+                          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        >
+                          <CheckCircle size={18} />
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleRejectClub(clubUid)}
+                          className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                        >
+                          <XCircle size={18} />
+                          Reject
+                        </button>
                       </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleApproveClub(registration.id)}
-                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                      >
-                        <CheckCircle size={18} />
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => handleRejectClub(registration.id)}
-                        className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                      >
-                        <XCircle size={18} />
-                        Reject
-                      </button>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -295,7 +310,7 @@ export function SuperAdmin() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-[#666666]">Total Clubs:</span>
-                  <span className="font-semibold text-[#1a1a1a]">3</span>
+                  <span className="font-semibold text-[#1a1a1a]">{clubs?.length || 0}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[#666666]">Total Users:</span>

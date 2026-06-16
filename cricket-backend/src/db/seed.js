@@ -8,6 +8,7 @@
 //
 // Run:  node src/db/seed.js     (or: npm run seed)
 require('dotenv').config();
+const bcrypt = require('bcryptjs');
 const { withTransaction } = require('../../db');
 const logger = require('../../config/logger');
 
@@ -25,11 +26,16 @@ const pick = (a) => a[Math.floor(rnd() * a.length)];
 const uuid = (n) => `00000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`;
 
 // ─── reference data ─────────────────────────────────────────────────────────
+const CLUB_ID = uuid(200);
 const users = [
-  { id: uuid(1), email: 'admin@crickethub.test', first: 'Sofia', last: 'Admin', role: 'admin' },
-  { id: uuid(2), email: 'scorer@crickethub.test', first: 'Priya', last: 'Score', role: 'scorer' }
+  { id: uuid(1), email: 'superadmin@cricket.com', first: 'Super', last: 'Admin', display: 'Super Admin', account_role: 'Super_Admin', platform_role: 'admin', password: 'superadmin123', club_id: null },
+  { id: uuid(2), email: 'scorer@cricket.com', first: 'Priya', last: 'Score', display: 'Scorer User', account_role: 'Scorer', platform_role: 'scorer', password: 'scorer123', club_id: CLUB_ID },
+  { id: uuid(3), email: 'clubadmin@cricket.com', first: 'Club', last: 'Admin', display: 'Club Admin', account_role: 'Club_Admin', platform_role: 'admin', password: 'clubadmin123', club_id: CLUB_ID },
+  { id: uuid(4), email: 'viewer@cricket.com', first: 'Viewer', last: 'User', display: 'Viewer User', account_role: 'Viewer', platform_role: 'viewer', password: 'viewer123', club_id: null },
+  { id: uuid(5), email: 'player@cricket.com', first: 'Player', last: 'User', display: 'Player User', account_role: 'Player', platform_role: 'viewer', password: 'player123', club_id: CLUB_ID },
+  { id: uuid(6), email: 'analyst@cricket.com', first: 'Analyst', last: 'User', display: 'Analyst User', account_role: 'Analyst', platform_role: 'analyst', password: 'analyst123', club_id: CLUB_ID }
 ];
-const ADMIN = users[0].id;
+const ADMIN = users[2].id;   // club admin creates seed matches/teams
 const SCORER = users[1].id;
 
 const teams = [
@@ -290,14 +296,36 @@ const careerRows = Object.values(careerByPlayer).map((c) => ({
 
 // ─── INSERT (one transaction, FK-safe order, idempotent) ────────────────────
 async function seed() {
+  const passwordHashes = {};
+  for (const u of users) {
+    passwordHashes[u.id] = await bcrypt.hash(u.password, 12);
+  }
+
   await withTransaction(async (client) => {
     const q = (text, params) => client.query(text, params);
 
+    await q(
+      `INSERT INTO clubs (clubs_id, name, home_ground, country, is_approved)
+       VALUES ($1,$2,$3,$4,true)
+       ON CONFLICT (clubs_id) DO UPDATE SET is_approved = true`,
+      [CLUB_ID, 'Cambridge Cricket Club', "Fenner's", 'England']
+    );
+
     for (const u of users) {
       await q(
-        `INSERT INTO users (user_id, email, first_name, last_name, display_name, role)
-         VALUES ($1,$2,$3,$4,$5,$6::platform_role) ON CONFLICT (user_id) DO NOTHING`,
-        [u.id, u.email, u.first, u.last, `${u.first} ${u.last}`, u.role]
+        `INSERT INTO users
+           (user_id, email, first_name, last_name, display_name, password_hash,
+            club_id, is_approved, account_role, role)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,true,$8::account_role,$9::platform_role)
+         ON CONFLICT (user_id) DO UPDATE SET
+           email = EXCLUDED.email,
+           password_hash = EXCLUDED.password_hash,
+           club_id = EXCLUDED.club_id,
+           is_approved = true,
+           account_role = EXCLUDED.account_role,
+           role = EXCLUDED.role`,
+        [u.id, u.email, u.first, u.last, u.display, passwordHashes[u.id],
+         u.club_id, u.account_role, u.platform_role]
       );
     }
     for (const t of teams) {
@@ -414,6 +442,17 @@ async function seed() {
          c.overs_bowled, c.runs_conceded, c.wickets_taken, c.three_wicket_haul, c.five_wicket_hauls]
       );
     }
+
+    const scheduledMatchId = matches[2].id;
+    await q(
+      `DELETE FROM scorer_assignments WHERE match_id = $1 AND scorer_id = $2`,
+      [scheduledMatchId, SCORER]
+    );
+    await q(
+      `INSERT INTO scorer_assignments (match_id, scorer_id, assigned_by)
+       VALUES ($1,$2,$3)`,
+      [scheduledMatchId, SCORER, ADMIN]
+    );
   });
 
   const totalDeliveries = allInnings.reduce((n, p) => n + p.deliveries.length, 0);

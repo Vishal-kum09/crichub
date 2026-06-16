@@ -10,7 +10,8 @@ const { pool } = require('../../db');
 
 const getMatch = async (db, matchId) => {
   const r = await db.query(
-    `SELECT matches_id, status, overs_per_match, team1_id, team2_id
+    `SELECT matches_id, status, overs_per_match, 
+            host_club_id AS team1_id, opponent_club_id AS team2_id
        FROM matches WHERE matches_id = $1`,
     [matchId]
   );
@@ -302,30 +303,6 @@ const ensureBowlingFigure = async (client, inningsId, playerId) => {
 
 // Increment a bowler's figures. balls_bowled feeds overs_bowled in the standard
 // cricket O.B notation (completed overs + balls/10).
-const bumpBowlingFigure = async (client, inningsId, playerId, d) => {
-  await client.query(
-    `UPDATE bowling_figures SET
-        balls_bowled  = balls_bowled  + $3,
-        runs_conceded = runs_conceded + $4,
-        wickets       = wickets       + $5,
-        wides         = wides         + $6,
-        no_balls      = no_balls      + $7,
-        dot_balls     = dot_balls     + $8,
-        boundaries_hit = boundaries_hit + $9,
-        sixes_hit      = sixes_hit     + $10,
-        overs_bowled  = FLOOR((balls_bowled + $3) / 6)
-                        + ((balls_bowled + $3) % 6)::numeric / 10,
-        economy_rate  = CASE WHEN (balls_bowled + $3) > 0
-                             THEN ROUND((runs_conceded + $4)::numeric * 6
-                                        / (balls_bowled + $3), 2)
-                             ELSE economy_rate END
-      WHERE innings_id = $1 AND player_id = $2`,
-    [
-      inningsId, playerId, d.balls || 0, d.runs || 0, d.wickets || 0,
-      d.wides || 0, d.no_balls || 0, d.dots || 0, d.fours || 0, d.sixes || 0
-    ]
-  );
-};
 
 const getBowlingFigure = async (db, inningsId, playerId) => {
   const r = await db.query(
@@ -374,21 +351,249 @@ const findAssignedMatches = async (scorerId) => {
   const r = await pool.query(
     `SELECT m.matches_id AS id, m.match_date, m.start_time, m.scheduled_at,
             m.status, m.format, m.overs_per_match, m.venue,
-            t1.name AS team1_name, t1.short_name AS team1_short_name,
-            t2.name AS team2_name, t2.short_name AS team2_short_name,
+            c1.club_name AS team1_name, c1.display_name AS team1_short_name,
+            c2.club_name AS team2_name, c2.display_name AS team2_short_name,
             sa.accepted_at, sa.created_at AS assigned_at
        FROM scorer_assignments sa
        JOIN matches m ON m.matches_id = sa.match_id
-       JOIN teams t1 ON t1.teams_id = m.team1_id
-       JOIN teams t2 ON t2.teams_id = m.team2_id
+       LEFT JOIN club c1 ON c1.club_id = m.host_club_id
+       LEFT JOIN club c2 ON c2.club_id = m.opponent_club_id
       WHERE sa.scorer_id = $1 AND sa.revoked_at IS NULL
+        AND m.status NOT IN ('completed', 'abandoned', 'rained_off')
       ORDER BY m.scheduled_at DESC`,
     [scorerId]
   );
   return r.rows;
 };
 
+const findCompletedMatchesForScorer = async (scorerId) => {
+  const r = await pool.query(
+    `SELECT m.matches_id AS id, m.match_date, m.scheduled_at, m.status, m.format,
+            m.venue, m.result_summary,
+            c1.club_name AS team1_name, c1.display_name AS team1_short_name,
+            c2.club_name AS team2_name, c2.display_name AS team2_short_name,
+            (SELECT CONCAT(i.total_runs, '/', i.total_wickets,
+                    ' (', FLOOR(i.total_balls / 6), '.', i.total_balls % 6, ' Ov)')
+               FROM innings i
+              WHERE i.match_id = m.matches_id AND i.batting_team_id = m.host_club_id
+              ORDER BY i.innings_number DESC LIMIT 1) AS team1_score,
+            (SELECT CONCAT(i.total_runs, '/', i.total_wickets,
+                    ' (', FLOOR(i.total_balls / 6), '.', i.total_balls % 6, ' Ov)')
+               FROM innings i
+              WHERE i.match_id = m.matches_id AND i.batting_team_id = m.opponent_club_id
+              ORDER BY i.innings_number DESC LIMIT 1) AS team2_score
+       FROM scorer_assignments sa
+       JOIN matches m ON m.matches_id = sa.match_id
+       LEFT JOIN club c1 ON c1.club_id = m.host_club_id
+       LEFT JOIN club c2 ON c2.club_id = m.opponent_club_id
+      WHERE sa.scorer_id = $1 AND sa.revoked_at IS NULL
+        AND m.status = 'completed'
+      ORDER BY m.completed_at DESC NULLS LAST, m.scheduled_at DESC`,
+    [scorerId]
+  );
+  return r.rows;
+};
+const getMatchPreviewRow = async (matchId) => {
+  const r = await pool.query(
+    `SELECT m.matches_id, m.match_date, m.scheduled_at, m.status, m.format,
+            m.overs_per_match, m.venue, m.city, m.country,
+            m.host_club_id AS team1_id, m.opponent_club_id AS team2_id,
+            c1.club_name AS team1_name, c2.club_name AS team2_name
+       FROM matches m
+       LEFT JOIN club c1 ON c1.club_id = m.host_club_id
+       LEFT JOIN club c2 ON c2.club_id = m.opponent_club_id
+      WHERE m.matches_id = $1`,
+    [matchId]
+  );
+  return r.rows[0] || null;
+};
+const findTeamRoster = async (teamId) => {
+  const r = await pool.query(
+    `SELECT players_id AS id, display_name AS name, primary_role AS role
+       FROM players
+      WHERE club_id = $1 AND is_active = true
+      ORDER BY jersey_number NULLS LAST, display_name ASC`,
+    [teamId]
+  );
+  return r.rows;
+};
+
+const getPlayerName = async (client, playerId) => {
+  const r = await client.query('SELECT display_name FROM players WHERE players_id = $1', [playerId]);
+  return r.rows[0]?.display_name || 'Unknown';
+};
+
+const scorerHasAssignment = async (scorerId, matchId) => {
+  const r = await pool.query(
+    `SELECT scorer_assignments_id FROM scorer_assignments
+      WHERE scorer_id = $1 AND match_id = $2 AND revoked_at IS NULL`,
+    [scorerId, matchId]
+  );
+  return !!r.rows[0];
+};
+
+const updateBattingCard = async (client, inningsId, playerId, stats) => {
+  await client.query(`
+    UPDATE batting_scorecards 
+    SET runs_scored = runs_scored + $1, 
+        balls_faced = balls_faced + $2, 
+        fours = fours + $3, 
+        sixes = sixes + $4,
+        dot_balls_faced = dot_balls_faced + $5
+    WHERE innings_id = $6 AND player_id = $7`, 
+    [
+      stats.runs, 
+      stats.balls, 
+      stats.fours, 
+      stats.sixes, 
+      stats.runs === 0 ? 1 : 0, // Dot ball logic
+      inningsId, 
+      playerId
+    ]);
+};
+
+const updateBowlingFigure = async (client, inningsId, bowlerId, stats) => {
+  await client.query(`
+    UPDATE bowling_figures 
+    SET runs_conceded = runs_conceded + $1, balls_bowled = balls_bowled + 1 
+    WHERE innings_id = $2 AND player_id = $3`, 
+    [stats.runs, inningsId, bowlerId]);
+};
+
+
+// Upgraded to calculate advanced metrics dynamically (Strike Rate, Average, Dots %)
+const bumpBowlingFigure = async (client, inningsId, playerId, d) => {
+  await client.query(
+    `UPDATE bowling_figures SET
+         balls_bowled   = balls_bowled   + $3,
+         runs_conceded  = runs_conceded  + $4,
+         wickets        = wickets        + $5,
+         wides          = wides          + $6,
+         no_balls       = no_balls       + $7,
+         dot_balls      = dot_balls      + $8,
+         boundaries_hit = boundaries_hit + $9,
+         sixes_hit      = sixes_hit      + $10,
+         overs_bowled   = FLOOR((balls_bowled + $3) / 6)
+                          + ((balls_bowled + $3) % 6)::numeric / 10,
+         economy_rate   = CASE WHEN (balls_bowled + $3) > 0
+                               THEN ROUND((runs_conceded + $4)::numeric * 6 / (balls_bowled + $3), 2)
+                               ELSE economy_rate END,
+         bowling_sr     = CASE WHEN (wickets + $5) > 0 
+                               THEN ROUND((balls_bowled + $3)::numeric / (wickets + $5), 2)
+                               ELSE NULL END,
+         bowling_avg    = CASE WHEN (wickets + $5) > 0
+                               THEN ROUND((runs_conceded + $4)::numeric / (wickets + $5), 2)
+                               ELSE NULL END,
+         dot_ball_percent = CASE WHEN (balls_bowled + $3) > 0
+                                 THEN ROUND(((dot_balls + $8)::numeric / (balls_bowled + $3)) * 100, 2)
+                                 ELSE 0 END
+       WHERE innings_id = $1 AND player_id = $2`,
+    [
+      inningsId, playerId, d.balls || 0, d.runs || 0, d.wickets || 0,
+      d.wides || 0, d.no_balls || 0, d.dots || 0, d.fours || 0, d.sixes || 0
+    ]
+  );
+};
+
+// New: Upsert over-by-over batsman analytics rows
+const bumpBatterOverStats = async (client, inningsId, batterId, overNumber, d) => {
+  await client.query(`
+    INSERT INTO batter_over_stats (innings_id, batter_id, over_number, runs, balls, fours, sixes)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    ON CONFLICT (innings_id, batter_id, over_number)
+    DO UPDATE SET
+      runs  = batter_over_stats.runs + EXCLUDED.runs,
+      balls = batter_over_stats.balls + EXCLUDED.balls,
+      fours = batter_over_stats.fours + EXCLUDED.fours,
+      sixes = batter_over_stats.sixes + EXCLUDED.sixes
+  `, [inningsId, batterId, overNumber, d.runs || 0, d.balls || 0, d.fours || 0, d.sixes || 0]);
+};
+
+// New: Upsert over-by-over bowler analytics rows
+const bumpBowlerOverStats = async (client, inningsId, bowlerId, overNumber, d) => {
+  await client.query(`
+    INSERT INTO bowler_over_stats (innings_id, bowler_id, over_number, runs_conceded, wickets, fours, sixes, dot_balls, wides, no_balls, is_maiden)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, false)
+    ON CONFLICT (innings_id, bowler_id, over_number)
+    DO UPDATE SET
+      runs_conceded = bowler_over_stats.runs_conceded + EXCLUDED.runs_conceded,
+      wickets       = bowler_over_stats.wickets + EXCLUDED.wickets,
+      fours         = bowler_over_stats.fours + EXCLUDED.fours,
+      sixes         = bowler_over_stats.sixes + EXCLUDED.sixes,
+      dot_balls     = bowler_over_stats.dot_balls + EXCLUDED.dot_balls,
+      wides         = bowler_over_stats.wides + EXCLUDED.wides,
+      no_balls      = bowler_over_stats.no_balls + EXCLUDED.no_balls
+  `, [
+    inningsId, bowlerId, overNumber, 
+    d.runs || 0, d.wickets || 0, d.fours || 0, d.sixes || 0, 
+    d.dots || 0, d.wides || 0, d.no_balls || 0
+  ]);
+};
+
+// New: Updates existing continuous spells (gap <= 2 overs) or establishes a fresh one
+const bumpBowlingSpell = async (client, inningsId, bowlerId, overNumber, d) => {
+  const existing = await client.query(`
+    SELECT * FROM bowling_spells WHERE innings_id = $1 AND bowler_id = $2
+    ORDER BY to_over DESC LIMIT 1
+  `, [inningsId, bowlerId]);
+
+  if (existing.rows[0] && (overNumber - existing.rows[0].to_over) <= 2) {
+    const spell = existing.rows[0];
+    // Fixed: Cleaned up the parameter index mismatch ($1 to $5 sequentially)
+    await client.query(`
+      UPDATE bowling_spells SET
+        to_over = GREATEST(to_over, $2),
+        runs_conceded = runs_conceded + $3,
+        wickets = wickets + $4,
+        overs_count = FLOOR((FLOOR(COALESCE(overs_count, 0)) * 6 + ROUND((COALESCE(overs_count, 0) % 1) * 10) + $5) / 6) + 
+                      (MOD((FLOOR(COALESCE(overs_count, 0)) * 6 + ROUND((COALESCE(overs_count, 0) % 1) * 10) + $5)::integer, 6))::numeric / 10
+      WHERE bowling_spells_id = $1
+    `, [spell.bowling_spells_id, overNumber, d.runs || 0, d.wickets || 0, d.balls || 0]);
+  } else {
+    const countRes = await client.query(`
+      SELECT COUNT(*) as count FROM bowling_spells WHERE innings_id = $1 AND bowler_id = $2
+    `, [inningsId, bowlerId]);
+    const spellNumber = parseInt(countRes.rows[0].count) + 1;
+
+    await client.query(`
+      INSERT INTO bowling_spells (innings_id, bowler_id, spell_number, from_over, to_over, overs_count, runs_conceded, wickets)
+      VALUES ($1, $2, $3, $4, $4, $5, $6, $7)
+    `, [inningsId, bowlerId, spellNumber, overNumber, d.balls ? (d.balls / 10) : 0, d.runs || 0, d.wickets || 0]);
+  }
+};
+// New: Maiden tracking engines to increment fields safely
+const checkAndMarkMaidenOver = async (client, inningsId, bowlerId, overNumber) => {
+  const res = await client.query(`
+    SELECT runs_conceded, wides, no_balls FROM bowler_over_stats 
+    WHERE innings_id = $1 AND bowler_id = $2 AND over_number = $3
+  `, [inningsId, bowlerId, overNumber]);
+
+  if (res.rows[0]) {
+    const { runs_conceded, wides, no_balls } = res.rows[0];
+    if (parseInt(runs_conceded) === 0 && parseInt(wides) === 0 && parseInt(no_balls) === 0) {
+      await client.query(`UPDATE bowler_over_stats SET is_maiden = true WHERE innings_id = $1 AND bowler_id = $2 AND over_number = $3`, [inningsId, bowlerId, overNumber]);
+      await client.query(`UPDATE bowling_figures SET maidens = maidens + 1 WHERE innings_id = $1 AND player_id = $2`, [inningsId, bowlerId]);
+    }
+  }
+};
+
+const checkAndUnmarkMaidenOver = async (client, inningsId, bowlerId, overNumber) => {
+  const res = await client.query(`SELECT is_maiden FROM bowler_over_stats WHERE innings_id = $1 AND bowler_id = $2 AND over_number = $3`, [inningsId, bowlerId, overNumber]);
+  if (res.rows[0] && res.rows[0].is_maiden) {
+    await client.query(`UPDATE bowler_over_stats SET is_maiden = false WHERE innings_id = $1 AND bowler_id = $2 AND over_number = $3`, [inningsId, bowlerId, overNumber]);
+    await client.query(`UPDATE bowling_figures SET maidens = GREATEST(0, maidens - 1) WHERE innings_id = $1 AND player_id = $2`, [inningsId, bowlerId]);
+  }
+};
+
+// New: Safe transactional database cleaners to handle Undo executions
+const deleteEmptyOverStatsAndSpells = async (client, inningsId, overNumber) => {
+  await client.query(`DELETE FROM batter_over_stats WHERE innings_id = $1 AND over_number = $2 AND runs = 0 AND balls = 0`, [inningsId, overNumber]);
+  await client.query(`DELETE FROM bowler_over_stats WHERE innings_id = $1 AND over_number = $2 AND runs_conceded = 0 AND wickets = 0 AND wides = 0 AND no_balls = 0`, [inningsId, overNumber]);
+  await client.query(`DELETE FROM bowling_spells WHERE innings_id = $1 AND overs_count = 0 AND runs_conceded = 0 AND wickets = 0`, [inningsId]);
+};
 module.exports = {
+  updateBattingCard,
+  updateBowlingFigure,
   getMatch,
   lockInnings,
   getInnings,
@@ -416,5 +621,11 @@ module.exports = {
   insertDismissal,
   getDismissalForDelivery,
   deleteDismissalForDelivery,
-  findAssignedMatches
+  findAssignedMatches,
+  findCompletedMatchesForScorer,
+  getMatchPreviewRow,
+  findTeamRoster,
+  scorerHasAssignment,
+  getPlayerName,bumpBowlingFigure,bumpBatterOverStats
+  ,bumpBowlerOverStats,bumpBowlingSpell,checkAndMarkMaidenOver,checkAndUnmarkMaidenOver,deleteEmptyOverStatsAndSpells
 };

@@ -1,53 +1,150 @@
-// Club-admin controllers + Zod request schemas. Field names map to the real
-// schema (assigned_role -> users.account_role). req.user.club_id is the only
-// tenant key the service trusts — it is never read from the request body.
 const { z } = require('zod');
-const clubAdminService = require('../services/clubAdminService');
 const { AppError } = require('../middlewares/errorHandler');
+const clubAdminService = require('../services/clubAdminService');
 
-const uuid = z.string().uuid();
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const isUuid = (id) => typeof id === 'string' && UUID_RE.test(id);
-
-// ─── Zod schemas ────────────────────────────────────────────────────────────
-
-// assigned_role maps to users.account_role. 'Umpire' is a valid account_role in
-// this deployment (added additively alongside the auth schema). assigned_role is
-// optional so REJECT need not carry one; it is required on APPROVE in the service.
-const ApprovalInputSchema = z.object({
-  user_id: uuid,
-  action: z.enum(['APPROVE', 'REJECT']),
-  assigned_role: z.enum(['Player', 'Scorer', 'Analyst', 'Umpire']).optional()
+// Zod Validation Schemas
+const DirectPlayerSchema = z.object({
+  first_name: z.string().min(1).max(50),
+  last_name: z.string().max(50).optional().default(''),
+  display_name: z.string().min(1).max(50),
+  contact_number: z.string().min(5).max(25), 
+  gender: z.enum(['male', 'female']),               
+  jersey_number: z.number().int().min(0).max(999).optional().nullable(),   
+  date_of_birth: z.string().optional().nullable(),   
+  batting_style: z.enum(['right_hand_bat', 'left_hand_bat']),
+  bowling_style: z.enum([
+    'right_arm_fast', 'right_arm_medium', 'right_arm_spin',
+    'left_arm_fast', 'left_arm_medium', 'left_arm_spin'
+  ]).optional().nullable(),
+  primary_role: z.enum(['batter', 'bowler', 'all_rounder', 'wicket_keeper']),
+  nationality: z.string().default('India')
 });
 
-const TournamentInputSchema = z.object({
-  tournament_name: z.string().min(3).max(100),
-  tournament_type: z.enum(['Knockout', 'League', 'RoundRobin']),
-  overs_limit: z.number().int().min(1).max(100),
-  max_teams: z.number().int().min(2).max(32),
-  // Optional — tournaments.start_date is NOT NULL; defaults to today if absent.
-  start_date: z.string().optional(),
-  end_date: z.string().optional()
+// 🔥 STRICT MATCHES TABLE SCHEMA VALIDATION
+const CreateMatchSchema = z.object({
+  match_type: z.enum(['cross_club', 'local']),
+  opponent_club_id: z.string().uuid().optional(),
+  match_date: z.string().min(1),
+  start_time: z.string().min(1),
+  scheduled_at: z.string().datetime(),
+  format: z.string().default('T20'),
+  ball_type: z.string().default('leather'),
+  overs_per_match: z.number().int().min(1).max(100).optional(),
+  venue: z.string().min(1),
+  pitch_num: z.number().int().optional().nullable(),
+  venue_neutral: z.boolean().default(false),
+  city: z.string().min(1),
+  country: z.string().min(1),
+  squad_player_ids: z.array(z.string()).default([]),
+  assigned_scorer_id: z.string().uuid()
 });
 
-const CreateMatchSchema = z
-  .object({
-    match_type: z.enum(['cross_club', 'local']),
-    opponent_club_id: uuid.optional(),
-    venue: z.string().min(1),
-    scheduled_at: z.string().datetime(),
-    total_overs: z.number().int().min(1).max(100),
-    // Optional team overrides — the live schema has no club→team link, so the
-    // service resolves these from the club when not supplied.
-    team1_id: uuid.optional(),
-    team2_id: uuid.optional()
-  })
-  .refine((d) => d.match_type !== 'cross_club' || !!d.opponent_club_id, {
-    message: 'opponent_club_id is required for a cross_club match',
-    path: ['opponent_club_id']
-  });
+// HANDLERS
+const createMatch = async (req, res, next) => {
+  const { query } = require('../../db');
+  try {
+    const adminClubId = req.user.club_id;
+    const adminUserId = req.user.id;
+    const data = CreateMatchSchema.parse(req.body);
 
-// ─── handlers ───────────────────────────────────────────────────────────────
+    await query('BEGIN');
+
+    let initialStatus = data.match_type === 'cross_club' ? 'pending_opponent' : 'scheduled';
+    
+    // 🔥 EXACT MATCHES TABLE INSERTION (Removed the redundant 'teams' table check entirely)
+    const matchSql = `
+      INSERT INTO matches (
+        host_club_id, opponent_club_id, match_date, start_time, scheduled_at, 
+        format, ball_type, overs_per_match, venue, pitch_num, venue_neutral, city, country, status, 
+        created_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW()) 
+      RETURNING matches_id;
+    `;
+    
+    const params = [
+      adminClubId, 
+      data.match_type === 'cross_club' ? data.opponent_club_id : adminClubId, 
+      data.match_date, data.start_time, data.scheduled_at, data.format, data.ball_type, 
+      data.overs_per_match || 20, data.venue, data.pitch_num, data.venue_neutral, data.city, data.country, initialStatus
+    ];
+
+    const matchRes = await query(matchSql, params);
+    const matchId = matchRes.rows[0].matches_id;
+    
+    // Assign Scorer
+    await query(
+      'INSERT INTO scorer_assignments (match_id, scorer_id, assigned_by, created_at) VALUES ($1, $2, $3, NOW())', 
+      [matchId, data.assigned_scorer_id, adminUserId]
+    );
+
+    // 🔥 SEND NOTIFICATION TO SCORER
+    await query(
+      `INSERT INTO notifications (user_id, match_id, type, title, body, is_read, created_at) 
+       VALUES ($1, $2, $3, $4, $5, false, NOW())`,
+      [
+        data.assigned_scorer_id, 
+        matchId, 
+        'match_invite', 
+        'New Match Assignment', 
+        `You have been assigned as the scorer for a match on ${data.match_date} at ${data.venue}.`
+      ]
+    );
+
+    await query('COMMIT');
+    res.status(201).json({ success: true, matchId: matchId });
+  } catch (err) { 
+    await query('ROLLBACK');
+    console.error("ERROR:", err);
+    next(err); 
+  }
+};
+
+const acceptMatchRequest = async (req, res, next) => {
+  try {
+    const { match_id } = req.params; 
+    const { assigned_scorer_id, squad_player_ids } = req.body;
+    const { query } = require('../../db');
+    
+    if (!match_id || match_id === 'undefined') throw new AppError('Match ID missing', 400);
+
+    await query('BEGIN');
+
+    // Update match status to scheduled
+    const matchUpd = await query(
+      "UPDATE matches SET status = 'scheduled' WHERE matches_id = $1 AND opponent_club_id = $2 AND status = 'pending_opponent' RETURNING *", 
+      [match_id, req.user.club_id]
+    );
+    
+    if (matchUpd.rows.length === 0) throw new AppError('Match not found', 404);
+    
+    // Assign opponent's scorer
+    await query(
+      'INSERT INTO scorer_assignments (match_id, scorer_id, assigned_by, created_at) VALUES ($1, $2, $3, NOW())', 
+      [match_id, assigned_scorer_id, req.user.id]
+    );
+
+    // 🔥 SEND NOTIFICATION TO OPPONENT SCORER
+    await query(
+      `INSERT INTO notifications (user_id, match_id, type, title, body, is_read, created_at) 
+       VALUES ($1, $2, $3, $4, $5, false, NOW())`,
+      [
+        assigned_scorer_id, 
+        match_id, 
+        'match_invite', 
+        'New Match Assignment', 
+        `You have been assigned as the scorer for an accepted match on ${matchUpd.rows[0].match_date}.`
+      ]
+    );
+    
+    await query('COMMIT');
+    res.json({ success: true, message: 'Match accepted' });
+  } catch (err) { 
+    const { query } = require('../../db');
+    await query('ROLLBACK');
+    next(err); 
+  }
+};
 
 const getPendingApprovals = async (req, res, next) => {
   try {
@@ -58,41 +155,49 @@ const getPendingApprovals = async (req, res, next) => {
 
 const updateApproval = async (req, res, next) => {
   try {
-    if (!isUuid(req.params.id)) throw new AppError('User not found', 404);
-    // The path id is the user being approved; merge it into the schema input.
-    const data = ApprovalInputSchema.parse({ ...req.body, user_id: req.params.id });
-    const result = await clubAdminService.processApproval(req.user, req.params.id, data);
+    const result = await clubAdminService.processApproval(req.user, req.params.id, req.body);
     res.json({ ok: true, ...result });
   } catch (err) { next(err); }
 };
 
-const createMatch = async (req, res, next) => {
+const getIncomingMatchRequests = async (req, res, next) => {
   try {
-    const data = CreateMatchSchema.parse(req.body);
-    const result = await clubAdminService.createMatch(req.user, data);
-    res.status(201).json(result);
+    const { query } = require('../../db');
+    const result = await query(
+      'SELECT m.*, c.club_name AS host_club_name FROM matches m JOIN club c ON m.host_club_id = c.club_id WHERE m.opponent_club_id = $1 AND m.status = $2', 
+      [req.user.club_id, 'pending_opponent']
+    );
+    res.json(result.rows || []);
+  } catch (err) { next(err); }
+};
+
+const rejectMatchRequest = async (req, res, next) => {
+  try {
+    const { query } = require('../../db');
+    await query("UPDATE matches SET status = 'rejected' WHERE matches_id = $1 AND opponent_club_id = $2", [req.params.match_id, req.user.club_id]);
+    res.json({ success: true });
   } catch (err) { next(err); }
 };
 
 const createTournament = async (req, res, next) => {
   try {
-    const data = TournamentInputSchema.parse(req.body);
-    const result = await clubAdminService.createTournament(req.user, data);
+    const result = await clubAdminService.createTournament(req.user, req.body);
     res.status(201).json(result);
   } catch (err) { next(err); }
 };
 
 const getRosterMatches = async (req, res, next) => {
   try {
-    const matches = await clubAdminService.listMatches(req.user);
-    res.json({ count: matches.length, matches });
+    const result = await clubAdminService.listMatches(req.user);
+    res.json({ count: result.length, matches: result });
   } catch (err) { next(err); }
 };
 
 const getRosterPlayers = async (req, res, next) => {
   try {
-    const players = await clubAdminService.listPlayers(req.user);
-    res.json({ count: players.length, players });
+    const { query } = require('../../db');
+    const result = await query('SELECT players_id, full_name, primary_role, contact_number FROM players WHERE club_id = $1 ORDER BY created_at DESC', [req.user.club_id]);
+    res.json({ count: result.rows.length, players: result.rows.map(r => ({ id: r.players_id, name: r.full_name, role: r.primary_role, email: r.contact_number, status: 'Active' })) });
   } catch (err) { next(err); }
 };
 
@@ -103,16 +208,59 @@ const getRosterScorers = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const getTeams = async (req, res, next) => {
+  try {
+    const teams = await clubAdminService.listTeams(req.user);
+    res.json({ count: teams.length, teams });
+  } catch (err) { next(err); }
+};
+
+const createTeam = async (req, res, next) => {
+  try {
+    const result = await clubAdminService.createTeam(req.user, req.body);
+    res.status(201).json(result);
+  } catch (err) { next(err); }
+};
+
+const assignScorer = async (req, res, next) => {
+  try {
+    const result = await clubAdminService.assignScorer(req.user, req.body);
+    res.status(201).json(result);
+  } catch (err) { next(err); }
+};
+
+const directRegisterPlayer = async (req, res, next) => {
+  try {
+    const data = DirectPlayerSchema.parse(req.body);
+    const { query } = require('../../db');
+    const sql = `INSERT INTO players (club_id, full_name, display_name, contact_number, gender, jersey_number, date_of_birth, batting_style, bowling_style, primary_role, nationality, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW()) RETURNING *;`;
+    const params = [req.user.club_id, `${data.first_name} ${data.last_name || ''}`.trim(), data.display_name, data.contact_number, data.gender, data.jersey_number || null, data.date_of_birth || null, data.batting_style, data.bowling_style || null, data.primary_role, data.nationality];
+    const result = await query(sql, params);
+    res.status(201).json({ success: true, player: result.rows[0] });
+  } catch (err) { next(err); }
+};
+
+const updatePlayerDirect = async (req, res, next) => {
+  try {
+    const { query } = require('../../db');
+    const result = await query('UPDATE players SET full_name = $1, primary_role = $2 WHERE players_id = $3 AND club_id = $4 RETURNING *', [req.body.full_name, req.body.primary_role, req.params.id, req.user.club_id]);
+    if (result.rows.length === 0) throw new AppError('Player not found', 404);
+    res.json({ success: true, player: result.rows[0] });
+  } catch (err) { next(err); }
+};
+
+const deletePlayerDirect = async (req, res, next) => {
+  try {
+    const { query } = require('../../db');
+    const result = await query('DELETE FROM players WHERE players_id = $1 AND club_id = $2 RETURNING *', [req.params.id, req.user.club_id]);
+    if (result.rows.length === 0) throw new AppError('Player not found', 404);
+    res.json({ success: true, message: 'Deleted' });
+  } catch (err) { next(err); }
+};
+
 module.exports = {
-  getPendingApprovals,
-  updateApproval,
-  createMatch,
-  createTournament,
-  getRosterMatches,
-  getRosterPlayers,
-  getRosterScorers,
-  // exported for testing / reuse
-  ApprovalInputSchema,
-  TournamentInputSchema,
-  CreateMatchSchema
+  getPendingApprovals, updateApproval, createMatch, createTournament,
+  getRosterMatches, getRosterPlayers, getRosterScorers, getTeams,
+  createTeam, assignScorer, directRegisterPlayer, updatePlayerDirect,
+  deletePlayerDirect, getIncomingMatchRequests, acceptMatchRequest, rejectMatchRequest
 };

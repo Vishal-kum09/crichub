@@ -24,6 +24,7 @@ router.get('/matches/:id/live', ctrl.getLiveState);
 
 // Live scoring lifecycle.
 router.post('/matches/:id/initialize', ctrl.initialize);
+router.post('/matches/:id/start-second-innings', ctrl.startSecondInnings);
 router.post('/matches/:id/ball', ctrl.recordBall);
 router.post('/matches/:id/wicket-wizard', ctrl.wicketWizard);
 router.post('/matches/:id/undo', ctrl.undo);

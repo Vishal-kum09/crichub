@@ -52,6 +52,8 @@ export function ClubAdmin() {
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [teamPlayerSearch, setTeamPlayerSearch] = useState('');
+  const [matchTeamSearch, setMatchTeamSearch] = useState('');
+  const [matchTeamPlayers, setMatchTeamPlayers] = useState<RosterMember[]>([]);
   const [teamForm, setTeamForm] = useState({ name: '', short_name: '', logo_url: '', home_ground: '', country: 'India' });
   
   const [incomingInvites, setIncomingInvites] = useState<any[]>([]);
@@ -73,6 +75,7 @@ export function ClubAdmin() {
     date: '', time: '', format: 'T20', ballType: 'leather', oversPerMatch: '20', 
     venue: '', pitchNum: '', venueNeutral: false, city: '', country: '',
     opponentClubId: '', selectedSquadIds: [] as string[], assignedScorerId: '' 
+    , team1Id: '', team2Id: ''
   });
   
   const [tournamentForm, setTournamentForm] = useState({ name: '', type: 'League', oversLimit: '20', maxTeams: '8', startDate: '', endDate: '' });
@@ -99,6 +102,23 @@ export function ClubAdmin() {
 
   const loadTeamPlayers = (teamId: string) => {
     getClubTeamPlayers(teamId).then(setTeamPlayers).catch(() => setTeamPlayers([]));
+  };
+
+  const loadMatchTeamPlayers = (teamId: string) => {
+    if (!teamId) {
+      setMatchTeamPlayers([]);
+      setMatchForm(prev => ({ ...prev, selectedSquadIds: [] }));
+      return;
+    }
+    getClubTeamPlayers(teamId)
+      .then((players) => {
+        setMatchTeamPlayers(players);
+        setMatchForm(prev => ({ ...prev, selectedSquadIds: players.map((player) => player.id) }));
+      })
+      .catch(() => {
+        setMatchTeamPlayers([]);
+        setMatchForm(prev => ({ ...prev, selectedSquadIds: [] }));
+      });
   };
 
   useEffect(() => { 
@@ -305,7 +325,9 @@ export function ClubAdmin() {
 
   const handleCreateMatchFinalSubmission = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (matchForm.selectedSquadIds.length === 0) { toast.error("Select squad players."); return; }
+    if (!matchForm.team1Id) { toast.error("Select your team."); return; }
+    if (matchType === 'local' && !matchForm.team2Id) { toast.error("Select the second local team."); return; }
+    if (matchForm.selectedSquadIds.length === 0) { toast.error("Selected team has no players."); return; }
     if (!matchForm.assignedScorerId) { toast.error("Assign a match scorer."); return; }
 
     try {
@@ -313,6 +335,8 @@ export function ClubAdmin() {
       await api.post('/api/club-admin/matches', {
         match_type: matchType === 'club' ? 'cross_club' : 'local',
         opponent_club_id: matchType === 'club' ? matchForm.opponentClubId : undefined,
+        team1_id: matchForm.team1Id,
+        team2_id: matchType === 'local' ? matchForm.team2Id : undefined,
         match_date: matchForm.date,
         start_time: matchForm.time ? `${matchForm.time}:00` : '10:00:00',
         scheduled_at: scheduledAt,
@@ -329,7 +353,8 @@ export function ClubAdmin() {
       });
 
       toast.success('Match scheduled successfully!');
-      setMatchForm({ date: '', time: '', format: 'T20', ballType: 'leather', oversPerMatch: '20', venue: '', pitchNum: '', venueNeutral: false, city: '', country: 'India', opponentClubId: '', selectedSquadIds: [], assignedScorerId: '' });
+      setMatchForm({ date: '', time: '', format: 'T20', ballType: 'leather', oversPerMatch: '20', venue: '', pitchNum: '', venueNeutral: false, city: '', country: 'India', opponentClubId: '', selectedSquadIds: [], assignedScorerId: '', team1Id: '', team2Id: '' } as any);
+      setMatchTeamPlayers([]);
       setWizardStep(1);
       setActiveTab('my-matches');
       loadRosterData();
@@ -354,6 +379,12 @@ export function ClubAdmin() {
     const query = teamPlayerSearch.trim().toLowerCase();
     const matchesSearch = !query || `${player.name} ${player.role}`.toLowerCase().includes(query);
     return matchesSearch && !teamPlayerIds.has(player.id);
+  });
+  const matchTeamPlayerIds = new Set(matchTeamPlayers.map((player) => player.id));
+  const filteredMatchTeamCandidates = myPlayers.filter((player) => {
+    const query = matchTeamSearch.trim().toLowerCase();
+    const matchesSearch = !query || `${player.name} ${player.role}`.toLowerCase().includes(query);
+    return matchesSearch && !matchTeamPlayerIds.has(player.id);
   });
 
   return (
@@ -689,6 +720,35 @@ export function ClubAdmin() {
                     </select>
                   </div>
                 )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-black text-gray-500 uppercase mb-1">Your Team *</label>
+                    <select
+                      value={matchForm.team1Id}
+                      onChange={(e) => {
+                        setMatchForm({ ...matchForm, team1Id: e.target.value });
+                        loadMatchTeamPlayers(e.target.value);
+                      }}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white text-xs font-bold text-gray-800 focus:outline-none focus:border-[#e60023]"
+                    >
+                      <option value="">-- Select Team --</option>
+                      {myTeams.map(team => <option key={team.id} value={team.id}>{team.name} ({team.player_count})</option>)}
+                    </select>
+                  </div>
+                  {matchType === 'local' && (
+                    <div>
+                      <label className="block text-xs font-black text-gray-500 uppercase mb-1">Opponent Team *</label>
+                      <select
+                        value={matchForm.team2Id}
+                        onChange={(e) => setMatchForm({ ...matchForm, team2Id: e.target.value })}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white text-xs font-bold text-gray-800 focus:outline-none focus:border-[#e60023]"
+                      >
+                        <option value="">-- Select Team --</option>
+                        {myTeams.filter(team => team.id !== matchForm.team1Id).map(team => <option key={team.id} value={team.id}>{team.name} ({team.player_count})</option>)}
+                      </select>
+                    </div>
+                  )}
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-black text-gray-500 uppercase mb-1">Format *</label>
@@ -743,6 +803,8 @@ export function ClubAdmin() {
                   <label htmlFor="neutral_venue" className="text-xs font-bold text-gray-700 cursor-pointer">Is this a Neutral Venue?</label>
                 </div>
                 <Button onClick={() => {
+                  if (!matchForm.team1Id) { toast.error("Choose your team."); return; }
+                  if (matchType === 'local' && !matchForm.team2Id) { toast.error("Choose opponent team."); return; }
                   if (matchType === 'club' && !matchForm.opponentClubId) { toast.error("Choose an opponent club."); return; }
                   if (!matchForm.date || !matchForm.venue || !matchForm.city || !matchForm.country) { toast.error("Complete all required fields."); return; }
                   setWizardStep(2);
@@ -754,31 +816,73 @@ export function ClubAdmin() {
             {wizardStep === 2 && (
               <div className="space-y-4 animate-fadeIn">
                 <div className="bg-gray-50 border border-gray-200 p-3 rounded-xl text-xs text-gray-500 font-semibold">
-                  <h4 className="font-extrabold text-gray-900 mb-0.5">Select Playing Squad</h4>
-                  <p>Checkmark players assigned to represent the club line-up.</p>
+                  <h4 className="font-extrabold text-gray-900 mb-0.5">Team Members</h4>
+                  <p>Players are loaded from the selected team. Add extra club players here when the squad changes.</p>
                 </div>
-                {myPlayers.length === 0 ? (
-                  <div className="text-center py-6 text-xs text-gray-400 font-bold">Approved player roster is empty.</div>
+                {matchTeamPlayers.length === 0 ? (
+                  <div className="text-center py-6 text-xs text-gray-400 font-bold">Selected team has no players yet.</div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto p-1">
-                    {myPlayers.map((player) => {
-                      const isSelected = matchForm.selectedSquadIds.includes(player.id);
-                      return (
-                        <div key={player.id} onClick={() => handleToggleSquadMember(player.id)} className={`p-3 border rounded-xl flex items-center justify-between cursor-pointer transition-all ${isSelected ? 'border-[#e60023] bg-red-50/30 font-extrabold scale-[0.99]' : 'border-gray-200 hover:bg-gray-50/50'}`}>
-                          <div>
-                            <p className="text-xs text-gray-900 font-bold">{player.name}</p>
-                            <p className="text-[10px] text-gray-400 capitalize">{player.role || 'Player'}</p>
-                          </div>
-                          <input type="checkbox" checked={isSelected} readOnly className="rounded border-gray-300 accent-[#e60023] h-4 w-4" />
+                    {matchTeamPlayers.map((player) => (
+                      <div key={player.id} className="p-3 border rounded-xl flex items-center justify-between bg-white border-gray-200">
+                        <div>
+                          <p className="text-xs text-gray-900 font-bold">{player.name}</p>
+                          <p className="text-[10px] text-gray-400 capitalize">{player.role || 'Player'} | Below 18: {player.below_18 ? 'Yes' : 'No'}</p>
                         </div>
-                      );
-                    })}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!matchForm.team1Id) return;
+                            removePlayerFromClubTeam(matchForm.team1Id, player.id)
+                              .then(() => loadMatchTeamPlayers(matchForm.team1Id))
+                              .catch(() => toast.error('Could not remove player from team.'));
+                          }}
+                          className="p-1 text-gray-400 hover:text-[#e60023]"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 )}
+                <div className="border border-gray-100 rounded-xl overflow-hidden">
+                  <div className="p-3 bg-gray-50 border-b border-gray-100 space-y-2">
+                    <h5 className="text-xs font-black text-gray-900">Add Other Club Player</h5>
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-2.5 text-gray-400" size={14} />
+                      <Input type="text" value={matchTeamSearch} onChange={(e) => setMatchTeamSearch(e.target.value)} placeholder="Search players..." className="pl-8 text-xs" />
+                    </div>
+                  </div>
+                  <div className="divide-y divide-gray-100 max-h-48 overflow-y-auto">
+                    {filteredMatchTeamCandidates.length === 0 ? (
+                      <div className="p-4 text-xs text-gray-400 font-bold text-center">No matching players available.</div>
+                    ) : filteredMatchTeamCandidates.map((player) => (
+                      <div key={player.id} className="p-3 flex items-center justify-between gap-3 hover:bg-gray-50/50">
+                        <div>
+                          <p className="text-xs font-extrabold text-gray-900">{player.name}</p>
+                          <p className="text-[10px] text-gray-400 capitalize">{player.role || 'Player'} | Below 18: {player.below_18 ? 'Yes' : 'No'}</p>
+                        </div>
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            if (!matchForm.team1Id) { toast.error('Select team first.'); return; }
+                            addPlayerToClubTeam(matchForm.team1Id, player.id)
+                              .then(() => loadMatchTeamPlayers(matchForm.team1Id))
+                              .catch(() => toast.error('Could not add player to team.'));
+                          }}
+                          variant="secondary"
+                          className="text-[10px] py-1 px-2 rounded-lg font-black"
+                        >
+                          Add
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
                 <div className="flex gap-2 pt-2">
                   <Button onClick={() => setWizardStep(1)} variant="secondary" className="flex-1 flex items-center justify-center gap-1 text-xs font-bold py-2.5 rounded-xl"><ArrowLeft size={14} /> Back</Button>
                   <Button onClick={() => {
-                    if (matchForm.selectedSquadIds.length === 0) { toast.error("Pick at least one member."); return; }
+                    if (matchForm.selectedSquadIds.length === 0) { toast.error("Selected team has no players."); return; }
                     setWizardStep(3);
                   }} variant="primary" className="flex-1 flex items-center justify-center gap-1 text-xs font-bold py-2.5 rounded-xl bg-[#e60023] text-white border-none">Assign Match Scorer <ArrowRight size={14} /></Button>
                 </div>

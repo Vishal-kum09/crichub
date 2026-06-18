@@ -170,6 +170,7 @@ const resolveCrease = async (db, inningsId, overrides = {}) => {
 const presentInningsState = (inn) => ({
   innings_id: inn.innings_id,
   match_id: inn.match_id,
+  innings_number: inn.innings_number,
   status: inn.status,
   total_runs: inn.total_runs,
   total_wickets: inn.total_wickets,
@@ -223,6 +224,75 @@ const presentBowler = (fig) =>
     wickets: fig.wickets,
     maidens: fig.maidens || 0
   };
+
+const chaseInfoFor = (innings, oversPerMatch) => {
+  if (!innings || !innings.target_runs) return null;
+  const target = Number(innings.target_runs);
+  const runsRequired = Math.max(0, target - Number(innings.total_runs || 0));
+  const ballsLimit = oversPerMatch ? oversPerMatch * 6 : null;
+  const ballsRemaining = ballsLimit == null ? null : Math.max(0, ballsLimit - Number(innings.total_balls || 0));
+  return {
+    target,
+    runs_required: runsRequired,
+    balls_remaining: ballsRemaining,
+    required_run_rate:
+      ballsRemaining && ballsRemaining > 0
+        ? Number(((runsRequired * 6) / ballsRemaining).toFixed(2))
+        : runsRequired === 0 ? 0 : null
+  };
+};
+
+const inningsBreakFor = (innings, oversPerMatch) => {
+  if (!innings || innings.innings_number !== 1 || innings.status !== 'completed') return null;
+  const target = Number(innings.total_runs || 0) + 1;
+  return {
+    innings_number: 1,
+    first_innings_score: `${innings.total_runs}/${innings.total_wickets}`,
+    target,
+    required_run_rate: oversPerMatch ? Number((target / oversPerMatch).toFixed(2)) : null
+  };
+};
+
+const resultForCompletedChase = (innings, previousInnings, oversPerMatch) => {
+  if (!innings || innings.innings_number < 2 || !previousInnings) return null;
+  const target = Number(innings.target_runs || previousInnings.total_runs + 1);
+  const chaseWon = Number(innings.total_runs) >= target;
+  if (chaseWon) {
+    const wicketsRemaining = Math.max(0, 10 - Number(innings.total_wickets || 0));
+    return {
+      winningTeamId: innings.batting_team_id,
+      resultType: 'won',
+      resultMargin: wicketsRemaining,
+      resultSummary: `Won by ${wicketsRemaining} wicket${wicketsRemaining === 1 ? '' : 's'}`
+    };
+  }
+  const runMargin = Math.max(0, target - Number(innings.total_runs) - 1);
+  return {
+    winningTeamId: previousInnings.batting_team_id,
+    resultType: runMargin === 0 ? 'tie' : 'won',
+    resultMargin: runMargin,
+    resultSummary:
+      runMargin === 0
+        ? 'Match tied'
+        : `Won by ${runMargin} run${runMargin === 1 ? '' : 's'}`
+  };
+};
+
+const decorateLifecycle = async (client, matchId, innings, oversPerMatch, extra = {}) => {
+  const previousInnings = innings?.innings_number > 1
+    ? await repo.getInningsByNumber(client, matchId, innings.innings_number - 1)
+    : null;
+  return {
+    ...extra,
+    innings_break: inningsBreakFor(innings, oversPerMatch),
+    chase: chaseInfoFor(innings, oversPerMatch),
+    match_complete: innings?.innings_number > 1 && innings.status === 'completed',
+    result:
+      innings?.innings_number > 1 && innings.status === 'completed'
+        ? resultForCompletedChase(innings, previousInnings, oversPerMatch)
+        : null
+  };
+};
 
 // ─── 🔥 INITIALIZE (UPGRADED WITH TEAMS RESOLUTION BRIDGE) ───────────────────
 const initialize = async (matchId, input) => {
@@ -458,6 +528,21 @@ const recordBall = async (matchId, input) => {
       balls: m.countsOver ? 1 : 0
     });
 
+    if (crease.nonStrikerId) {
+      await repo.bumpPartnership(client, {
+        inningsId: input.innings_id,
+        wicketNumber: updatedInnings.total_wickets + 1,
+        batter1Id: crease.strikerId,
+        batter2Id: crease.nonStrikerId,
+        strikerId: crease.strikerId,
+        startedAtRuns: innings.total_runs,
+        totalRuns: m.runsTotal,
+        legalBalls: m.countsOver ? 1 : 0,
+        batterRuns: m.runsBatter,
+        batterBalls: m.batterFaces ? 1 : 0
+      });
+    }
+
     const runRate =
       updatedInnings.total_balls > 0
         ? Number(((updatedInnings.total_runs * 6) / updatedInnings.total_balls).toFixed(2))
@@ -485,13 +570,26 @@ const recordBall = async (matchId, input) => {
 
     let inningsComplete = false;
     let finalInnings = updatedInnings;
+    let matchComplete = false;
+    let resultSummary = null;
+    const chaseWon =
+      updatedInnings.innings_number > 1 &&
+      updatedInnings.target_runs &&
+      updatedInnings.total_runs >= updatedInnings.target_runs;
     if (
+      chaseWon ||
       updatedInnings.total_wickets >= 10 ||
       (oversPerMatch && oversCompleted >= oversPerMatch)
     ) {
       finalInnings = await repo.setInningsStatus(client, input.innings_id, 'completed');
-      await repo.setMatchStatus(client, innings.match_id, 'completed');
       inningsComplete = true;
+      if (finalInnings.innings_number > 1) {
+        const previousInnings = await repo.getInningsByNumber(client, innings.match_id, 1);
+        const result = resultForCompletedChase(finalInnings, previousInnings, oversPerMatch);
+        await repo.completeMatch(client, innings.match_id, result || {});
+        matchComplete = true;
+        resultSummary = result;
+      }
     }
 
     // Fetch the updated records cleanly inside the transaction
@@ -507,6 +605,13 @@ const recordBall = async (matchId, input) => {
     const strikerState = strikerCard ? presentBatter(strikerCard) : null;
 
     const nonStrikerState = nonStrikerCard ? presentBatter(nonStrikerCard) : null;
+
+    const lifecycle = await decorateLifecycle(client, innings.match_id, finalInnings, oversPerMatch, {
+      over_completed: overCompleted,
+      innings_complete: inningsComplete,
+      match_complete: matchComplete,
+      result: resultSummary
+    });
 
     return {
       response: {
@@ -526,8 +631,7 @@ const recordBall = async (matchId, input) => {
         striker: strikerState,          // <-- Fixed to use the newly mapped state
         non_striker: nonStrikerState,   // <-- Fixed to use the newly mapped state
         bowler: presentBowler(bowlerFig),
-        over_completed: overCompleted,
-        innings_complete: inningsComplete
+        ...lifecycle
       },
       log: {
         match_id: innings.match_id,
@@ -611,6 +715,15 @@ const wicketWizard = async (matchId, input) => {
         overAtFall,
         wicketNumber
       });
+      await repo.insertFallOfWicket(client, {
+        inningsId: innings.innings_id,
+        wicketNumber,
+        dismissedBatterId: input.dismissed_player_id,
+        runsAtFall: innings.total_runs,
+        ballsAtFall: innings.total_balls,
+        overAtFall
+      });
+      await repo.endActivePartnership(client, innings.innings_id, wicketNumber, innings.total_runs);
 
       await client.query(
         `UPDATE deliveries SET is_wicket = true WHERE deliveries_id = $1`,
@@ -647,13 +760,26 @@ const wicketWizard = async (matchId, input) => {
     });
 
     let inningsComplete = false;
+    let matchComplete = false;
+    let resultSummary = null;
     if (!retiredHurt && updatedInnings.total_wickets >= 10) {
       updatedInnings = await repo.setInningsStatus(client, innings.innings_id, 'completed');
-      await repo.setMatchStatus(client, innings.match_id, 'completed');
       inningsComplete = true;
+      if (updatedInnings.innings_number > 1) {
+        const previousInnings = await repo.getInningsByNumber(client, innings.match_id, 1);
+        resultSummary = resultForCompletedChase(updatedInnings, previousInnings);
+        await repo.completeMatch(client, innings.match_id, resultSummary || {});
+        matchComplete = true;
+      }
     }
 
     const partnership = await repo.getActiveBatters(client, innings.innings_id);
+    const match = await repo.getMatch(client, innings.match_id);
+    const lifecycle = await decorateLifecycle(client, innings.match_id, updatedInnings, match?.overs_per_match, {
+      innings_complete: inningsComplete,
+      match_complete: matchComplete,
+      result: resultSummary
+    });
     return {
       ok: true,
       dismissal: dismissal && {
@@ -665,7 +791,72 @@ const wicketWizard = async (matchId, input) => {
       retired_hurt: retiredHurt,
       innings: presentInningsState(updatedInnings),
       partnership: partnership.map(presentBatter),
-      innings_complete: inningsComplete
+      ...lifecycle
+    };
+  });
+};
+
+const startSecondInnings = async (matchId, input = {}) => {
+  return withTransaction(async (client) => {
+    const match = await repo.getMatch(client, matchId);
+    if (!match) throw new AppError('Match not found', 404);
+
+    const firstInnings = await repo.getInningsByNumber(client, matchId, 1);
+    if (!firstInnings || firstInnings.status !== 'completed') {
+      throw new AppError('First innings is not complete yet', 409);
+    }
+
+    const existingSecond = await repo.getInningsByNumber(client, matchId, 2);
+    if (existingSecond) {
+      if (existingSecond.status === 'completed') throw new AppError('Match is already completed', 409);
+      return getLiveMatchState(matchId);
+    }
+
+    const innings = await repo.createInnings(client, {
+      matchId,
+      inningsNumber: 2,
+      battingTeamId: firstInnings.fielding_team_id,
+      fieldingTeamId: firstInnings.batting_team_id,
+      targetRuns: firstInnings.total_runs + 1
+    });
+
+    const battingRoster = await repo.findTeamRoster(innings.batting_team_id);
+    const fieldingRoster = await repo.findTeamRoster(innings.fielding_team_id);
+    const strikerId = input.striker_id || battingRoster[0]?.id;
+    const nonStrikerId = input.non_striker_id || battingRoster.find((p) => p.id !== strikerId)?.id;
+    const bowlerId = input.bowler_id || fieldingRoster[0]?.id;
+
+    const striker = strikerId
+      ? await repo.ensureBattingCard(client, innings.innings_id, strikerId, { position: 1, cameInAtOver: 0 })
+      : null;
+    const nonStriker = nonStrikerId
+      ? await repo.ensureBattingCard(client, innings.innings_id, nonStrikerId, { position: 2, cameInAtOver: 0 })
+      : null;
+    const bowler = bowlerId ? await repo.ensureBowlingFigure(client, innings.innings_id, bowlerId) : null;
+
+    await repo.setMatchStatus(client, matchId, 'live');
+
+    const allPlayers = [...battingRoster, ...fieldingRoster];
+    const playerNames = {};
+    const playerIdMap = {};
+    for (const player of allPlayers) {
+      playerNames[player.id] = player.name;
+      playerIdMap[player.name] = player.id;
+    }
+
+    return {
+      ok: true,
+      match_id: matchId,
+      innings: presentInningsState(innings),
+      overs_per_match: match.overs_per_match,
+      striker: presentBatter(striker),
+      non_striker: presentBatter(nonStriker),
+      bowler: presentBowler(bowler),
+      playerNames,
+      battingRoster: battingRoster.map((p) => p.name),
+      fieldingRoster: fieldingRoster.map((p) => p.name),
+      playerIdMap,
+      chase: chaseInfoFor(innings, match.overs_per_match)
     };
   });
 };
@@ -833,8 +1024,17 @@ const getMatchPreview = async (scorerId, matchId) => {
   const match = await repo.getMatchPreviewRow(matchId);
   if (!match) throw new AppError('Match not found', 404);
 
-  let team1Roster = await repo.findTeamRoster(match.team1_id);
-  let team2Roster = await repo.findTeamRoster(match.team2_id);
+  let mappedTeams = {};
+  try {
+    mappedTeams = match.notes ? JSON.parse(match.notes) : {};
+  } catch (_) {
+    mappedTeams = {};
+  }
+  const team1Id = mappedTeams.team1_id || match.team1_id;
+  const team2Id = mappedTeams.team2_id || match.team2_id;
+
+  let team1Roster = await repo.findTeamRoster(team1Id);
+  let team2Roster = await repo.findTeamRoster(team2Id);
 
   if (match.team1_id === match.team2_id) {
     const rawPool = [...team1Roster];
@@ -844,8 +1044,8 @@ const getMatchPreview = async (scorerId, matchId) => {
 
   return {
     match_id: match.matches_id,
-    team1_id: match.team1_id,
-    team2_id: match.team2_id,
+    team1_id: team1Id,
+    team2_id: team2Id,
     team1_name: match.team1_id === match.team2_id ? `${match.team1_name} (A)` : match.team1_name,
     team2_name: match.team1_id === match.team2_id ? `${match.team2_name} (B)` : match.team2_name,
     venue: match.venue || '',
@@ -863,8 +1063,29 @@ const getMatchPreview = async (scorerId, matchId) => {
 const getLiveMatchState = async (matchId) => {
   return withTransaction(async (client) => {
     const activeInnings = await repo.getCurrentInnings(client, matchId);
+    const match = await repo.getMatch(client, matchId);
 
     if (!activeInnings) {
+      const latest = await repo.getLatestInnings(client, matchId);
+      if (latest && latest.innings_number === 1 && latest.status === 'completed') {
+        return {
+          ok: true,
+          match_id: matchId,
+          innings: presentInningsState(latest),
+          innings_break: inningsBreakFor(latest, match?.overs_per_match),
+          match_complete: false
+        };
+      }
+      if (latest && latest.status === 'completed') {
+        const previousInnings = await repo.getInningsByNumber(client, matchId, 1);
+        return {
+          ok: true,
+          match_id: matchId,
+          innings: presentInningsState(latest),
+          match_complete: true,
+          result: resultForCompletedChase(latest, previousInnings, match?.overs_per_match)
+        };
+      }
       throw new AppError('No active innings found for this match', 404);
     }
 
@@ -879,7 +1100,6 @@ const getLiveMatchState = async (matchId) => {
       ? await repo.getBowlingFigure(client, activeInnings.innings_id, crease.bowlerId)
       : null;
 
-    const match = await repo.getMatch(client, matchId);
     const roster = match
       ? [
           ...(await repo.findTeamRoster(match.team1_id)),
@@ -913,13 +1133,15 @@ const getLiveMatchState = async (matchId) => {
       playerNames,
       battingRoster: uniqueRoster.map((p) => p.name),
       fieldingRoster: uniqueRoster.map((p) => p.name),
-      playerIdMap
+      playerIdMap,
+      chase: chaseInfoFor(activeInnings, match?.overs_per_match)
     };
   });
 };
 
 module.exports = {
   initialize,
+  startSecondInnings,
   recordBall,
   wicketWizard,
   undo,

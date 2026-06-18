@@ -60,6 +60,12 @@ const InitializeSchema = z.object({
   }).optional()
 });
 
+const StartSecondInningsSchema = z.object({
+  striker_id: uuid.optional(),
+  non_striker_id: uuid.optional(),
+  bowler_id: uuid.optional()
+}).default({});
+
 const UndoSchema = z.object({ innings_id: uuid.optional() }).default({});
 
 // ─── handlers ───────────────────────────────────────────────────────────────
@@ -69,6 +75,15 @@ const initialize = async (req, res, next) => {
     if (!isUuid(req.params.id)) throw new AppError('Match not found', 404);
     const data = InitializeSchema.parse(req.body);
     const result = await scorerService.initialize(req.params.id, data);
+    res.status(201).json(result);
+  } catch (err) { next(err); }
+};
+
+const startSecondInnings = async (req, res, next) => {
+  try {
+    if (!isUuid(req.params.id)) throw new AppError('Match not found', 404);
+    const data = StartSecondInningsSchema.parse(req.body || {});
+    const result = await scorerService.startSecondInnings(req.params.id, data);
     res.status(201).json(result);
   } catch (err) { next(err); }
 };
@@ -141,6 +156,7 @@ const getLiveState = async (req, res, next) => {
 
 module.exports = {
   initialize,
+  startSecondInnings,
   getLiveState,
   recordBall,
   wicketWizard,
@@ -150,5 +166,6 @@ module.exports = {
   matchPreview,
   BallInputSchema,
   WicketWizardSchema,
-  InitializeSchema
+  InitializeSchema,
+  StartSecondInningsSchema
 };

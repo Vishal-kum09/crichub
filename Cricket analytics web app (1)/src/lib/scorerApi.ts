@@ -13,6 +13,7 @@
   export interface InningsState {
     innings_id: string;
     match_id: string;
+    innings_number: number;
     status: string;
     total_runs: number;
     total_wickets: number;
@@ -28,6 +29,27 @@
       penalties: number;
       total: number;
     };
+  }
+
+  export interface ChaseInfo {
+    target: number;
+    runs_required: number;
+    balls_remaining: number | null;
+    required_run_rate: number | null;
+  }
+
+  export interface InningsBreakInfo {
+    innings_number: number;
+    first_innings_score: string;
+    target: number;
+    required_run_rate: number | null;
+  }
+
+  export interface MatchResultInfo {
+    winningTeamId?: string;
+    resultType?: string;
+    resultMargin?: number;
+    resultSummary?: string;
   }
 
   export interface BatterState {
@@ -66,6 +88,10 @@
     striker: BatterState | null;
     non_striker: BatterState | null;
     bowler: BowlerState | null;
+    innings_break?: InningsBreakInfo | null;
+    chase?: ChaseInfo | null;
+    match_complete?: boolean;
+    result?: MatchResultInfo | null;
   }
 
   export interface BallPayload {
@@ -104,6 +130,10 @@
     bowler: BowlerState | null;
     over_completed: boolean;
     innings_complete: boolean;
+    innings_break?: InningsBreakInfo | null;
+    chase?: ChaseInfo | null;
+    match_complete?: boolean;
+    result?: MatchResultInfo | null;
   }
 
   export interface WicketPayload {
@@ -121,6 +151,10 @@
     innings: InningsState;
     partnership: BatterState[];
     innings_complete: boolean;
+    innings_break?: InningsBreakInfo | null;
+    chase?: ChaseInfo | null;
+    match_complete?: boolean;
+    result?: MatchResultInfo | null;
   }
 
   export interface UndoResponse {
@@ -154,6 +188,11 @@
     payload: InitializePayload
   ): Promise<InitializeResponse> {
     const { data } = await api.post(`/api/scorer/matches/${matchId}/initialize`, payload);
+    return data;
+  }
+
+  export async function startSecondInnings(matchId: string): Promise<LiveMatchState> {
+    const { data } = await api.post(`/api/scorer/matches/${matchId}/start-second-innings`, {});
     return data;
   }
 
@@ -223,6 +262,10 @@
     battingRoster?: string[];
     fieldingRoster?: string[];
     playerIdMap?: { [name: string]: string };
+    innings_break?: InningsBreakInfo | null;
+    chase?: ChaseInfo | null;
+    match_complete?: boolean;
+    result?: MatchResultInfo | null;
   }
 
   export async function getLiveMatchState(matchId: string): Promise<LiveMatchState> {

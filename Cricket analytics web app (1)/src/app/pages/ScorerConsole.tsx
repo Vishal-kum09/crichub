@@ -12,6 +12,7 @@ import {
   recordBall as apiRecordBall,
   wicketWizard as apiWicketWizard,
   undoBall as apiUndoBall,
+  startSecondInnings as apiStartSecondInnings,
   getLiveSession,
   setLiveSession,
   getLiveMatchState,
@@ -19,6 +20,9 @@ import {
   type InningsState,
   type LiveSession,
   type DismissalType,
+  type ChaseInfo,
+  type InningsBreakInfo,
+  type MatchResultInfo,
 } from '../../lib/scorerApi';
 
 interface ScorerConsoleProps {
@@ -82,6 +86,12 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
   const [wickets, setWickets] = useState(0);
   const [overs, setOvers] = useState(0);
   const [balls, setBalls] = useState(0);
+  const [inningsNumber, setInningsNumber] = useState(1);
+  const [chaseInfo, setChaseInfo] = useState<ChaseInfo | null>(null);
+  const [inningsBreak, setInningsBreak] = useState<InningsBreakInfo | null>(null);
+  const [matchResult, setMatchResult] = useState<MatchResultInfo | null>(null);
+  const [showInningsBreakDialog, setShowInningsBreakDialog] = useState(false);
+  const [showMatchCompleteDialog, setShowMatchCompleteDialog] = useState(false);
 
   // Current ball state
   const [currentRuns, setCurrentRuns] = useState(0);
@@ -224,6 +234,7 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
     setWickets(innings.total_wickets);
     setOvers(innings.overs_completed);
     setBalls(innings.balls_this_over);
+    setInningsNumber(Number(innings.innings_number || 1));
     setExtras({
       wides: innings.extras.wides,
       noBalls: innings.extras.no_balls,
@@ -231,6 +242,28 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
       legByes: innings.extras.leg_byes,
       penalties: innings.extras.penalties,
     });
+  };
+
+  const applyLifecycle = (payload: {
+    innings?: InningsState;
+    innings_break?: InningsBreakInfo | null;
+    chase?: ChaseInfo | null;
+    match_complete?: boolean;
+    result?: MatchResultInfo | null;
+  }) => {
+    if (payload.innings) syncFromInnings(payload.innings);
+    setChaseInfo(payload.chase || null);
+    if (payload.innings_break) {
+      setInningsBreak(payload.innings_break);
+      setShowInningsBreakDialog(true);
+      setIsLive(false);
+    }
+    if (payload.match_complete) {
+      setMatchResult(payload.result || { resultSummary: 'Match completed' });
+      setShowMatchCompleteDialog(true);
+      setIsLive(false);
+      clearSession();
+    }
   };
 
   const nameForPlayer = (playerId?: string, names?: { [key: string]: string }) =>
@@ -255,6 +288,7 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
     setLiveSession(nextSession);
     setSessionState(nextSession);
     syncFromInnings(liveState.innings);
+    applyLifecycle(liveState);
 
     const strikerName = nameForPlayer(liveState.striker?.player_id, playerNames);
     const nonStrikerName = nameForPlayer(liveState.non_striker?.player_id, playerNames);
@@ -299,6 +333,29 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
     }
 
     saveSession(liveState.innings);
+  };
+
+  const startSecondInnings = async () => {
+    if (!matchId) return;
+    try {
+      const liveState = await apiStartSecondInnings(matchId);
+      setScore(0);
+      setWickets(0);
+      setOvers(0);
+      setBalls(0);
+      setBallHistory([]);
+      setUndoStack([]);
+      setBatsmen([]);
+      setBowlers([]);
+      setInningsBreak(null);
+      setShowInningsBreakDialog(false);
+      hydrateFromLiveState(liveState);
+      setInningsNumber(2);
+      setIsLive(true);
+      toast.success('Second innings started');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Failed to start second innings');
+    }
   };
 
   const pendingDeliveries = useRef<any[]>([]);
@@ -386,6 +443,7 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
   };
 
   const runRate = overs + balls / 6 > 0 ? (score / (overs + balls / 6)).toFixed(2) : '0.00';
+  const startButtonLabel = inningsBreak ? 'Start 2nd Innings' : isLive ? 'Pause' : 'Start';
 
   useEffect(() => {
     if (selectedOutBatsman !== striker && selectedOutBatsman !== nonStriker) {
@@ -516,24 +574,26 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
           if (wicketPayload) {
             const wicketRes = await apiWicketWizard(matchId!, wicketPayload);
             syncFromInnings(wicketRes.innings);
+            applyLifecycle(wicketRes);
             saveSession(wicketRes.innings);
             if (session) {
               const incomingId = wicketPayload.incoming_batsman_id;
               if (dismissedBatsman === striker) session.strikerId = incomingId;
               else session.nonStrikerId = incomingId;
             }
-            if (wicketRes.innings_complete) {
+            if (wicketRes.innings_complete && wicketRes.match_complete) {
               clearSession();
-              toast.success('All out - innings complete');
+              toast.success('All out - match complete');
             }
           } else {
             syncFromInnings(res.innings);
+            applyLifecycle(res);
             saveSession(res.innings);
           }
           void flushPendingDeliveries();
-          if (res.innings_complete) {
+          if (res.innings_complete && res.match_complete) {
             clearSession();
-            toast.success('Innings complete');
+            toast.success(res.match_complete ? 'Match complete' : 'Innings complete');
           }
         })
         .catch((err) => {
@@ -768,20 +828,26 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
           </button>
           <div>
             <h1 className="text-2xl font-semibold text-[#1a1a1a]">Scorer Console</h1>
-            <p className="text-sm text-[#666666]">Live Match Scoring</p>
+            <p className="text-sm text-[#666666]">Live Match Scoring | Innings {inningsNumber}</p>
           </div>
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => setIsLive(!isLive)}
+            onClick={() => {
+              if (inningsBreak) {
+                void startSecondInnings();
+                return;
+              }
+              setIsLive(!isLive);
+            }}
             className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
               isLive
                 ? 'bg-[#e60023] text-white hover:bg-[#cc001e]'
                 : 'bg-[#1a1a1a] text-white hover:bg-[#2a2a2a]'
             }`}
           >
-            {isLive ? <Pause size={18} /> : <Play size={18} />}
-            {isLive ? 'Pause' : 'Start'}
+            {isLive && !inningsBreak ? <Pause size={18} /> : <Play size={18} />}
+            {startButtonLabel}
           </button>
           <button
             onClick={() => toast.success('Match saved')}
@@ -798,6 +864,18 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
         <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-lg">
           <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse" />
           <span className="text-sm font-medium text-red-600">LIVE SCORING</span>
+        </div>
+      )}
+
+      {inningsBreak && (
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <div>
+            <span className="text-sm font-semibold text-amber-800">First innings complete</span>
+            <p className="text-xs text-amber-700">Target {inningsBreak.target}, required run rate {inningsBreak.required_run_rate ?? 'N/A'}</p>
+          </div>
+          <button onClick={() => void startSecondInnings()} className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700">
+            Start 2nd Innings
+          </button>
         </div>
       )}
 
@@ -832,6 +910,13 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
             <div><p className="text-xs text-gray-400">Leg Byes</p><p className="text-2xl font-semibold tabular-nums">{extras.legByes}</p></div>
             <div><p className="text-xs text-gray-400">Penalties</p><p className="text-2xl font-semibold tabular-nums">{extras.penalties}</p></div>
           </div>
+          {chaseInfo && (
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4 text-center border-t border-gray-700 pt-5">
+              <div><p className="text-xs text-gray-400">Target</p><p className="text-2xl font-semibold tabular-nums">{chaseInfo.target}</p></div>
+              <div><p className="text-xs text-gray-400">Required</p><p className="text-2xl font-semibold tabular-nums">{chaseInfo.runs_required} from {chaseInfo.balls_remaining ?? '-'} balls</p></div>
+              <div><p className="text-xs text-gray-400">Req. Run Rate</p><p className="text-2xl font-semibold tabular-nums">{chaseInfo.required_run_rate ?? 'N/A'}</p></div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1342,6 +1427,56 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
       )}
 
       {/* Dialogs */}
+      {showInningsBreakDialog && inningsBreak && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-40" />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-2xl shadow-2xl z-50 p-6">
+            <h3 className="text-xl font-semibold mb-3">First Innings Complete</h3>
+            <div className="space-y-2 text-sm text-[#444]">
+              <p>Score: <span className="font-semibold">{inningsBreak.first_innings_score}</span></p>
+              <p>Target: <span className="font-semibold">{inningsBreak.target}</span></p>
+              <p>Required run rate: <span className="font-semibold">{inningsBreak.required_run_rate ?? 'N/A'}</span></p>
+            </div>
+            <div className="flex gap-3 pt-6">
+              <button
+                onClick={() => void startSecondInnings()}
+                className="flex-1 p-3 bg-[#1a1a1a] text-white rounded-lg font-semibold hover:bg-[#2a2a2a] transition-all"
+              >
+                Start Second Innings
+              </button>
+              <button
+                onClick={() => setShowInningsBreakDialog(false)}
+                className="flex-1 p-3 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300 transition-all"
+              >
+                Back
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {showMatchCompleteDialog && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-40" />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-2xl shadow-2xl z-50 p-6">
+            <h3 className="text-xl font-semibold mb-3">Match Completed</h3>
+            <p className="text-sm text-[#666666] mb-6">
+              {matchResult?.resultSummary || 'The match has been completed and saved.'}
+            </p>
+            <button
+              onClick={() => {
+                setShowMatchCompleteDialog(false);
+                toast.success('Match submitted');
+                onNavigate('/scorer-dashboard');
+              }}
+              className="w-full p-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-all"
+            >
+              Submit Match
+            </button>
+          </div>
+        </>
+      )}
+
       {showOthersDialog && (
         <>
           <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setShowOthersDialog(false)} />

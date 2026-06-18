@@ -36,6 +36,8 @@ const CreateMatchSchema = z.object({
   city: z.string().min(1),
   country: z.string().min(1),
   squad_player_ids: z.array(z.string()).default([]),
+  team1_id: z.string().uuid().optional(),
+  team2_id: z.string().uuid().optional(),
   assigned_scorer_id: z.string().uuid()
 });
 
@@ -56,7 +58,7 @@ const createMatch = async (req, res, next) => {
   const { query } = require('../../db');
   try {
     const adminClubId = req.user.club_id;
-    const adminUserId = req.user.id;
+    const adminUserId = req.user.user_id || req.user.id;
     const data = CreateMatchSchema.parse(req.body);
 
     await query('BEGIN');
@@ -64,13 +66,19 @@ const createMatch = async (req, res, next) => {
     let initialStatus = data.match_type === 'cross_club' ? 'pending_opponent' : 'scheduled';
     
     // 🔥 EXACT MATCHES TABLE INSERTION (Removed the redundant 'teams' table check entirely)
+    const notes = JSON.stringify({
+      team1_id: data.team1_id || null,
+      team2_id: data.team2_id || null,
+      squad_player_ids: data.squad_player_ids || []
+    });
+
     const matchSql = `
       INSERT INTO matches (
         host_club_id, opponent_club_id, match_date, start_time, scheduled_at, 
         format, ball_type, overs_per_match, venue, pitch_num, venue_neutral, city, country, status, 
-        created_at
+        notes, created_by, created_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW()) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW()) 
       RETURNING matches_id;
     `;
     
@@ -78,7 +86,8 @@ const createMatch = async (req, res, next) => {
       adminClubId, 
       data.match_type === 'cross_club' ? data.opponent_club_id : adminClubId, 
       data.match_date, data.start_time, data.scheduled_at, data.format, data.ball_type, 
-      data.overs_per_match || 20, data.venue, data.pitch_num, data.venue_neutral, data.city, data.country, initialStatus
+      data.overs_per_match || 20, data.venue, data.pitch_num, data.venue_neutral, data.city, data.country, initialStatus,
+      notes, adminUserId
     ];
 
     const matchRes = await query(matchSql, params);

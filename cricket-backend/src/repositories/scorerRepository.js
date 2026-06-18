@@ -44,6 +44,25 @@ const getCurrentInnings = async (db, matchId) => {
   return r.rows[0] || null;
 };
 
+const getLatestInnings = async (db, matchId) => {
+  const r = await db.query(
+    `SELECT * FROM innings
+      WHERE match_id = $1
+      ORDER BY innings_number DESC
+      LIMIT 1`,
+    [matchId]
+  );
+  return r.rows[0] || null;
+};
+
+const getInningsByNumber = async (db, matchId, inningsNumber) => {
+  const r = await db.query(
+    `SELECT * FROM innings WHERE match_id = $1 AND innings_number = $2 LIMIT 1`,
+    [matchId, inningsNumber]
+  );
+  return r.rows[0] || null;
+};
+
 // ─── Innings mutations ──────────────────────────────────────────────────────
 
 const createInnings = async (client, p) => {
@@ -104,6 +123,27 @@ const setMatchStatus = async (client, matchId, status) => {
             updated_at = now()
       WHERE matches_id = $1`,
     [matchId, status]
+  );
+};
+
+const completeMatch = async (client, matchId, result) => {
+  await client.query(
+    `UPDATE matches
+        SET status = 'completed'::match_status,
+            completed_at = now(),
+            winning_team_id = $2,
+            result_type = $3,
+            result_margin = $4,
+            result_summary = $5,
+            updated_at = now()
+      WHERE matches_id = $1`,
+    [
+      matchId,
+      result.winningTeamId || null,
+      result.resultType || null,
+      result.resultMargin || null,
+      result.resultSummary || null
+    ]
   );
 };
 
@@ -342,6 +382,15 @@ const insertDismissal = async (client, p) => {
   return r.rows[0];
 };
 
+const insertFallOfWicket = async (client, p) => {
+  await client.query(
+    `INSERT INTO fall_of_wickets
+       (innings_id, wicket_number, dismissed_batter_id, runs_at_fall, balls_at_fall, over_at_fall)
+     VALUES ($1,$2,$3,$4,$5,$6)`,
+    [p.inningsId, p.wicketNumber, p.dismissedBatterId, p.runsAtFall, p.ballsAtFall, p.overAtFall]
+  );
+};
+
 const getDismissalForDelivery = async (db, deliveryId) => {
   const r = await db.query(`SELECT * FROM dismissals WHERE delivery_id = $1`, [deliveryId]);
   return r.rows[0] || null;
@@ -354,6 +403,55 @@ const deleteDismissalForDelivery = async (client, deliveryId) => {
     [deliveryId]
   );
   await client.query(`DELETE FROM dismissals WHERE delivery_id = $1`, [deliveryId]);
+};
+
+const getOrCreatePartnership = async (client, p) => {
+  const r = await client.query(
+    `SELECT * FROM partnerships
+      WHERE innings_id = $1
+        AND wicket_number = $2
+        AND ended_at_runs IS NULL
+        AND ((batter1_id = $3 AND batter2_id = $4) OR (batter1_id = $4 AND batter2_id = $3))
+      LIMIT 1`,
+    [p.inningsId, p.wicketNumber, p.batter1Id, p.batter2Id]
+  );
+  if (r.rows[0]) return r.rows[0];
+  const created = await client.query(
+    `INSERT INTO partnerships
+       (innings_id, wicket_number, batter1_id, batter2_id, started_at_runs)
+     VALUES ($1,$2,$3,$4,$5)
+     RETURNING *`,
+    [p.inningsId, p.wicketNumber, p.batter1Id, p.batter2Id, p.startedAtRuns]
+  );
+  return created.rows[0];
+};
+
+const bumpPartnership = async (client, p) => {
+  const partner = await getOrCreatePartnership(client, p);
+  const batter1Runs = partner.batter1_id === p.strikerId ? p.batterRuns : 0;
+  const batter2Runs = partner.batter2_id === p.strikerId ? p.batterRuns : 0;
+  const batter1Balls = partner.batter1_id === p.strikerId ? p.batterBalls : 0;
+  const batter2Balls = partner.batter2_id === p.strikerId ? p.batterBalls : 0;
+  await client.query(
+    `UPDATE partnerships SET
+        runs = runs + $2,
+        balls = balls + $3,
+        batter1_runs = batter1_runs + $4,
+        batter1_balls = batter1_balls + $5,
+        batter2_runs = batter2_runs + $6,
+        batter2_balls = batter2_balls + $7
+      WHERE partnerships_id = $1`,
+    [partner.partnerships_id, p.totalRuns || 0, p.legalBalls || 0, batter1Runs, batter1Balls, batter2Runs, batter2Balls]
+  );
+};
+
+const endActivePartnership = async (client, inningsId, wicketNumber, endedAtRuns) => {
+  await client.query(
+    `UPDATE partnerships
+        SET ended_at_runs = $3
+      WHERE innings_id = $1 AND wicket_number = $2 AND ended_at_runs IS NULL`,
+    [inningsId, wicketNumber, endedAtRuns]
+  );
 };
 
 // ─── Scorer assignments ─────────────────────────────────────────────────────
@@ -415,7 +513,7 @@ const findCompletedMatchesForScorer = async (scorerId) => {
 const getMatchPreviewRow = async (matchId) => {
   const r = await pool.query(
     `SELECT m.matches_id, m.match_date, m.scheduled_at, m.status, m.format,
-            m.overs_per_match, m.venue, m.city, m.country,
+            m.overs_per_match, m.venue, m.city, m.country, m.notes,
             m.host_club_id AS team1_id, m.opponent_club_id AS team2_id,
             c1.club_name AS team1_name, c2.club_name AS team2_name
        FROM matches m
@@ -428,10 +526,15 @@ const getMatchPreviewRow = async (matchId) => {
 };
 const findTeamRoster = async (teamId) => {
   const r = await pool.query(
-    `SELECT players_id AS id, display_name AS name, primary_role AS role
+    `SELECT p.players_id AS id, p.display_name AS name, p.primary_role AS role
+       FROM team_players tp
+       JOIN players p ON p.players_id = tp.player_id
+      WHERE tp.team_id = $1 AND tp.left_at IS NULL AND p.is_active = true
+      UNION
+     SELECT players_id AS id, display_name AS name, primary_role AS role
        FROM players
       WHERE club_id = $1 AND is_active = true
-      ORDER BY jersey_number NULLS LAST, display_name ASC`,
+      ORDER BY name ASC`,
     [teamId]
   );
   return r.rows;
@@ -617,10 +720,13 @@ module.exports = {
   lockInnings,
   getInnings,
   getCurrentInnings,
+  getLatestInnings,
+  getInningsByNumber,
   createInnings,
   applyInningsDelta,
   setInningsStatus,
   setMatchStatus,
+  completeMatch,
   getOrCreateOver,
   updateOverAggregates,
   deleteOverIfEmpty,
@@ -639,8 +745,11 @@ module.exports = {
   bumpBowlingFigure,
   getBowlingFigure,
   insertDismissal,
+  insertFallOfWicket,
   getDismissalForDelivery,
   deleteDismissalForDelivery,
+  bumpPartnership,
+  endActivePartnership,
   findAssignedMatches,
   findCompletedMatchesForScorer,
   getMatchPreviewRow,

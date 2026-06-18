@@ -195,7 +195,9 @@ const listTeams = async (user) => {
     id: t.id,
     name: t.name,
     short_name: t.short_name,
+    logo_url: t.logo_url || '',
     home_ground: t.home_ground || '',
+    country: t.country || '',
     player_count: t.player_count
   }));
 };
@@ -206,11 +208,64 @@ const createTeam = async (user, input) => {
   const team = await repo.insertTeam({
     name: input.name,
     short_name: short,
+    logo_url: input.logo_url,
     home_ground: input.home_ground,
     country: input.country,
     created_by: user.user_id
   });
   return { team_id: team.id, name: team.name, short_name: team.short_name };
+};
+
+const updateTeam = async (user, teamId, input) => {
+  const existing = await repo.findClubTeamById(user.club_id, teamId);
+  if (!existing) throw new AppError('Team not found for your club', 404);
+  const short = input.short_name
+    || input.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 4).toUpperCase();
+  const team = await repo.updateTeam(teamId, {
+    name: input.name,
+    short_name: short,
+    logo_url: input.logo_url,
+    home_ground: input.home_ground,
+    country: input.country
+  });
+  return team;
+};
+
+const deleteTeam = async (user, teamId) => {
+  const existing = await repo.findClubTeamById(user.club_id, teamId);
+  if (!existing) throw new AppError('Team not found for your club', 404);
+  await repo.softDeleteTeam(teamId);
+  return { success: true };
+};
+
+const listTeamPlayers = async (user, teamId) => {
+  const existing = await repo.findClubTeamById(user.club_id, teamId);
+  if (!existing) throw new AppError('Team not found for your club', 404);
+  const rows = await repo.findTeamPlayers(teamId);
+  return rows.map((p) => ({
+    id: p.id,
+    name: p.name,
+    role: p.role,
+    email: p.email,
+    status: 'Active',
+    below_18: !!p.below_18
+  }));
+};
+
+const addTeamPlayer = async (user, teamId, playerId) => {
+  const existing = await repo.findClubTeamById(user.club_id, teamId);
+  if (!existing) throw new AppError('Team not found for your club', 404);
+  const playerOk = await repo.playerBelongsToClub(user.club_id, playerId);
+  if (!playerOk) throw new AppError('Player not found in your club', 400);
+  await repo.addTeamPlayer(teamId, playerId);
+  return { success: true };
+};
+
+const removeTeamPlayer = async (user, teamId, playerId) => {
+  const existing = await repo.findClubTeamById(user.club_id, teamId);
+  if (!existing) throw new AppError('Team not found for your club', 404);
+  await repo.removeTeamPlayer(teamId, playerId);
+  return { success: true };
 };
 
 const assignScorer = async (user, input) => {
@@ -242,6 +297,11 @@ module.exports = {
   listScorers,
   listTeams,
   createTeam,
+  updateTeam,
+  deleteTeam,
+  listTeamPlayers,
+  addTeamPlayer,
+  removeTeamPlayer,
   assignScorer,
   TENANT_MISMATCH,
   platformRoleFor

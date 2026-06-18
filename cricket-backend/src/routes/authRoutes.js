@@ -21,4 +21,12 @@ router.get('/club/pending-players', authenticate, ctrl.getPendingClubMembers);
 // 2. Kisi dynamic player request ko accept/approve karne ke liye
 router.post('/club/approve-player', authenticate, ctrl.approveClubMember);
 
+// ─── 🔥 PASSWORD RESET ENDPOINTS ─────────────────────────────────────────────
+
+router.post('/forgot-password', ctrl.forgotPassword);
+router.post('/verify-reset-otp', ctrl.verifyResetOtp);
+router.post('/reset-password', ctrl.resetPassword);  
+// Auth routes file mein
+router.get('/realtime-token', ctrl.getRealtimeToken); 
+
 module.exports = router;

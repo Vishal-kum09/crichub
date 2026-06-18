@@ -175,6 +175,12 @@ const nextDeliverySequence = async (client, inningsId) => {
 };
 
 const insertDelivery = async (client, p) => {
+  let batsmanHand = p.batsmanhand;
+  if (p.batsmanHand === 'right') {
+    batsmanHand = 'Right_hand';
+  } else if (p.batsmanHand === 'left') {
+    batsmanHand = 'Left_hand';
+  }
   const r = await client.query(
     `INSERT INTO deliveries
        (innings_id, over_id, over_number, ball_in_over, delivery_sequence,

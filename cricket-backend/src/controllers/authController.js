@@ -1,8 +1,12 @@
 // Auth controllers + Zod request schemas. Validation errors are ZodErrors,
 // translated to 400 by the central errorHandler.
 const { z } = require('zod');
+const bcrypt = require('bcrypt'); // 🔥 Moved here
 const authService = require('../services/authService');
 const { sendOtpEmail } = require('../services/EmailService');
+
+// 🔥 DATABASE IMPORT ADDED (Path check kar lena agar 'db' ki jagah 'database' ho)
+const {  query } = require('../../db'); // Raw query helper for fail-safe backup
 
 // ─── Zod schemas (fields map to real column names) ──────────────────────────
 
@@ -13,7 +17,7 @@ const RegisterIndividualSchema = z.object({
   password: z.string().min(8),
   phone: z.string().min(7).optional(),
   display_name: z.string().min(1).optional(),
-  club_id: z.string().optional().nullable(), // Kept flexible as string/UUID for fresh alignment
+  club_id: z.string().optional().nullable(),
   account_role: z.string().optional(),
   
   player_profile: z.object({
@@ -30,11 +34,10 @@ const RegisterIndividualSchema = z.object({
   }).optional()
 });
 
-// 🔥 ALIGNED WITH FRESH 'club' TABLE COLUMNS STRUCTURE
 const RegisterClubSchema = z.object({
   club: z.object({
     name: z.string().min(1),
-    display_name: z.string().min(1).optional(), // Short_name replaced cleanly with display_name
+    display_name: z.string().min(1).optional(),
     home_ground: z.string().optional(),
     country: z.string().optional()
   }),
@@ -120,11 +123,9 @@ const me = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// 🔥 MATCH WIZARD DROPDOWN BYPASS LINK
 const listClubs = async (req, res, next) => {
   try {
     const clubs = await authService.listApprovedClubs();
-    // Directly sending array payload so that frontend `allGlobalClubs.map` doesn't crash
     res.status(200).json(clubs);
   } catch (err) { next(err); }
 };
@@ -170,6 +171,122 @@ const approveClubMember = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// ─── FORGOT PASSWORD HANDLERS ─────────────────────────────────────────────
+
+// 1. Send OTP for Password Reset
+const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  try {
+    // Check if user exists in the main users table
+    const userResult = await query('SELECT * FROM users WHERE email = $1', [email]);
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User with this email does not exist' });
+    }
+
+    // Generate 6-digit OTP and Expiry (10 minutes)
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); 
+
+    // Insert new OTP record
+    await query(
+      `INSERT INTO otp_verifications (email, code, expires_at, verified, created_at) 
+       VALUES ($1, $2, $3, false, NOW())`,
+      [email, otp, expiresAt]
+    );
+
+    // 🔥 USING YOUR EXISTING EMAIL SERVICE INSTEAD OF RAW TRANSPORTER
+    await sendOtpEmail(email, otp.toString());
+
+    res.json({ message: 'OTP sent successfully' });
+  } catch (error) {
+    console.error('Forgot Password Error:', error);
+    res.status(500).json({ error: 'Failed to send OTP' });
+  }
+};
+
+// 2. Verify OTP
+const verifyResetOtp = async (req, res) => {
+  const { email, otp } = req.body;
+  try {
+    const otpResult = await query(
+      `SELECT * FROM otp_verifications 
+       WHERE email = $1 AND code = $2 
+       ORDER BY created_at DESC LIMIT 1`,
+      [email, otp]
+    );
+
+    const otpRecord = otpResult.rows[0];
+
+    if (!otpRecord) {
+      return res.status(400).json({ error: 'Invalid OTP' });
+    }
+    if (new Date() > new Date(otpRecord.expires_at)) {
+      return res.status(400).json({ error: 'OTP has expired' });
+    }
+
+    await query(
+      'UPDATE otp_verifications SET verified = true WHERE otp_verifications_id = $1',
+      [otpRecord.otp_verifications_id]
+    );
+
+    res.json({ message: 'OTP verified successfully' });
+  } catch (error) {
+    console.error('Verify OTP Error:', error);
+    res.status(500).json({ error: 'Failed to verify OTP' });
+  }
+};
+
+// 3. Reset Password
+const resetPassword = async (req, res) => {
+  const { email, newPassword } = req.body;
+  try {
+    const verificationCheck = await query(
+      `SELECT * FROM otp_verifications 
+       WHERE email = $1 AND verified = true 
+       ORDER BY created_at DESC LIMIT 1`,
+      [email]
+    );
+
+    if (verificationCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Email not verified. Please verify OTP first.' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    await query(
+  'UPDATE users SET password_hash = $1 WHERE email = $2',
+  [hashedPassword, email]
+);
+
+    await query('DELETE FROM otp_verifications WHERE email = $1', [email]);
+
+    res.json({ message: 'Password reset successfully' });
+  } catch (error) {
+    console.error('Reset Password Error:', error);
+    res.status(500).json({ error: 'Failed to reset password' });
+  }
+};
+
+// 🎙️ Get Realtime Gateway Token for Live Commentary
+const getRealtimeToken = async (req, res, next) => {
+  try {
+    // Process.env se token read karega (Local pe local .env, Live pe live settings)
+    const token = process.env.REALTIME_CLIENT_TOKEN;
+    
+    if (!token) {
+      return res.status(500).json({ error: 'Realtime token configuration missing on server.' });
+    }
+
+    res.status(200).json({ 
+      success: true, 
+      token: token 
+    });
+  } catch (err) { 
+    next(err); 
+  }
+};
+
 module.exports = {
   register,
   registerClub,
@@ -182,5 +299,9 @@ module.exports = {
   approveClubMember,
   RegisterIndividualSchema,
   RegisterClubSchema,
-  LoginSchema
+  LoginSchema,
+  forgotPassword,
+  verifyResetOtp,
+  resetPassword,
+  getRealtimeToken
 };

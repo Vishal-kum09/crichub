@@ -39,6 +39,18 @@ const CreateMatchSchema = z.object({
   assigned_scorer_id: z.string().uuid()
 });
 
+const TeamSchema = z.object({
+  name: z.string().min(1).max(120),
+  short_name: z.string().min(1).max(20).optional().nullable(),
+  logo_url: z.string().url().optional().or(z.literal('')).nullable(),
+  home_ground: z.string().max(120).optional().nullable(),
+  country: z.string().max(80).optional().nullable()
+});
+
+const TeamPlayerSchema = z.object({
+  player_id: z.string().uuid()
+});
+
 // HANDLERS
 const createMatch = async (req, res, next) => {
   const { query } = require('../../db');
@@ -196,8 +208,18 @@ const getRosterMatches = async (req, res, next) => {
 const getRosterPlayers = async (req, res, next) => {
   try {
     const { query } = require('../../db');
-    const result = await query('SELECT players_id, full_name, primary_role, contact_number FROM players WHERE club_id = $1 ORDER BY created_at DESC', [req.user.club_id]);
-    res.json({ count: result.rows.length, players: result.rows.map(r => ({ id: r.players_id, name: r.full_name, role: r.primary_role, email: r.contact_number, status: 'Active' })) });
+    const result = await query(
+      `SELECT players_id, full_name, primary_role, contact_number,
+              CASE
+                WHEN date_of_birth IS NULL THEN false
+                ELSE date_of_birth > (CURRENT_DATE - INTERVAL '18 years')
+              END AS below_18
+         FROM players
+        WHERE club_id = $1
+        ORDER BY created_at DESC`,
+      [req.user.club_id]
+    );
+    res.json({ count: result.rows.length, players: result.rows.map(r => ({ id: r.players_id, name: r.full_name, role: r.primary_role, email: r.contact_number, status: 'Active', below_18: !!r.below_18 })) });
   } catch (err) { next(err); }
 };
 
@@ -217,8 +239,46 @@ const getTeams = async (req, res, next) => {
 
 const createTeam = async (req, res, next) => {
   try {
-    const result = await clubAdminService.createTeam(req.user, req.body);
+    const data = TeamSchema.parse(req.body);
+    const result = await clubAdminService.createTeam(req.user, data);
     res.status(201).json(result);
+  } catch (err) { next(err); }
+};
+
+const updateTeam = async (req, res, next) => {
+  try {
+    const data = TeamSchema.parse(req.body);
+    const team = await clubAdminService.updateTeam(req.user, req.params.team_id, data);
+    res.json({ success: true, team });
+  } catch (err) { next(err); }
+};
+
+const deleteTeam = async (req, res, next) => {
+  try {
+    const result = await clubAdminService.deleteTeam(req.user, req.params.team_id);
+    res.json(result);
+  } catch (err) { next(err); }
+};
+
+const getTeamPlayers = async (req, res, next) => {
+  try {
+    const players = await clubAdminService.listTeamPlayers(req.user, req.params.team_id);
+    res.json({ count: players.length, players });
+  } catch (err) { next(err); }
+};
+
+const addTeamPlayer = async (req, res, next) => {
+  try {
+    const data = TeamPlayerSchema.parse(req.body);
+    const result = await clubAdminService.addTeamPlayer(req.user, req.params.team_id, data.player_id);
+    res.status(201).json(result);
+  } catch (err) { next(err); }
+};
+
+const removeTeamPlayer = async (req, res, next) => {
+  try {
+    const result = await clubAdminService.removeTeamPlayer(req.user, req.params.team_id, req.params.player_id);
+    res.json(result);
   } catch (err) { next(err); }
 };
 
@@ -261,6 +321,7 @@ const deletePlayerDirect = async (req, res, next) => {
 module.exports = {
   getPendingApprovals, updateApproval, createMatch, createTournament,
   getRosterMatches, getRosterPlayers, getRosterScorers, getTeams,
-  createTeam, assignScorer, directRegisterPlayer, updatePlayerDirect,
+  createTeam, updateTeam, deleteTeam, getTeamPlayers, addTeamPlayer, removeTeamPlayer,
+  assignScorer, directRegisterPlayer, updatePlayerDirect,
   deletePlayerDirect, getIncomingMatchRequests, acceptMatchRequest, rejectMatchRequest
 };

@@ -24,6 +24,11 @@ router.post('/tournaments', ctrl.createTournament);
 // Teams & Scorer dispatch
 router.get('/teams', ctrl.getTeams);
 router.post('/teams', ctrl.createTeam);
+router.put('/teams/:team_id', ctrl.updateTeam);
+router.delete('/teams/:team_id', ctrl.deleteTeam);
+router.get('/teams/:team_id/players', ctrl.getTeamPlayers);
+router.post('/teams/:team_id/players', ctrl.addTeamPlayer);
+router.delete('/teams/:team_id/players/:player_id', ctrl.removeTeamPlayer);
 router.post('/assign-scorer', ctrl.assignScorer);
 
 // Roster operations

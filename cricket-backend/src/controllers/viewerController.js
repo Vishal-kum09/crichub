@@ -2,6 +2,7 @@
 // errorHandler via next(err); missing resources raise AppError(404).
 const viewerService = require('../services/viewerService');
 const { AppError } = require('../middlewares/errorHandler');
+const { query } = require('../../db');
 
 const VALID_STATUS = new Set(['live', 'scheduled', 'completed', 'all']);
 
@@ -87,7 +88,33 @@ const getDashboardKpis = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// Backend Route: GET /api/viewer/matches/:matchId/wagon-wheel
+const getMatchWagonWheel = async (req, res, next) => {
+  const { matchId } = req.params;
+  try {
+    if (!isUuid(matchId)) throw new AppError('Match not found', 404);
+    const sql = `
+      SELECT 
+        d.runs_batter, 
+        d.is_boundary_four, 
+        d.is_boundary_six, 
+        d.wagon_x, 
+        d.wagon_y, 
+        p.batting_style
+      FROM deliveries d
+      JOIN innings i ON d.innings_id = i.innings_id
+      LEFT JOIN players p ON p.players_id = d.batter_id
+      WHERE i.match_id = $1 AND d.wagon_x IS NOT NULL;
+    `;
+    const result = await query(sql, [matchId]);
+    res.json({ success: true, shots: result.rows });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
+  getMatchWagonWheel,
   getMatches,
   getMatchById,
   getScorecard,

@@ -185,7 +185,7 @@ const getClubName = async (clubId) => {
 
 const findClubTeams = async (clubId) => {
   const r = await query(
-    `SELECT t.teams_id AS id, t.name, t.short_name, t.home_ground,
+    `SELECT t.teams_id AS id, t.name, t.short_name, t.logo_url, t.home_ground, t.country,
             (SELECT COUNT(*)::int FROM team_players tp
                WHERE tp.team_id = t.teams_id AND tp.left_at IS NULL) AS player_count
        FROM teams t
@@ -197,14 +197,104 @@ const findClubTeams = async (clubId) => {
   return r.rows;
 };
 
+const findClubTeamById = async (clubId, teamId) => {
+  const r = await query(
+    `SELECT t.teams_id AS id, t.name, t.short_name, t.logo_url, t.home_ground, t.country
+       FROM teams t
+      WHERE t.teams_id = $2
+        AND t.created_by IN (SELECT user_id FROM users WHERE club_id = $1)
+        AND t.is_active = true`,
+    [clubId, teamId]
+  );
+  return r.rows[0] || null;
+};
+
 const insertTeam = async (t) => {
   const r = await query(
-    `INSERT INTO teams (name, short_name, home_ground, country, created_by)
-     VALUES ($1,$2,$3,$4,$5)
-     RETURNING teams_id AS id, name, short_name, home_ground, country`,
-    [t.name, t.short_name, t.home_ground || null, t.country || null, t.created_by]
+    `INSERT INTO teams (name, short_name, logo_url, home_ground, country, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6)
+     RETURNING teams_id AS id, name, short_name, logo_url, home_ground, country`,
+    [t.name, t.short_name, t.logo_url || null, t.home_ground || null, t.country || null, t.created_by]
   );
   return r.rows[0];
+};
+
+const updateTeam = async (teamId, t) => {
+  const r = await query(
+    `UPDATE teams
+        SET name = $2,
+            short_name = $3,
+            logo_url = $4,
+            home_ground = $5,
+            country = $6
+      WHERE teams_id = $1
+      RETURNING teams_id AS id, name, short_name, logo_url, home_ground, country`,
+    [teamId, t.name, t.short_name, t.logo_url || null, t.home_ground || null, t.country || null]
+  );
+  return r.rows[0] || null;
+};
+
+const softDeleteTeam = async (teamId) => {
+  const r = await query(
+    `UPDATE teams SET is_active = false
+      WHERE teams_id = $1
+      RETURNING teams_id AS id`,
+    [teamId]
+  );
+  return r.rows[0] || null;
+};
+
+const findTeamPlayers = async (teamId) => {
+  const r = await query(
+    `SELECT p.players_id AS id,
+            p.full_name AS name,
+            p.primary_role AS role,
+            COALESCE(p.contact_number, '') AS email,
+            CASE
+              WHEN p.date_of_birth IS NULL THEN false
+              ELSE p.date_of_birth > (CURRENT_DATE - INTERVAL '18 years')
+            END AS below_18,
+            tp.squad_role
+       FROM team_players tp
+       JOIN players p ON p.players_id = tp.player_id
+      WHERE tp.team_id = $1 AND tp.left_at IS NULL
+      ORDER BY p.full_name ASC`,
+    [teamId]
+  );
+  return r.rows;
+};
+
+const playerBelongsToClub = async (clubId, playerId) => {
+  const r = await query(
+    `SELECT players_id FROM players
+      WHERE players_id = $2 AND club_id = $1 AND is_active = true`,
+    [clubId, playerId]
+  );
+  return !!r.rows[0];
+};
+
+const addTeamPlayer = async (teamId, playerId) => {
+  const r = await query(
+    `INSERT INTO team_players (team_id, player_id, squad_role, joined_at)
+     SELECT $1, $2, 'player'::squad_role_enum, CURRENT_DATE
+      WHERE NOT EXISTS (
+        SELECT 1 FROM team_players
+         WHERE team_id = $1 AND player_id = $2 AND left_at IS NULL
+      )
+     RETURNING team_players_id AS id`,
+    [teamId, playerId]
+  );
+  return r.rows[0] || null;
+};
+
+const removeTeamPlayer = async (teamId, playerId) => {
+  const r = await query(
+    `UPDATE team_players SET left_at = CURRENT_DATE
+      WHERE team_id = $1 AND player_id = $2 AND left_at IS NULL
+      RETURNING team_players_id AS id`,
+    [teamId, playerId]
+  );
+  return r.rows[0] || null;
 };
 
 const insertScorerAssignment = async (p) => {
@@ -251,7 +341,14 @@ module.exports = {
   findClubMembersByRole,
   getClubName,
   findClubTeams,
+  findClubTeamById,
   insertTeam,
+  updateTeam,
+  softDeleteTeam,
+  findTeamPlayers,
+  playerBelongsToClub,
+  addTeamPlayer,
+  removeTeamPlayer,
   insertScorerAssignment,
   matchBelongsToClub,
   scorerBelongsToClub

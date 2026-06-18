@@ -32,6 +32,7 @@ export interface RosterMember {
   email: string;
   role: string;
   status: string;
+  below_18?: boolean;
 }
 
 export interface CreateMatchPayload {
@@ -173,7 +174,9 @@ export interface ClubTeam {
   id: string;
   name: string;
   short_name: string;
+  logo_url?: string;
   home_ground: string;
+  country?: string;
   player_count: number;
 }
 
@@ -185,11 +188,40 @@ export async function getClubTeams(): Promise<ClubTeam[]> {
 export async function createTeam(payload: {
   name: string;
   short_name?: string;
+  logo_url?: string;
   home_ground?: string;
   country?: string;
 }): Promise<{ team_id: string }> {
   const { data } = await api.post('/api/club-admin/teams', payload);
   return data;
+}
+
+export async function updateClubTeam(teamId: string, payload: {
+  name: string;
+  short_name?: string;
+  logo_url?: string;
+  home_ground?: string;
+  country?: string;
+}): Promise<ClubTeam> {
+  const { data } = await api.put(`/api/club-admin/teams/${teamId}`, payload);
+  return data.team as ClubTeam;
+}
+
+export async function deleteClubTeam(teamId: string): Promise<void> {
+  await api.delete(`/api/club-admin/teams/${teamId}`);
+}
+
+export async function getClubTeamPlayers(teamId: string): Promise<RosterMember[]> {
+  const { data } = await api.get(`/api/club-admin/teams/${teamId}/players`);
+  return data.players as RosterMember[];
+}
+
+export async function addPlayerToClubTeam(teamId: string, playerId: string): Promise<void> {
+  await api.post(`/api/club-admin/teams/${teamId}/players`, { player_id: playerId });
+}
+
+export async function removePlayerFromClubTeam(teamId: string, playerId: string): Promise<void> {
+  await api.delete(`/api/club-admin/teams/${teamId}/players/${playerId}`);
 }
 
 export async function assignScorerToMatch(matchId: string, scorerId: string): Promise<void> {

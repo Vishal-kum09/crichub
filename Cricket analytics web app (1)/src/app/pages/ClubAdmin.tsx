@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Users, Trophy, Calendar, CheckCircle, XCircle, Trash2, Edit, ArrowRight, ArrowLeft, ShieldCheck, UserPlus, Save, X, Radio } from 'lucide-react';
+import { Users, Trophy, Search, Calendar, CheckCircle, XCircle, Trash2, Edit, ArrowRight, ArrowLeft, ShieldCheck, UserPlus, Save, X, Radio } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { toast } from '../../lib/toast';
@@ -8,23 +8,32 @@ import {
   getPendingApprovals,
   decideApproval,
   toAssignedRole,
-  createTournament as apiCreateTournament,
   getRosterMatches,
   getRosterPlayers,
   getRosterScorers,
   getGlobalApprovedClubs,
+  getClubTeams,
   createTeam as apiCreateTeam,
-  assignScorerToMatch,
+  updateClubTeam,
+  deleteClubTeam,
+  getClubTeamPlayers,
+  addPlayerToClubTeam,
+  removePlayerFromClubTeam,
   createPlayerDirectByAdmin, 
   type PendingApproval,
   type RosterMatch,
   type RosterMember,
+  type ClubTeam,
 } from '../../lib/adminApi';
 
 export function ClubAdmin() {
   const [activeTab, setActiveTab] = useState<'approvals' | 'my-matches' | 'create-match' | 'create-tournament' | 'roster'>('approvals');
   
-  const [rosterView, setRosterView] = useState<'players' | 'scorers'>('players');
+  // 🔥 ADDED NEW STATE VARIABLES FOR MATCH SEARCH & SORT
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  
+  const [rosterView, setRosterView] = useState<'players' | 'teams' | 'scorers'>('players');
   const [matchType, setMatchType] = useState<'club' | 'local'>('club');
   const [wizardStep, setWizardStep] = useState(1);
   const [showAddPlayerForm, setShowAddPlayerForm] = useState(false);
@@ -36,7 +45,14 @@ export function ClubAdmin() {
   const [myMatches, setMyMatches] = useState<RosterMatch[]>([]);
   const [myPlayers, setMyPlayers] = useState<RosterMember[]>([]);
   const [myScorers, setMyScorers] = useState<RosterMember[]>([]);
+  const [myTeams, setMyTeams] = useState<ClubTeam[]>([]);
+  const [teamPlayers, setTeamPlayers] = useState<RosterMember[]>([]);
   const [globalClubs, setGlobalClubs] = useState<any[]>([]);
+  const [showTeamForm, setShowTeamForm] = useState(false);
+  const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [teamPlayerSearch, setTeamPlayerSearch] = useState('');
+  const [teamForm, setTeamForm] = useState({ name: '', short_name: '', logo_url: '', home_ground: '', country: 'India' });
   
   const [incomingInvites, setIncomingInvites] = useState<any[]>([]);
   const [selectedInvite, setSelectedInvite] = useState<any | null>(null);
@@ -53,10 +69,9 @@ export function ClubAdmin() {
     bowlingStyle: 'right_arm_fast', primaryRole: 'batter', nationality: 'India'
   });
 
-  // 🔥 STRICTLY ALIGNED TO DB MATCHES TABLE
   const [matchForm, setMatchForm] = useState({ 
     date: '', time: '', format: 'T20', ballType: 'leather', oversPerMatch: '20', 
-    venue: '', pitchNum: '', venueNeutral: false, city: '', country: 'India',
+    venue: '', pitchNum: '', venueNeutral: false, city: '', country: '',
     opponentClubId: '', selectedSquadIds: [] as string[], assignedScorerId: '' 
   });
   
@@ -79,6 +94,11 @@ export function ClubAdmin() {
     getRosterMatches().then(setMyMatches).catch(() => setMyMatches([]));
     getRosterPlayers().then((data: any) => setMyPlayers(data.players || data)).catch(() => setMyPlayers([]));
     getRosterScorers().then(setMyScorers).catch(() => setMyScorers([]));
+    getClubTeams().then(setMyTeams).catch(() => setMyTeams([]));
+  };
+
+  const loadTeamPlayers = (teamId: string) => {
+    getClubTeamPlayers(teamId).then(setTeamPlayers).catch(() => setTeamPlayers([]));
   };
 
   useEffect(() => { 
@@ -183,6 +203,99 @@ export function ClubAdmin() {
     } catch (err: any) { toast.error('Failed to remove player'); }
   };
 
+  const resetTeamForm = () => {
+    setTeamForm({ name: '', short_name: '', logo_url: '', home_ground: '', country: 'India' });
+    setEditingTeamId(null);
+    setSelectedTeamId(null);
+    setTeamPlayers([]);
+    setTeamPlayerSearch('');
+  };
+
+  const handleStartCreateTeam = () => {
+    resetTeamForm();
+    setShowTeamForm(true);
+  };
+
+  const handleStartEditTeam = (team: ClubTeam) => {
+    setEditingTeamId(team.id);
+    setSelectedTeamId(team.id);
+    setTeamForm({
+      name: team.name || '',
+      short_name: team.short_name || '',
+      logo_url: team.logo_url || '',
+      home_ground: team.home_ground || '',
+      country: team.country || 'India'
+    });
+    setShowTeamForm(true);
+    loadTeamPlayers(team.id);
+  };
+
+  const handleTeamSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!teamForm.name.trim()) { toast.error('Enter team name.'); return; }
+    try {
+      const payload = {
+        name: teamForm.name.trim(),
+        short_name: teamForm.short_name.trim() || undefined,
+        logo_url: teamForm.logo_url.trim() || undefined,
+        home_ground: teamForm.home_ground.trim() || undefined,
+        country: teamForm.country.trim() || undefined
+      };
+      if (editingTeamId) {
+        await updateClubTeam(editingTeamId, payload);
+        toast.success('Team updated.');
+      } else {
+        const created = await apiCreateTeam(payload);
+        toast.success('Team created.');
+        setSelectedTeamId(created.team_id);
+        setEditingTeamId(created.team_id);
+        loadTeamPlayers(created.team_id);
+      }
+      getClubTeams().then(setMyTeams).catch(() => {});
+    } catch (err: any) {
+      toast.error('Failed to save team.');
+    }
+  };
+
+  const handleDeleteTeam = async (teamId: string) => {
+    if (!window.confirm('Delete this team? Existing historical records will be preserved.')) return;
+    try {
+      await deleteClubTeam(teamId);
+      toast.success('Team deleted.');
+      if (selectedTeamId === teamId) {
+        resetTeamForm();
+        setShowTeamForm(false);
+      }
+      getClubTeams().then(setMyTeams).catch(() => {});
+    } catch (err: any) {
+      toast.error('Failed to delete team.');
+    }
+  };
+
+  const handleAddTeamPlayer = async (playerId: string) => {
+    if (!selectedTeamId) return;
+    try {
+      await addPlayerToClubTeam(selectedTeamId, playerId);
+      toast.success('Player added to team.');
+      loadTeamPlayers(selectedTeamId);
+      getClubTeams().then(setMyTeams).catch(() => {});
+    } catch (err: any) {
+      toast.error('Could not add player.');
+    }
+  };
+
+  const handleRemoveTeamPlayer = async (playerId: string) => {
+    if (!selectedTeamId) return;
+    try {
+      await removePlayerFromClubTeam(selectedTeamId, playerId);
+      toast.success('Player removed from team.');
+      loadTeamPlayers(selectedTeamId);
+      getClubTeams().then(setMyTeams).catch(() => {});
+    } catch (err: any) {
+      toast.error('Could not remove player.');
+    }
+  };
+
   const handleToggleSquadMember = (playerId: string) => {
     setMatchForm(prev => {
       const updated = prev.selectedSquadIds.includes(playerId) ? prev.selectedSquadIds.filter(id => id !== playerId) : [...prev.selectedSquadIds, playerId];
@@ -190,7 +303,6 @@ export function ClubAdmin() {
     });
   };
 
-  // 🔥 SENDING STRICT DB PAYLOAD
   const handleCreateMatchFinalSubmission = async (e: React.FormEvent) => {
     e.preventDefault();
     if (matchForm.selectedSquadIds.length === 0) { toast.error("Select squad players."); return; }
@@ -237,6 +349,13 @@ export function ClubAdmin() {
     } catch (err: any) { toast.error('Failed to generate tournament'); }
   };
 
+  const teamPlayerIds = new Set(teamPlayers.map((player) => player.id));
+  const filteredTeamCandidates = myPlayers.filter((player) => {
+    const query = teamPlayerSearch.trim().toLowerCase();
+    const matchesSearch = !query || `${player.name} ${player.role}`.toLowerCase().includes(query);
+    return matchesSearch && !teamPlayerIds.has(player.id);
+  });
+
   return (
     <div className="space-y-6 text-black w-full px-2 sm:px-4 max-w-7xl mx-auto">
       {/* Header Panel */}
@@ -247,8 +366,8 @@ export function ClubAdmin() {
 
       {/* Tabs */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-        <button onClick={() => setActiveTab('approvals')} className={`p-3 rounded-xl text-xs font-bold flex flex-col items-center justify-center text-center border transition-all ${activeTab === 'approvals' ? 'bg-[#e60023] text-white border-transparent shadow-sm font-black scale-[1.01]' : 'bg-white text-gray-500 border-gray-200'}`}><Users className="mb-1" size={18} /><span>Approval Queue</span></button>
-        <button onClick={() => setActiveTab('my-matches')} className={`p-3 rounded-xl text-xs font-bold flex flex-col items-center justify-center text-center border transition-all ${activeTab === 'my-matches' ? 'bg-[#e60023] text-white border-transparent shadow-sm font-black scale-[1.01]' : 'bg-white text-gray-500 border-gray-200'}`}><Calendar className="mb-1" size={18} /><span>My Matches</span></button>
+        <button onClick={() => setActiveTab('approvals')} className={`p-3 rounded-xl text-xs font-bold flex flex-col items-center justify-center text-center border transition-all ${activeTab === 'approvals' ? 'bg-[#e60023] text-white border-transparent shadow-sm font-black scale-[1.01]' : 'bg-white text-gray-500 border-gray-200'}`}><Users className="mb-1" size={18} /><span>Approval Section</span></button>
+        <button onClick={() => setActiveTab('my-matches')} className={`p-3 rounded-xl text-xs font-bold flex flex-col items-center justify-center text-center border transition-all ${activeTab === 'my-matches' ? 'bg-[#e60023] text-white border-transparent shadow-sm font-black scale-[1.01]' : 'bg-white text-gray-500 border-gray-200'}`}><Calendar className="mb-1" size={18} /><span>Scheduled Matches</span></button>
         <button onClick={() => { setActiveTab('create-match'); setWizardStep(1); }} className={`p-3 rounded-xl text-xs font-bold flex flex-col items-center justify-center text-center border transition-all ${activeTab === 'create-match' ? 'bg-[#e60023] text-white border-transparent shadow-sm font-black scale-[1.01]' : 'bg-white text-gray-500 border-gray-200'}`}><Trophy className="mb-1" size={18} /><span>Create Match</span></button>
         <button onClick={() => setActiveTab('create-tournament')} className={`p-3 rounded-xl text-xs font-bold flex flex-col items-center justify-center text-center border transition-all ${activeTab === 'create-tournament' ? 'bg-[#e60023] text-white border-transparent shadow-sm font-black scale-[1.01]' : 'bg-white text-gray-500 border-gray-200'}`}><Calendar className="mb-1" size={18} /><span>Tournament Wizard</span></button>
         <button onClick={() => { setActiveTab('roster'); setRosterView('players'); }} className={`p-3 rounded-xl text-xs font-bold flex flex-col items-center justify-center text-center border transition-all ${activeTab === 'roster' ? 'bg-[#e60023] text-white border-transparent shadow-sm font-black scale-[1.01]' : 'bg-white text-gray-500 border-gray-200'}`}><Users className="mb-1" size={18} /><span>Roster Panel</span></button>
@@ -260,35 +379,8 @@ export function ClubAdmin() {
         {activeTab === 'approvals' && (
           <div className="space-y-6">
             <div className="space-y-4">
-              <h2 className="text-lg font-black text-gray-900 border-b pb-2">Pending Registrations Queue</h2>
-              {pendingApprovals.length === 0 ? (
-                <div className="text-center py-6 text-sm font-bold text-gray-400 border border-dashed rounded-xl">All clean! No pending club approvals.</div>
-              ) : (
-                <div className="space-y-3">
-                  {pendingApprovals.map((approval) => (
-                    <div key={approval.id} className="border border-gray-200 rounded-xl p-4 hover:bg-gray-50/40 transition-all">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-extrabold text-sm text-gray-900">{approval.name}</h3>
-                            <span className="px-2 py-0.5 bg-red-50 text-[#e60023] text-[10px] font-black rounded-md border border-red-100 uppercase">{approval.role}</span>
-                          </div>
-                          <p className="text-xs text-gray-500 font-semibold">Email: <span className="text-gray-700">{approval.email}</span></p>
-                        </div>
-                        <div className="flex gap-2 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
-                          <button onClick={() => handleApprove(approval.id)} className="flex-1 sm:flex-initial flex items-center justify-center gap-1 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm"><CheckCircle size={14} /> Approve</button>
-                          <button onClick={() => handleReject(approval.id)} className="flex-1 sm:flex-initial flex items-center justify-center gap-1 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-bold"><XCircle size={14} /> Reject</button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-4 pt-4 border-t border-gray-100">
               <h2 className="text-lg font-black text-gray-900 border-b pb-2 flex items-center gap-2">
-                <Radio className="text-[#e60023] animate-pulse" size={18} /> Incoming Cross-Club Match Challenges
+                <Radio className="text-[#e60023] animate-pulse" size={18} /> Upcoming Matches
               </h2>
               
               {!selectedInvite ? (
@@ -296,8 +388,8 @@ export function ClubAdmin() {
                   <div className="text-center py-8 text-sm font-bold text-gray-400 border border-dashed rounded-xl">No incoming club match invites right now.</div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {incomingInvites.map((invite) => (
-                      <div key={invite.id} className="border border-gray-200 rounded-xl p-4 bg-gradient-to-br from-white to-gray-50/50 space-y-3">
+                    {incomingInvites.map((invite, index) => (
+                      <div key={invite.id || invite.matches_id || `invite-${index}`} className="border border-gray-200 rounded-xl p-4 bg-gradient-to-br from-white to-gray-50/50 space-y-3">
                         <div className="flex justify-between items-start">
                           <div>
                             <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-100 rounded text-[10px] font-black uppercase tracking-wider">{invite.format} • {invite.ball_type}</span>
@@ -396,59 +488,176 @@ export function ClubAdmin() {
                 </div>
               )}
             </div>
+
+            <div className="space-y-4 pt-4 border-t border-gray-100">
+              <h2 className="text-lg font-black text-gray-900 border-b pb-2">Pending Registration Approval</h2>
+              {pendingApprovals.length === 0 ? (
+                <div className="text-center py-6 text-sm font-bold text-gray-400 border border-dashed rounded-xl">All clean! No pending club approvals.</div>
+              ) : (
+                <div className="space-y-3">
+                  {pendingApprovals.map((approval) => (
+                    <div key={approval.id} className="border border-gray-200 rounded-xl p-4 hover:bg-gray-50/40 transition-all">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-extrabold text-sm text-gray-900">{approval.name}</h3>
+                            <span className="px-2 py-0.5 bg-red-50 text-[#e60023] text-[10px] font-black rounded-md border border-red-100 uppercase">{approval.role}</span>
+                          </div>
+                          <p className="text-xs text-gray-500 font-semibold">Email: <span className="text-gray-700">{approval.email}</span></p>
+                        </div>
+                        <div className="flex gap-2 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
+                          <button onClick={() => handleApprove(approval.id)} className="flex-1 sm:flex-initial flex items-center justify-center gap-1 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm"><CheckCircle size={14} /> Approve</button>
+                          <button onClick={() => handleReject(approval.id)} className="flex-1 sm:flex-initial flex items-center justify-center gap-1 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-bold"><XCircle size={14} /> Reject</button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
           </div>
         )}
 
-        {/* MY MATCHES */}
-        {activeTab === 'my-matches' && (
-          <div className="space-y-4">
-            <h2 className="text-lg font-black text-gray-900 border-b pb-2">All Scheduled Club Fixtures</h2>
-            {myMatches.length === 0 ? (
-              <div className="text-center py-12 text-sm font-bold text-gray-400">No active matches scheduled.</div>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {myMatches.map((match) => (
-                  <div key={match.id} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md transition-all">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Club Fixture</p>
-                        <h3 className="text-base font-black text-gray-900 mt-1">{match.opponent}</h3>
-                      </div>
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase border ${match.status === 'scheduled' ? 'bg-blue-50 text-blue-700 border-blue-200' : match.status === 'completed' ? 'bg-gray-100 text-gray-700 border-gray-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
-                        {match.status}
-                      </span>
-                    </div>
-                    {(match.live_score || match.team1_score || match.team2_score) && (
-                      <div className="mt-4 rounded-xl bg-gray-50 border border-gray-100 p-4">
-                        {match.status === 'live' && match.live_score ? (
-                          <>
-                            <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Live Score</p>
-                            <p className="text-2xl font-black text-gray-900 tabular-nums">{match.live_score}</p>
-                          </>
-                        ) : (
-                          <div className="grid grid-cols-2 gap-3 text-sm">
-                            <div>
-                              <p className="text-[10px] font-black uppercase text-gray-400">Innings 1</p>
-                              <p className="font-black text-gray-900 tabular-nums">{match.team1_score || '-'}</p>
-                            </div>
-                            <div>
-                              <p className="text-[10px] font-black uppercase text-gray-400">Innings 2</p>
-                              <p className="font-black text-gray-900 tabular-nums">{match.team2_score || '-'}</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    <div className="mt-4 grid grid-cols-2 gap-3 text-xs font-bold text-gray-500">
-                      <p>{new Date(match.date).toLocaleDateString()}</p>
-                      <p className="text-right truncate">{match.venue}</p>
-                    </div>
+        {/* 🔥 COMPLETELY UPDATED MY MATCHES SECTION */}
+        {activeTab === 'my-matches' && (() => {
+          const processedMatches = [...myMatches]
+            .filter((match) =>
+              match.opponent?.toLowerCase().includes(searchTerm.toLowerCase())
+            )
+            .sort((a, b) => {
+              if (a.status === 'live' && b.status !== 'live') return -1;
+              if (b.status === 'live' && a.status !== 'live') return 1;
+
+              const dateA = new Date(a.date).getTime();
+              const dateB = new Date(b.date).getTime();
+
+              return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+            });
+
+          return (
+            
+            <div className="space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-4">
+                <div>
+                  <h2 className="text-lg font-black text-gray-900">All Scheduled Club Fixtures</h2>
+                  <p className="text-xs text-gray-500 font-medium">Manage and monitor live and upcoming matches</p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="relative min-w-[240px]">
+                    <input
+                      type="text"
+                      placeholder="Search by team..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-900 placeholder-gray-400 focus:border-gray-900 focus:outline-none transition-colors"
+                    />
                   </div>
-                ))}
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black text-gray-400 uppercase tracking-wider">Sort Date:</span>
+                    <select
+                      value={sortOrder}
+                      onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
+                      className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-black text-gray-900 focus:border-gray-900 focus:outline-none transition-colors cursor-pointer"
+                    >
+                      <option value="asc">Ascending (Closest)</option>
+                      <option value="desc">Descending (Furthest)</option>
+                    </select>
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
-        )}
+
+              {processedMatches.length === 0 ? (
+                <div className="text-center py-12 text-sm font-bold text-gray-400 bg-white rounded-2xl border border-gray-200 shadow-sm">
+                  No matches found matching your criteria.
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-sm">
+                  <table className="w-full min-w-[800px] text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-200 bg-gray-50 text-[11px] font-black uppercase tracking-wider text-gray-400">
+                        <th className="p-4">Date</th>
+                        <th className="p-4">Fixture / Teams</th>
+                        <th className="p-4">Venue</th>
+                        <th className="p-4">Format</th>
+                        <th className="p-4">Tournament</th>
+                        <th className="p-4 text-right">Status / Score</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {processedMatches.map((matchItem, index) => {
+                        // Bypass TypeScript complaining about DB properties not in RosterMatch interface
+                        const match = matchItem as any; 
+                        
+                        return (
+                          <tr 
+                            key={match.id || match.matches_id || `match-${index}`} 
+                            className={`hover:bg-gray-50/70 transition-colors ${
+                              match.status === 'live' ? 'bg-emerald-50/30' : ''
+                            }`}
+                          >
+                            <td className="p-4 text-sm font-black text-gray-900 tabular-nums">
+                              {new Date(match.date).toLocaleDateString(undefined, {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric'
+                              })}
+                            </td>
+
+                            <td className="p-4">
+                              <div className="text-sm font-black text-gray-900">{match.opponent}</div>
+                              <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Club Match</div>
+                            </td>
+
+                            <td className="p-4 text-sm font-bold text-gray-500 max-w-[180px] truncate">
+                              {match.venue || 'TBD'}
+                            </td>
+
+                            <td className="p-4">
+                              <span className="inline-block rounded-lg bg-gray-100 px-2 py-0.5 text-xs font-black text-gray-700 uppercase">
+                                {match.format || 'T20'}
+                              </span>
+                            </td>
+
+                            <td className="p-4 text-sm font-black text-gray-700">
+                              {match.tournament || 'Club Bilateral'}
+                            </td>
+
+                            <td className="p-4 text-right">
+                              <div className="flex flex-col items-end gap-1.5">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase border ${
+                                  match.status === 'scheduled' 
+                                    ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                                    : match.status === 'completed' 
+                                    ? 'bg-gray-100 text-gray-900 border-gray-300' 
+                                    : 'bg-emerald-50 text-emerald-700 border-emerald-200 animate-pulse'
+                                }`}>
+                                  {match.status === 'completed' ? (match.result || 'COMPLETED') : match.status}
+                                </span>
+                                
+                                {match.status === 'live' && match.live_score ? (
+                                  <span className="text-sm font-black text-emerald-700 tabular-nums bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-lg">
+                                    {match.live_score}
+                                  </span>
+                                ) : (match.team1_score || match.team2_score) ? (
+                                  <span className="text-xs font-bold text-gray-500 tabular-nums">
+                                    {match.team1_score || '-'} / {match.team2_score || '-'}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* CREATE MATCH WIZARD */}
         {activeTab === 'create-match' && (
@@ -461,14 +670,12 @@ export function ClubAdmin() {
                 <span className={`px-2 py-0.5 rounded-md ${wizardStep === 3 ? 'bg-[#e60023] text-white shadow-sm' : 'bg-gray-100'}`}>3. SCORER</span>
               </div>
             </div>
-
             {wizardStep === 1 && (
               <div className="flex gap-2 p-1 bg-gray-50 rounded-xl">
                 <button type="button" onClick={() => setMatchType('club')} className={`flex-1 py-2 px-3 text-xs font-black rounded-lg transition-all ${matchType === 'club' ? 'bg-white text-gray-900 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-700'}`}>Against Another Club</button>
                 <button type="button" onClick={() => setMatchType('local')} className={`flex-1 py-2 px-3 text-xs font-black rounded-lg transition-all ${matchType === 'local' ? 'bg-white text-gray-900 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-700'}`}>Internal Local Match</button>
               </div>
             )}
-
             {wizardStep === 1 && (
               <div className="space-y-4 animate-fadeIn">
                 {matchType === 'club' && (
@@ -482,15 +689,14 @@ export function ClubAdmin() {
                     </select>
                   </div>
                 )}
-
-                {/* ALIGNED TO MATCHES TABLE FIELDS */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-black text-gray-500 uppercase mb-1">Format *</label>
                     <select value={matchForm.format} onChange={(e) => setMatchForm({ ...matchForm, format: e.target.value })} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white text-xs font-bold focus:outline-none">
                       <option value="T20">T20</option>
-                      <option value="ODI">ODI (50 Overs)</option>
-                      <option value="Test">Test Match</option>
+                      <option value="50 Overs">50 Overs</option>
+                      <option value="Multi Day">Multi Day</option>
+                      <option value="National Cup">National Cup(40 Overs)</option>
                       <option value="Custom">Custom</option>
                     </select>
                   </div>
@@ -500,7 +706,7 @@ export function ClubAdmin() {
                       <option value="Red Leather Ball">Red Leather Ball</option>
                       <option value="White Leather Ball">White Leather Ball</option>
                       <option value="Pink Leather Ball">Pink Leather Ball</option>
-                      <option value="Tennis Ball">Tennis Ball</option>
+                      <option value="Soft Ball">Soft Ball</option>
                     </select>
                   </div>
                   <div>
@@ -532,12 +738,10 @@ export function ClubAdmin() {
                     <Input type="number" placeholder="e.g. 1" value={matchForm.pitchNum} onChange={(e) => setMatchForm({ ...matchForm, pitchNum: e.target.value })} />
                   </div>
                 </div>
-
                 <div className="flex items-center gap-2 p-3 border border-gray-200 rounded-xl bg-gray-50 mt-2">
                   <input type="checkbox" id="neutral_venue" checked={matchForm.venueNeutral} onChange={(e) => setMatchForm({ ...matchForm, venueNeutral: e.target.checked })} className="h-4 w-4 accent-[#e60023]" />
                   <label htmlFor="neutral_venue" className="text-xs font-bold text-gray-700 cursor-pointer">Is this a Neutral Venue?</label>
                 </div>
-
                 <Button onClick={() => {
                   if (matchType === 'club' && !matchForm.opponentClubId) { toast.error("Choose an opponent club."); return; }
                   if (!matchForm.date || !matchForm.venue || !matchForm.city || !matchForm.country) { toast.error("Complete all required fields."); return; }
@@ -547,14 +751,12 @@ export function ClubAdmin() {
                 </Button>
               </div>
             )}
-
             {wizardStep === 2 && (
               <div className="space-y-4 animate-fadeIn">
                 <div className="bg-gray-50 border border-gray-200 p-3 rounded-xl text-xs text-gray-500 font-semibold">
                   <h4 className="font-extrabold text-gray-900 mb-0.5">Select Playing Squad</h4>
                   <p>Checkmark players assigned to represent the club line-up.</p>
                 </div>
-
                 {myPlayers.length === 0 ? (
                   <div className="text-center py-6 text-xs text-gray-400 font-bold">Approved player roster is empty.</div>
                 ) : (
@@ -573,7 +775,6 @@ export function ClubAdmin() {
                     })}
                   </div>
                 )}
-
                 <div className="flex gap-2 pt-2">
                   <Button onClick={() => setWizardStep(1)} variant="secondary" className="flex-1 flex items-center justify-center gap-1 text-xs font-bold py-2.5 rounded-xl"><ArrowLeft size={14} /> Back</Button>
                   <Button onClick={() => {
@@ -583,7 +784,6 @@ export function ClubAdmin() {
                 </div>
               </div>
             )}
-
             {wizardStep === 3 && (
               <form onSubmit={handleCreateMatchFinalSubmission} className="space-y-4 animate-fadeIn">
                 <div>
@@ -595,13 +795,11 @@ export function ClubAdmin() {
                     ))}
                   </select>
                 </div>
-
                 <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl text-xs space-y-1.5 text-gray-500 font-semibold shadow-inner">
                   <h5 className="font-extrabold text-gray-800 flex items-center gap-1 mb-1 text-sm"><ShieldCheck className="text-green-600" size={16} /> Summary Checklist Telemetry</h5>
                   <p>• <span className="font-extrabold text-gray-700">Format Structure:</span> {matchForm.format} Match | <span className="capitalize">{matchForm.ballType}</span> Ball</p>
                   <p>• <span className="font-extrabold text-gray-700">Venue Ground:</span> {matchForm.venue}, {matchForm.city} on {matchForm.date} @ {matchForm.time}</p>
                 </div>
-
                 <div className="flex gap-2">
                   <Button type="button" onClick={() => setWizardStep(2)} variant="secondary" className="flex-1 flex items-center justify-center gap-1 text-xs font-bold py-2.5 rounded-xl"><ArrowLeft size={14} /> Back</Button>
                   <Button type="submit" variant="primary" className="flex-1 shadow-md bg-green-600 hover:bg-green-700 text-white font-bold text-xs py-2.5 rounded-xl border-none">Schedule Active Match</Button>
@@ -648,7 +846,8 @@ export function ClubAdmin() {
           <div className="space-y-4">
             <div className="flex gap-2 border-b border-gray-200 py-1">
               <button onClick={() => setRosterView('players')} className={`px-4 py-2 text-xs font-black transition-all relative uppercase ${rosterView === 'players' ? 'text-[#e60023]' : 'text-gray-400 hover:text-gray-800'}`} >Club Players {rosterView === 'players' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#e60023]" />}</button>
-              <button onClick={() => setRosterView('scorers')} className={`px-4 py-2 text-xs font-black transition-all relative uppercase ${rosterView === 'scorers' ? 'text-[#e60023]' : 'text-gray-400 hover:text-gray-800'}`} >Club Scorers {rosterView === 'scorers' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#e60023]" />}</button>
+              <button onClick={() => setRosterView('teams')} className={`px-4 py-2 text-xs font-black transition-all relative uppercase ${rosterView === 'teams' ? 'text-[#e60023]' : 'text-gray-400 hover:text-gray-800'}`} >Club Teams {rosterView === 'teams' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#e60023]" />}</button>
+              <button onClick={() => setRosterView('scorers')} className={`px-4 py-2 text-xs font-black transition-all relative uppercase ${rosterView === 'scorers' ? 'text-[#e60023]' : 'text-gray-400 hover:text-gray-800'}`} >Club Officials {rosterView === 'scorers' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#e60023]" />}</button>
             </div>
 
             {/* PLAYERS SUBVIEW */}
@@ -663,7 +862,6 @@ export function ClubAdmin() {
                     <UserPlus size={14} /> {showAddPlayerForm ? 'Close Form' : 'Add New Player'}
                   </Button>
                 </div>
-
                 {showAddPlayerForm && (
                   <form onSubmit={handleAddPlayerSubmit} className="bg-red-50/10 border border-red-100 rounded-2xl p-4 md:p-5 space-y-4 shadow-inner animate-fadeIn">
                     <div className="flex items-center gap-1 text-[#e60023] font-black text-xs border-b pb-2 border-red-100/60 uppercase tracking-wider">
@@ -673,12 +871,11 @@ export function ClubAdmin() {
                       <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-1">First Name *</label><Input type="text" placeholder="e.g., Virat" required value={playerForm.firstName} onChange={(e) => setPlayerForm({ ...playerForm, firstName: e.target.value })} /></div>
                       <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Last Name</label><Input type="text" placeholder="e.g., Kohli" value={playerForm.lastName} onChange={(e) => setPlayerForm({ ...playerForm, lastName: e.target.value })} /></div>
                       <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Display Name *</label><Input type="text" placeholder="e.g., VIRAT" required value={playerForm.displayName} onChange={(e) => setPlayerForm({ ...playerForm, displayName: e.target.value })} /></div>
-                      
+
                       <div>
                         <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Jersey Number</label>
                         <Input type="number" placeholder="e.g., 18" value={playerForm.jerseyNumber} onChange={(e) => setPlayerForm({ ...playerForm, jerseyNumber: e.target.value })} />
                       </div>
-
                       <div>
                         <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Gender Identity *</label>
                         <select value={playerForm.gender} onChange={(e) => setPlayerForm({ ...playerForm, gender: e.target.value })} className="w-full p-2.5 border border-gray-200 rounded-xl bg-white text-xs font-bold text-gray-800" required>
@@ -686,7 +883,6 @@ export function ClubAdmin() {
                           <option value="female">Female</option>
                         </select>
                       </div>
-
                       <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Date of Birth</label><Input type="date" value={playerForm.dateOfBirth} onChange={(e) => setPlayerForm({ ...playerForm, dateOfBirth: e.target.value })} /></div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-bold">
@@ -710,7 +906,6 @@ export function ClubAdmin() {
                     </div>
                   </form>
                 )}
-
                 <div className="overflow-x-auto border border-gray-100 rounded-xl w-full">
                   <table className="w-full text-xs text-left whitespace-nowrap">
                     <thead>
@@ -768,7 +963,120 @@ export function ClubAdmin() {
                 </div>
               </div>
             )}
-
+            
+            {/* TEAMS SUBVIEW */}
+            {rosterView === 'teams' && (
+              <div className="space-y-4">
+                <div className="flex justify-between items-center bg-gray-50 border border-gray-200 p-3 rounded-xl gap-2">
+                  <div>
+                    <h4 className="text-xs font-black text-gray-900">Total Club Teams: {myTeams.length}</h4>
+                    <p className="text-[10px] text-gray-400 font-semibold">Teams are created for your club and linked through the club admin account.</p>
+                  </div>
+                  <Button onClick={handleStartCreateTeam} variant="primary" className="text-[11px] py-1.5 px-3 flex items-center gap-1 font-black bg-[#e60023] text-white rounded-lg shadow-sm border-none">
+                    <Trophy size={14} /> Create Team
+                  </Button>
+                </div>
+                {showTeamForm && (
+                  <form onSubmit={handleTeamSubmit} className="bg-red-50/10 border border-red-100 rounded-2xl p-4 md:p-5 space-y-4 shadow-inner animate-fadeIn">
+                    <div className="flex items-center justify-between gap-2 border-b pb-2 border-red-100/60">
+                      <div className="flex items-center gap-1 text-[#e60023] font-black text-xs uppercase tracking-wider">
+                        <Trophy size={16} /> {editingTeamId ? 'Edit Club Team' : 'Create Club Team'}
+                      </div>
+                      <button type="button" onClick={() => { resetTeamForm(); setShowTeamForm(false); }} className="p-1 text-gray-400 hover:text-gray-700"><X size={16} /></button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                      <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Name *</label><Input type="text" required value={teamForm.name} onChange={(e) => setTeamForm({ ...teamForm, name: e.target.value })} placeholder="e.g., Lions XI" /></div>
+                      <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Short Name</label><Input type="text" value={teamForm.short_name} onChange={(e) => setTeamForm({ ...teamForm, short_name: e.target.value })} placeholder="LXI" /></div>
+                      <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Logo URL</label><Input type="url" value={teamForm.logo_url} onChange={(e) => setTeamForm({ ...teamForm, logo_url: e.target.value })} placeholder="https://..." /></div>
+                      <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Home Ground</label><Input type="text" value={teamForm.home_ground} onChange={(e) => setTeamForm({ ...teamForm, home_ground: e.target.value })} placeholder="Main Oval" /></div>
+                      <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Country</label><Input type="text" value={teamForm.country} onChange={(e) => setTeamForm({ ...teamForm, country: e.target.value })} placeholder="India" /></div>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button type="submit" variant="primary" className="bg-[#e60023] hover:bg-red-700 text-white font-black py-2 px-6 rounded-xl border-none shadow-sm">
+                        <Save size={14} /> {editingTeamId ? 'Save Team' : 'Submit Team'}
+                      </Button>
+                    </div>
+                    {editingTeamId && (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">
+                        <div className="border border-gray-100 rounded-xl bg-white overflow-hidden">
+                          <div className="px-3 py-2 bg-gray-50 border-b border-gray-100">
+                            <h5 className="text-xs font-black text-gray-900">Players in Team: {teamPlayers.length}</h5>
+                          </div>
+                          <div className="divide-y divide-gray-100 max-h-72 overflow-y-auto">
+                            {teamPlayers.length === 0 ? (
+                              <div className="p-4 text-xs text-gray-400 font-bold text-center">No players added yet.</div>
+                            ) : teamPlayers.map((player) => (
+                              <div key={player.id} className="p-3 flex items-center justify-between gap-3">
+                                <div>
+                                  <p className="text-xs font-extrabold text-gray-900">{player.name}</p>
+                                  <p className="text-[10px] text-gray-400 capitalize">{player.role || 'Player'} | Below 18: {player.below_18 ? 'Yes' : 'No'}</p>
+                                </div>
+                                <button type="button" onClick={() => handleRemoveTeamPlayer(player.id)} className="p-1 text-gray-400 hover:text-[#e60023]"><Trash2 size={14} /></button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="border border-gray-100 rounded-xl bg-white overflow-hidden">
+                          <div className="p-3 bg-gray-50 border-b border-gray-100 space-y-2">
+                            <h5 className="text-xs font-black text-gray-900">Add Player</h5>
+                            <div className="relative">
+                              <Search className="absolute left-2.5 top-2.5 text-gray-400" size={14} />
+                              <Input type="text" value={teamPlayerSearch} onChange={(e) => setTeamPlayerSearch(e.target.value)} placeholder="Search club players..." className="pl-8 text-xs" />
+                            </div>
+                          </div>
+                          <div className="divide-y divide-gray-100 max-h-72 overflow-y-auto">
+                            {filteredTeamCandidates.length === 0 ? (
+                              <div className="p-4 text-xs text-gray-400 font-bold text-center">No matching club players available.</div>
+                            ) : filteredTeamCandidates.map((player) => (
+                              <div key={player.id} className="p-3 flex items-center justify-between gap-3 hover:bg-gray-50/50">
+                                <div>
+                                  <p className="text-xs font-extrabold text-gray-900">{player.name}</p>
+                                  <p className="text-[10px] text-gray-400 capitalize">{player.role || 'Player'} | Below 18: {player.below_18 ? 'Yes' : 'No'}</p>
+                                </div>
+                                <Button type="button" onClick={() => handleAddTeamPlayer(player.id)} variant="secondary" className="text-[10px] py-1 px-2 rounded-lg font-black">Add</Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </form>
+                )}
+                <div className="overflow-x-auto border border-gray-100 rounded-xl w-full">
+                  <table className="w-full text-xs text-left whitespace-nowrap">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200 text-gray-400 font-bold uppercase">
+                        <th className="py-3 px-4">Team Name</th>
+                        <th className="py-3 px-4">Short Name</th>
+                        <th className="py-3 px-4">Home Ground</th>
+                        <th className="py-3 px-4 text-center">Country</th>
+                        <th className="py-3 px-4 text-center">Players</th>
+                        <th className="py-3 px-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 font-semibold text-gray-700">
+                      {myTeams.map((team) => (
+                        <tr key={team.id} className="hover:bg-gray-50/30 transition-colors">
+                          <td className="py-3 px-4 font-extrabold text-gray-900">{team.name}</td>
+                          <td className="py-3 px-4">{team.short_name}</td>
+                          <td className="py-3 px-4 text-gray-500">{team.home_ground || '-'}</td>
+                          <td className="py-3 px-4 text-center text-gray-500">{team.country || '-'}</td>
+                          <td className="py-3 px-4 text-center"><span className="px-2 py-0.5 rounded text-[10px] font-black bg-gray-50 text-gray-600 border border-gray-200">{team.player_count}</span></td>
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex justify-end gap-2">
+                              <button onClick={() => handleStartEditTeam(team)} className="p-1 text-gray-400 hover:text-blue-600 transition-colors"><Edit size={14} /></button>
+                              <button onClick={() => handleDeleteTeam(team.id)} className="p-1 text-gray-400 hover:text-[#e60023] transition-colors"><Trash2 size={14} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+            
+            {/* SCORERS SUBVIEW */}
             {rosterView === 'scorers' && (
               <div className="overflow-x-auto border border-gray-100 rounded-xl w-full">
                 <table className="w-full text-xs text-left whitespace-nowrap">

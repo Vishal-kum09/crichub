@@ -271,16 +271,23 @@ const resetPassword = async (req, res) => {
 // 🎙️ Get Realtime Gateway Token for Live Commentary
 const getRealtimeToken = async (req, res, next) => {
   try {
-    // Process.env se token read karega (Local pe local .env, Live pe live settings)
     const token = process.env.REALTIME_CLIENT_TOKEN;
+    const realtimeUrl = process.env.REALTIME_GATEWAY_URL;
     
-    if (!token) {
-      return res.status(500).json({ error: 'Realtime token configuration missing on server.' });
+    if (!token || !realtimeUrl) {
+      return res.status(200).json({
+        success: true,
+        enabled: false,
+        token: null,
+        realtime_url: null
+      });
     }
 
     res.status(200).json({ 
       success: true, 
-      token: token 
+      enabled: true,
+      token,
+      realtime_url: realtimeUrl
     });
   } catch (err) { 
     next(err); 

@@ -39,3 +39,23 @@ exports.triggerDeliveryCommentary = async (matchId, deliveryId, userId) => {
     // Ignore error so scoring workflow is not blocked
   }
 };
+
+exports.invalidateDeliveryCommentary = async (matchId, deliveryId) => {
+  try {
+    const client = await auth.getIdTokenClient(COMMENTARY_AUDIENCE);
+    const response = await client.request({
+      url: `${COMMENTARY_API_URL}/commentary/invalidate-delivery`,
+      method: 'POST',
+      data: {
+        match_id: matchId,
+        delivery_id: deliveryId,
+        reason: 'delivery_undone'
+      }
+    });
+
+    console.log('AI Commentary invalidated:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Failed to invalidate AI Commentary:', error.message);
+  }
+};

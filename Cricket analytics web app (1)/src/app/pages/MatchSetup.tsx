@@ -62,6 +62,45 @@ export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
   const totalSteps = 5;
   const stepsList = ['Schedule', 'Playing XI', 'Toss Field', 'Settings Config', 'Strike Deck'];
 
+  // MatchSetup.tsx (Snippet)
+const [commentaryMode, setCommentaryMode] = useState('auto_with_manual_override');
+const [commentaryStyle, setCommentaryStyle] = useState('broadcast_english');
+
+{/* Commentary Configuration */}
+<div className="space-y-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+  <h4 className="font-bold text-gray-900">🎙️ AI Commentary Configuration</h4>
+  
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="space-y-1">
+      <label className="text-xs font-bold text-gray-500">Operation Mode</label>
+      <select 
+        value={commentaryMode} 
+        onChange={(e) => setCommentaryMode(e.target.value)}
+        className="w-full p-2.5 bg-white border rounded-xl"
+      >
+        <option value="auto_with_manual_override">Auto (AI) + Manual Override</option>
+        <option value="manual_only">Manual Only (No AI)</option>
+        <option value="off">Disabled</option>
+      </select>
+    </div>
+
+    <div className="space-y-1">
+      <label className="text-xs font-bold text-gray-500">Commentary Style</label>
+      <select 
+        value={commentaryStyle} 
+        onChange={(e) => setCommentaryStyle(e.target.value)}
+        className="w-full p-2.5 bg-white border rounded-xl"
+      >
+        <option value="broadcast_english">Standard Broadcast (English)</option>
+        <option value="analytical">Data & Analytical Focus</option>
+        <option value="dramatic">Dramatic & Exciting</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+
+
   // FETCH: Load Assigned Match Administrative Parameters from Real DB Connection
   useEffect(() => {
     if (!matchId) return;
@@ -89,6 +128,8 @@ export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
       })
       .finally(() => setLoading(false));
   }, [matchId]);
+
+
 
   const canProceed = () => {
     switch (currentStep) {

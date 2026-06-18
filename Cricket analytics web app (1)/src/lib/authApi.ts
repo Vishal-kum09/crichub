@@ -116,6 +116,6 @@ export const defaultRouteForRole = (role: AppUserRole): string => {
     case 'scorer': return '/assigned-matches';
     case 'club_admin': return '/admin';
     case 'super_admin': return '/super-admin';
-    default: return '/dashboard';
+    default: return '/matches';
   }
 };

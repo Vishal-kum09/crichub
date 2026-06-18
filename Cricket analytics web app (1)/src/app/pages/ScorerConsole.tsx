@@ -2,9 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Play, Pause, Save, ArrowLeft, Undo, Redo, MoreHorizontal, RotateCcw, AlertCircle } from 'lucide-react';
 import { toast } from '../../lib/toast';
 import WagonWheel from '../../app/components/WagonWheel';
+import { buildCommentarySocketUrl, commentaryKey, getCommentaryHistory, getRealtimeCommentaryConfig } from '../../lib/commentaryApi';
+import { api } from '../../lib/api'; // 🔥 Ensure API is imported for WebSocket token fetch
 
 // sessionStorage key for crash-recovery of an in-progress scoring session.
 const SCORER_SESSION_KEY = 'scorer_session';
+
 import {
   recordBall as apiRecordBall,
   wicketWizard as apiWicketWizard,
@@ -69,6 +72,11 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
   const [isLive, setIsLive] = useState(false);
   const [activeTab, setActiveTab] = useState<'scoring' | 'scorecard' | 'commentary'>('scoring');
 
+  // 🔥 AI Commentary State & Refs for Scorer (Moved INSIDE the component)
+  const [aiCommentaryList, setAiCommentaryList] = useState<any[]>([]);
+  const [isWsConnected, setIsWsConnected] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
+
   // Score state
   const [score, setScore] = useState(0);
   const [wickets, setWickets] = useState(0);
@@ -83,19 +91,16 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
   const [shotPoint, setShotPoint] = useState<any>(null);
   const [batsmanHand, setBatsmanHand] = useState<'right' | 'left'>('right');
 
-  
   // 🔥 REAL PLAYERS STATE: Replaced mock data with session variables
-  // Around line 60 in ScorerConsole.tsx
-// Assuming you update your scorerApi/session structure to include these names
   const [striker, setStriker] = useState(
-  session?.playerNames?.[session?.strikerId || ''] || 'Striker 1'
-);
-const [nonStriker, setNonStriker] = useState(
-  session?.playerNames?.[session?.nonStrikerId || ''] || 'Non-Striker'
-);
-const [currentBowler, setCurrentBowler] = useState(
-  session?.playerNames?.[session?.bowlerId || ''] || 'Opening Bowler'
-);
+    session?.playerNames?.[session?.strikerId || ''] || 'Striker 1'
+  );
+  const [nonStriker, setNonStriker] = useState(
+    session?.playerNames?.[session?.nonStrikerId || ''] || 'Non-Striker'
+  );
+  const [currentBowler, setCurrentBowler] = useState(
+    session?.playerNames?.[session?.bowlerId || ''] || 'Opening Bowler'
+  );
   const [previousBowler, setPreviousBowler] = useState<string | null>(null);
 
   // Ball history
@@ -111,10 +116,12 @@ const [currentBowler, setCurrentBowler] = useState(
     { 
       name: session?.playerNames?.[session?.nonStrikerId || ''] || 'Non-Striker', 
       runs: 0, balls: 0, fours: 0, sixes: 0, isOut: false 
-    },]);
-    const [battingRoster, setBattingRoster] = useState<string[]>(session?.battingRoster || []);
-    const [fieldingRoster, setFieldingRoster] = useState<string[]>(session?.fieldingRoster || []);
-    const [selectedNextBowler, setSelectedNextBowler] = useState('');
+    },
+  ]);
+  const [battingRoster, setBattingRoster] = useState<string[]>(session?.battingRoster || []);
+  const [fieldingRoster, setFieldingRoster] = useState<string[]>(session?.fieldingRoster || []);
+  const [selectedNextBowler, setSelectedNextBowler] = useState('');
+  
   // Bowlers data - Initialized with real identities
   const [bowlers, setBowlers] = useState<Bowler[]>([
     { 
@@ -151,6 +158,66 @@ const [currentBowler, setCurrentBowler] = useState(
       && name !== nonStriker
       && name !== nextBatsman
   );
+
+  // 🔥 Fetch History & Connect Secure WebSocket
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    let isMounted = true;
+
+    const setupLiveCommentary = async () => {
+      if (activeTab === 'commentary' && matchId) {
+        
+        // A. Fetch Historical Data
+        getCommentaryHistory(matchId!)
+          .then(fetchedData => {
+            if (!isMounted) return;
+            setAiCommentaryList(fetchedData);
+          })
+          .catch(err => console.error("Failed to load commentary history", err));
+
+        try {
+          // B. Get Secure Token
+          const realtime = await getRealtimeCommentaryConfig();
+
+          if (!isMounted || !realtime.enabled || !realtime.realtimeUrl || !realtime.token) return;
+
+          // C. Connect to GCP Realtime Gateway
+          const WS_URL = buildCommentarySocketUrl(realtime.realtimeUrl, matchId!, realtime.token);
+          ws = new WebSocket(WS_URL);
+          wsRef.current = ws;
+
+          ws.onopen = () => { if (isMounted) setIsWsConnected(true); };
+          
+          ws.onmessage = (event) => {
+            try {
+              const payload = JSON.parse(event.data);
+              const newCommentary = payload.data ? payload.data : payload;
+
+              setAiCommentaryList(prev => {
+                const safePrev = Array.isArray(prev) ? prev : [];
+                if (safePrev.some(c => commentaryKey(c, -1) === commentaryKey(newCommentary, -2))) return safePrev;
+                return [newCommentary, ...safePrev];
+              });
+            } catch (e) {
+              console.error("Failed to parse websocket message", e);
+            }
+          };
+
+          ws.onclose = () => { if (isMounted) setIsWsConnected(false); };
+
+        } catch (error) {
+          console.error("❌ Failed to authenticate realtime stream", error);
+        }
+      }
+    };
+
+    setupLiveCommentary();
+
+    return () => {
+      isMounted = false;
+      if (ws) ws.close();
+    };
+  }, [activeTab, matchId]);
 
   const syncFromInnings = (innings: InningsState) => {
     setScore(innings.total_runs);
@@ -370,7 +437,7 @@ const [currentBowler, setCurrentBowler] = useState(
     
     if (requiresWagonWheel && !shotPoint) {
       toast.error('Please map the shot direction on the Wagon Wheel first!');
-      return; // Execution yahin rok dein
+      return;
     }
     const ballEvent: BallEvent = {
       over: overs,
@@ -611,17 +678,6 @@ const [currentBowler, setCurrentBowler] = useState(
     }));
   };
 
-  const progressBall = () => {
-    if (balls === 5) {
-      setOvers(overs + 1);
-      setBalls(0);
-      setShowBowlerChangeDialog(true);
-      swapStrike();
-    } else {
-      setBalls(balls + 1);
-    }
-  };
-
   const swapStrike = () => {
     const temp = striker;
     setStriker(nonStriker);
@@ -637,7 +693,7 @@ const [currentBowler, setCurrentBowler] = useState(
     setSelectedFielder('');
     setSelectedOutBatsman(striker);
     setNextBatsman('');
-    setShotPoint(null); // 🔥 Shot clear karein
+    setShotPoint(null); // 🔥 Shot clear
   };
 
   const undoLastBall = () => {
@@ -748,23 +804,18 @@ const [currentBowler, setCurrentBowler] = useState(
       {/* LARGE Scoreboard - Production Grade */}
       <div className="bg-gradient-to-br from-[#1a1a1a] to-[#2a2a2a] rounded-2xl shadow-2xl p-8 text-white">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Score */}
           <div className="text-center">
             <p className="text-sm text-gray-400 mb-3 uppercase tracking-wide">Score</p>
             <p className="text-7xl md:text-8xl font-bold tabular-nums">
               {score}<span className="text-5xl text-gray-400">/{wickets}</span>
             </p>
           </div>
-
-          {/* Overs */}
           <div className="text-center">
             <p className="text-sm text-gray-400 mb-3 uppercase tracking-wide">Overs</p>
             <p className="text-7xl md:text-8xl font-bold tabular-nums">
               {overs}<span className="text-5xl text-gray-400">.{balls}</span>
             </p>
           </div>
-
-          {/* Run Rate */}
           <div className="text-center">
             <p className="text-sm text-gray-400 mb-3 uppercase tracking-wide">Run Rate</p>
             <p className="text-7xl md:text-8xl font-bold tabular-nums">
@@ -773,29 +824,13 @@ const [currentBowler, setCurrentBowler] = useState(
           </div>
         </div>
 
-        {/* Extras Summary */}
         <div className="mt-8 pt-6 border-t border-gray-700">
           <div className="grid grid-cols-5 gap-4 text-center">
-            <div>
-              <p className="text-xs text-gray-400">Wides</p>
-              <p className="text-2xl font-semibold tabular-nums">{extras.wides}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400">No Balls</p>
-              <p className="text-2xl font-semibold tabular-nums">{extras.noBalls}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400">Byes</p>
-              <p className="text-2xl font-semibold tabular-nums">{extras.byes}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400">Leg Byes</p>
-              <p className="text-2xl font-semibold tabular-nums">{extras.legByes}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400">Penalties</p>
-              <p className="text-2xl font-semibold tabular-nums">{extras.penalties}</p>
-            </div>
+            <div><p className="text-xs text-gray-400">Wides</p><p className="text-2xl font-semibold tabular-nums">{extras.wides}</p></div>
+            <div><p className="text-xs text-gray-400">No Balls</p><p className="text-2xl font-semibold tabular-nums">{extras.noBalls}</p></div>
+            <div><p className="text-xs text-gray-400">Byes</p><p className="text-2xl font-semibold tabular-nums">{extras.byes}</p></div>
+            <div><p className="text-xs text-gray-400">Leg Byes</p><p className="text-2xl font-semibold tabular-nums">{extras.legByes}</p></div>
+            <div><p className="text-xs text-gray-400">Penalties</p><p className="text-2xl font-semibold tabular-nums">{extras.penalties}</p></div>
           </div>
         </div>
       </div>
@@ -821,18 +856,11 @@ const [currentBowler, setCurrentBowler] = useState(
       </div>
 
       {/* Tab Content */}
-      {/* Tab Content */}
       {activeTab === 'scoring' && (
         <div className="flex flex-col xl:flex-row gap-6">
-          
-          {/* ============================================================== */}
-          {/* LEFT COLUMN: SCORING CONSOLE (60% Width)                         */}
-          {/* ============================================================== */}
+          {/* LEFT COLUMN: SCORING CONSOLE */}
           <div className="xl:w-[60%] space-y-6">
-            
-            {/* Current Players */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Batsmen Block */}
               <div className="bg-white rounded-lg shadow-sm p-6 border border-[#e0e0e0] flex flex-col justify-between">
                 <div>
                   <p className="text-xs text-[#666666] mb-3 uppercase tracking-wide">Batsmen</p>
@@ -866,7 +894,6 @@ const [currentBowler, setCurrentBowler] = useState(
                 </button>
               </div>
 
-              {/* Current & Previous Bowler Block */}
               <div className="bg-white rounded-lg shadow-sm p-6 border border-[#e0e0e0] flex flex-col justify-between">
                 <div>
                   <p className="text-xs text-[#666666] mb-3 uppercase tracking-wide">Current Bowler</p>
@@ -906,7 +933,6 @@ const [currentBowler, setCurrentBowler] = useState(
               </div>
             </div>
 
-            {/* Current Ball State */}
             <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-6 border-2 border-purple-200">
               <h3 className="text-lg font-semibold mb-4 text-[#1a1a1a]">Current Ball</h3>
               <div className="grid grid-cols-3 gap-4 text-center">
@@ -932,11 +958,8 @@ const [currentBowler, setCurrentBowler] = useState(
               )}
             </div>
 
-            {/* Scoring Inputs (Runs, Extras, Wicket) */}
             <div className="bg-white rounded-lg shadow-sm p-6 border border-[#e0e0e0]">
               <h2 className="text-lg font-semibold text-[#1a1a1a] mb-4">Score Runs</h2>
-
-              {/* Run Buttons */}
               <div className="mb-6">
                 <p className="text-sm text-[#666666] mb-3">Runs off bat</p>
                 <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
@@ -966,7 +989,6 @@ const [currentBowler, setCurrentBowler] = useState(
                 </div>
               </div>
 
-              {/* Extras Buttons */}
               <div className="mb-6">
                 <p className="text-sm text-[#666666] mb-3">Extras</p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -1032,7 +1054,6 @@ const [currentBowler, setCurrentBowler] = useState(
                 )}
               </div>
 
-              {/* Wicket Toggle */}
               <div>
                 <button
                   onClick={() => {
@@ -1047,7 +1068,6 @@ const [currentBowler, setCurrentBowler] = useState(
               </div>
             </div>
 
-            {/* Recent Deliveries Timeline */}
             <div className="bg-white rounded-lg shadow-sm p-6 border border-[#e0e0e0]">
               <h2 className="text-lg font-semibold text-[#1a1a1a] mb-4">Recent Deliveries</h2>
               <div className="flex gap-2 overflow-x-auto pb-2">
@@ -1071,20 +1091,14 @@ const [currentBowler, setCurrentBowler] = useState(
             </div>
           </div>
 
-          {/* ============================================================== */}
-          {/* RIGHT COLUMN: WAGON WHEEL & ACTIONS (40% Width)                  */}
-          {/* ============================================================== */}
+          {/* RIGHT COLUMN: WAGON WHEEL & ACTIONS */}
           <div className="xl:w-[40%] space-y-6">
-            
             <div className="bg-white rounded-xl shadow-sm border border-[#e0e0e0] p-6 sticky top-6">
-              
-              {/* Header & Handedness Toggle */}
               <div className="flex justify-between items-center mb-4">
                 <div>
                   <h2 className="text-lg font-semibold text-[#1a1a1a]">Shot Direction</h2>
                   <p className="text-xs text-gray-500">Tap field to map delivery</p>
                 </div>
-                
                 <div className="flex bg-gray-100 p-1 rounded-lg">
                   <button 
                     onClick={() => setBatsmanHand('right')}
@@ -1101,7 +1115,6 @@ const [currentBowler, setCurrentBowler] = useState(
                 </div>
               </div>
               
-              {/* Actual Wagon Wheel Component */}
               <div className="bg-[#fbfdfb] border border-[#d9e4d5] rounded-xl overflow-hidden mb-6 relative flex justify-center">
                 <WagonWheel
                   batsmanHand={batsmanHand}
@@ -1110,7 +1123,6 @@ const [currentBowler, setCurrentBowler] = useState(
                   stadiumEnd="Pavilion End"
                   savePoint={async () => {}}
                 />
-                
                 {shotPoint && (
                   <div className="absolute bottom-3 bg-[#315c2b] text-white text-[11px] font-bold px-3 py-1.5 rounded-full shadow-md">
                     {shotPoint.fieldArea} ({shotPoint.x}, {shotPoint.y})
@@ -1118,7 +1130,6 @@ const [currentBowler, setCurrentBowler] = useState(
                 )}
               </div>
 
-              {/* ACTION BUTTONS (Moved from left column) */}
               <div>
                 <div className="flex flex-col gap-3">
                   <button
@@ -1137,7 +1148,6 @@ const [currentBowler, setCurrentBowler] = useState(
                   </button>
                 </div>
 
-                {/* Undo / Redo / Reset Actions */}
                 <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-100">
                   <button
                     onClick={undoLastBall}
@@ -1161,19 +1171,14 @@ const [currentBowler, setCurrentBowler] = useState(
                   </button>
                 </div>
               </div>
-
             </div>
           </div>
-
         </div>
       )}
 
-      {/* ============================================================== */}
-      {/* OTHER TABS & DIALOGS (Kept EXACTLY as provided)                  */}
-      {/* ============================================================== */}
+      {/* SCORECARD TAB */}
       {activeTab === 'scorecard' && (
         <div className="space-y-6">
-          {/* Batting Table */}
           <div className="bg-white rounded-lg shadow-sm p-6 border border-[#e0e0e0]">
             <h2 className="text-xl font-semibold mb-4">Batting</h2>
             <div className="overflow-x-auto">
@@ -1208,7 +1213,6 @@ const [currentBowler, setCurrentBowler] = useState(
             </div>
           </div>
 
-          {/* Innings Summary */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-white rounded-lg shadow-sm p-6 border border-[#e0e0e0]">
               <p className="text-sm text-[#666666] mb-2">Total</p>
@@ -1217,7 +1221,7 @@ const [currentBowler, setCurrentBowler] = useState(
             </div>
             <div className="bg-white rounded-lg shadow-sm p-6 border border-[#e0e0e0]">
               <p className="text-sm text-[#666666] mb-2">Extras</p>
-              <p className="text-3xl font-bold tabular-nums">{/* Assuming totalExtras exists in your scope */ currentExtras}</p>
+              <p className="text-3xl font-bold tabular-nums">{currentExtras}</p>
               <p className="text-sm text-[#666666] mt-1">
                 NB {extras.noBalls}, WD {extras.wides}, B {extras.byes}, LB {extras.legByes}, P {extras.penalties}
               </p>
@@ -1232,13 +1236,10 @@ const [currentBowler, setCurrentBowler] = useState(
           <div className="bg-white rounded-lg shadow-sm p-6 border border-[#e0e0e0]">
             <h2 className="text-xl font-semibold mb-3">Yet to Bat</h2>
             <p className="text-sm text-[#666666]">
-              {/* Assuming yetToBat exists in your scope */}
-              {/* {yetToBat.length > 0 ? yetToBat.join(', ') : 'All listed batters have appeared'} */}
-              Batters listing
+              {yetToBat.length > 0 ? yetToBat.join(', ') : 'All listed batters have appeared'}
             </p>
           </div>
 
-          {/* Bowling Table */}
           <div className="bg-white rounded-lg shadow-sm p-6 border border-[#e0e0e0]">
             <h2 className="text-xl font-semibold mb-4">Bowling</h2>
             <div className="overflow-x-auto">
@@ -1275,78 +1276,86 @@ const [currentBowler, setCurrentBowler] = useState(
         </div>
       )}
 
+      {/* 🔥 AI COMMENTARY TAB (Replaced Static/Dumb Output) */}
       {activeTab === 'commentary' && (
-        <div className="bg-white rounded-lg shadow-sm p-6 border border-[#e0e0e0]">
-          <h2 className="text-xl font-semibold mb-4">Ball-by-Ball Commentary</h2>
-          <div className="space-y-3 max-h-[600px] overflow-y-auto">
-            {ballHistory.length === 0 ? (
-              <p className="text-center text-[#666666] py-8">No balls recorded yet</p>
+        <div className="bg-white rounded-lg shadow-sm p-6 border border-[#e0e0e0] animate-fadeIn">
+          <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-3">
+            <h2 className="text-xl font-semibold">Live AI Commentary Feed</h2>
+            {isWsConnected ? (
+              <span className="flex items-center gap-1.5 text-xs font-bold text-green-600 bg-green-50 px-2.5 py-1 rounded-full border border-green-200">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Live Sync
+              </span>
             ) : (
-              ballHistory.map((ball, index) => (
-                <div
-                  key={index}
-                  className={`p-4 rounded-lg border-l-4 ${
-                    ball.wicket
-                      ? 'bg-red-50 border-red-600'
-                      : ball.runs >= 4
-                      ? 'bg-green-50 border-green-600'
-                      : 'bg-[#f9f9f9] border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs font-bold text-[#666666] bg-white px-2 py-1 rounded">
-                        {ball.over}.{ball.ball}
-                      </span>
-                      <span className="text-sm font-medium text-[#1a1a1a]">
-                        {ball.bowler} to {ball.batsman}
-                      </span>
+              <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full border border-gray-200">
+                Connecting to AI...
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+            {!Array.isArray(aiCommentaryList) || aiCommentaryList.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-[#666666] font-medium">Waiting for AI generated updates...</p>
+                <p className="text-xs text-gray-400 mt-1">Commentary appears ~3 seconds after you save a ball.</p>
+              </div>
+            ) : (
+              aiCommentaryList.filter(c => c && c.is_visible !== false).map((item, index) => {
+                const taskStr = typeof item.task === 'string' ? item.task : '';
+                const isWicket = taskStr.includes('wicket');
+                const isBoundary = taskStr.includes('boundary');
+                const uniqueKey = commentaryKey(item, index);
+
+                return (
+                  <div
+                    key={uniqueKey}
+                    className={`p-4 rounded-lg border-l-4 ${
+                      isWicket ? 'bg-red-50 border-red-600' : isBoundary ? 'bg-blue-50 border-blue-600' : 'bg-[#f9f9f9] border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <span className={`text-xs font-bold px-2 py-1 rounded text-white ${isWicket ? 'bg-red-600' : isBoundary ? 'bg-blue-600' : 'bg-gray-600'}`}>
+                          {isWicket ? 'WICKET' : isBoundary ? 'BOUNDARY' : 'LIVE'}
+                        </span>
+                      </div>
+                      <button className="text-xs font-bold text-gray-400 hover:text-[#e60023] underline decoration-dashed transition-colors">
+                        Manual Override
+                      </button>
                     </div>
-                    <span
-                      className={`text-2xl font-bold tabular-nums ${
-                        ball.wicket ? 'text-red-600' : ball.runs >= 4 ? 'text-green-600' : 'text-[#1a1a1a]'
-                      }`}
-                    >
-                      {ball.wicket ? 'W' : ball.runs}
-                    </span>
+                    
+                    <p className="text-sm text-gray-800 font-medium leading-relaxed">{item.output || 'No commentary text generated.'}</p>
+                    
+                    <div className="flex items-center gap-2 mt-3 pt-2 border-t border-gray-200/60">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">
+                        Source: {item.source || 'AI Generator'}
+                      </p>
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">
+                        Task: {item.task || 'live_ball'}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-sm text-[#666666]">{ball.commentary}</p>
-                  {ball.extraType && (
-                    <span className="inline-block mt-2 text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">
-                      {ball.extraType.toUpperCase()}
-                    </span>
-                  )}
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
       )}
 
-      {/* Others Dialog (7, 8, Penalty) */}
+      {/* Dialogs */}
       {showOthersDialog && (
         <>
-          <div
-            className="fixed inset-0 bg-black/50 z-40"
-            onClick={() => setShowOthersDialog(false)}
-          />
+          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setShowOthersDialog(false)} />
           <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-2xl shadow-2xl z-50 p-6">
             <h3 className="text-xl font-semibold mb-4">Other Runs</h3>
             <div className="grid grid-cols-3 gap-3">
               <button
-                onClick={() => {
-                  handleRunClick(7);
-                  setShowOthersDialog(false);
-                }}
+                onClick={() => { handleRunClick(7); setShowOthersDialog(false); }}
                 className="p-6 bg-purple-600 text-white rounded-xl font-bold text-2xl hover:bg-purple-700 transition-all"
               >
                 7
               </button>
               <button
-                onClick={() => {
-                  handleRunClick(8);
-                  setShowOthersDialog(false);
-                }}
+                onClick={() => { handleRunClick(8); setShowOthersDialog(false); }}
                 className="p-6 bg-purple-600 text-white rounded-xl font-bold text-2xl hover:bg-purple-700 transition-all"
               >
                 8
@@ -1372,7 +1381,6 @@ const [currentBowler, setCurrentBowler] = useState(
         </>
       )}
 
-      {/* Wicket Dialog */}
       {showWicketDialog && (
         <>
           <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setShowWicketDialog(false)} />
@@ -1381,7 +1389,6 @@ const [currentBowler, setCurrentBowler] = useState(
               <AlertCircle className="text-red-600" size={24} />
               <h3 className="text-xl font-semibold">Record Wicket</h3>
             </div>
-
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-2">Batsman Out</label>
@@ -1394,7 +1401,6 @@ const [currentBowler, setCurrentBowler] = useState(
                   <option value={nonStriker}>{nonStriker}</option>
                 </select>
               </div>
-
               <div>
                 <label className="block text-sm font-medium mb-2">Dismissal Type</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -1413,82 +1419,48 @@ const [currentBowler, setCurrentBowler] = useState(
                   ))}
                 </div>
               </div>
-
               {(selectedDismissal === 'Caught' || selectedDismissal === 'Run Out' || selectedDismissal === 'Stumped') && (
                 <div>
                   <label className="block text-sm font-medium mb-2">Fielder</label>
-                <select
+                  <select
                     value={selectedFielder}
-                        onChange={(e) => setSelectedFielder(e.target.value)}
-                        className="w-full p-3 border border-[#e0e0e0] rounded-lg">
-                        <option value="">Select Fielder (Optional)</option>
-                        {fieldingRoster.map(name => (
-                        <option key={name} value={name}>{name}</option>))}
-                </select>
-                      </div>)}
-
+                    onChange={(e) => setSelectedFielder(e.target.value)}
+                    className="w-full p-3 border border-[#e0e0e0] rounded-lg"
+                  >
+                    <option value="">Select Fielder (Optional)</option>
+                    {fieldingRoster.map(name => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium mb-2">Next Batsman</label>
                 <select
-                    value={nextBatsman}
-                        onChange={(e) => setNextBatsman(e.target.value)}
-                           className="w-full p-3 border border-[#e0e0e0] rounded-lg">
-                      <option value="">Select next batsman</option>
-                      {battingRoster
+                  value={nextBatsman}
+                  onChange={(e) => setNextBatsman(e.target.value)}
+                  className="w-full p-3 border border-[#e0e0e0] rounded-lg"
+                >
+                  <option value="">Select next batsman</option>
+                  {battingRoster
                     .filter(name => name !== striker && name !== nonStriker && !batsmen.some(b => b.name === name && b.isOut)) 
                     .map(name => (
-                        <option key={name} value={name}>{name}</option>))}
-                    </select>
-                  </div>
-
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                </select>
+              </div>
               <div className="flex gap-3 pt-4">
                 <button
-  onClick={() => {
-    if (!selectedDismissal) {
-      toast.error('Please select a dismissal type');
-      return;
-    }
-    if (!nextBatsman) {
-      toast.error('Please select the next batsman');
-      return;
-    }
-      setShowWicketDialog(false);
-      // 🔥 Your updated logic handles API inside recordBall now
-      setIsWicket(true); 
-      // Also remember to save your selections somewhere or let recordBall read them
-      return;
-      
-      if (false && isConnected && session && selectedDismissal) {
-      // 🔥 1. MAP SE ID NIKALEIN (Agar map mein nahi mila toh fallback ke liye name hi use karein)
-      const incomingBatsmanId = session!.playerIdMap?.[nextBatsman] || nextBatsman;
-      const fielderId = selectedFielder 
-        ? (session!.playerIdMap?.[selectedFielder] || selectedFielder) 
-        : undefined;
-
-      // 🔥 2. API KO IDs BHEJEIN
-      apiWicketWizard(matchId!, {
-        innings_id: session!.inningsId,
-        dismissed_player_id: session!.strikerId!, // Note: Isko bhi dynamic karna hoga baad mein
-        dismissal_type: selectedDismissal as DismissalType,
-        fielder_id: fielderId,
-        incoming_batsman_id: incomingBatsmanId,
-      })
-        .then((res) => {
-          syncFromInnings(res.innings);
-          // Naye batsman ki ID ko session mein update karein
-          session!.strikerId = incomingBatsmanId;
-          if (res.innings_complete) toast.success('All out — innings complete');
-        })
-        .catch((err) =>
-          toast.error(err?.response?.data?.error || 'Failed to record wicket')
-        );
-    }
-    toast.success('Wicket selected');
-  }}
-  className="flex-1 p-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all"
->
-  Save Wicket Details
-</button>
+                  onClick={() => {
+                    if (!selectedDismissal) { toast.error('Please select a dismissal type'); return; }
+                    if (!nextBatsman) { toast.error('Please select the next batsman'); return; }
+                    setShowWicketDialog(false);
+                    setIsWicket(true); 
+                  }}
+                  className="flex-1 p-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all"
+                >
+                  Save Wicket Details
+                </button>
                 <button
                   onClick={() => setShowWicketDialog(false)}
                   className="flex-1 p-3 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300 transition-all"
@@ -1501,7 +1473,6 @@ const [currentBowler, setCurrentBowler] = useState(
         </>
       )}
 
-      {/* Reset Confirmation Dialog */}
       {showResetDialog && (
         <>
           <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setShowResetDialog(false)} />
@@ -1531,15 +1502,12 @@ const [currentBowler, setCurrentBowler] = useState(
         </>
       )}
 
-      {/* Bowler Change Dialog */}
       {showBowlerChangeDialog && (
         <>
           <div className="fixed inset-0 bg-black/50 z-40" />
           <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-2xl shadow-2xl z-50 p-6">
             <h3 className="text-xl font-semibold mb-4">End of Over - Change Bowler</h3>
             <p className="text-sm text-[#666666] mb-4">Select the bowler for the next over</p>
-            
-            {/* 🔥 NEW DROPDOWN INSTEAD OF TEXT INPUT */}
             <select
               className="w-full p-3 border border-[#e0e0e0] rounded-lg mb-4 bg-white"
               value={selectedNextBowler}
@@ -1547,46 +1515,34 @@ const [currentBowler, setCurrentBowler] = useState(
             >
               <option value="">Select next bowler</option>
               {fieldingRoster
-                // Puraane bowler ko hide karein (consecutive overs not allowed)
                 .filter(name => name !== currentBowler)
                 .map(name => (
-                <option key={name} value={name}>{name}</option>
-              ))}
+                  <option key={name} value={name}>{name}</option>
+                ))}
             </select>
-
             <button
-  onClick={() => {
-    if (!selectedNextBowler) {
-      toast.error('Please select the next bowler');
-      return;
-    }
-    
-    // Logic to track previous bowler & register the new one
-    setPreviousBowler(currentBowler);
-    setCurrentBowler(selectedNextBowler);
-    
-    // 🔥 CRITICAL FIX: Backend ke liye session ki Bowler ID update karein
-    if (session) {
-      const newBowlerId = session.playerIdMap?.[selectedNextBowler] || selectedNextBowler;
-      session.bowlerId = newBowlerId; 
-    }
-    
-    // Ensure the new bowler exists in stats array
-    setBowlers(prev => {
-      if (!prev.find(b => b.name === selectedNextBowler)) {
-        return [...prev, { name: selectedNextBowler, overs: 0, balls: 0, runs: 0, wickets: 0, maidens: 0 }];
-      }
-      return prev;
-    });
-
-    setShowBowlerChangeDialog(false);
-    setSelectedNextBowler(''); // Next over ke liye state clear karein
-    toast.success('Bowler changed');
-  }}
-  className="w-full p-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all"
->
-  Continue
-</button>
+              onClick={() => {
+                if (!selectedNextBowler) { toast.error('Please select the next bowler'); return; }
+                setPreviousBowler(currentBowler);
+                setCurrentBowler(selectedNextBowler);
+                if (session) {
+                  const newBowlerId = session.playerIdMap?.[selectedNextBowler] || selectedNextBowler;
+                  session.bowlerId = newBowlerId; 
+                }
+                setBowlers(prev => {
+                  if (!prev.find(b => b.name === selectedNextBowler)) {
+                    return [...prev, { name: selectedNextBowler, overs: 0, balls: 0, runs: 0, wickets: 0, maidens: 0 }];
+                  }
+                  return prev;
+                });
+                setShowBowlerChangeDialog(false);
+                setSelectedNextBowler('');
+                toast.success('Bowler changed');
+              }}
+              className="w-full p-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all"
+            >
+              Continue
+            </button>
           </div>
         </>
       )}

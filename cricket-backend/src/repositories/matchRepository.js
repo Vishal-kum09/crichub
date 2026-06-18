@@ -198,10 +198,25 @@ const findFallOfWickets = async (inningsId) => {
 
 
 
-// Ordered ball-by-ball commentary for a match (excludes soft-deleted balls).
+// Visible AI commentary for a match. Falls back to deterministic ball text when
+// the commentary module has not generated rows yet.
 const findCommentary = async (matchId) => {
-  const result = await query(
-    `SELECT d.deliveries_id AS id, d.over_number, d.ball_in_over,
+  const aiResult = await query(
+    `SELECT ai_commentary_id, match_id, innings_id, delivery_id, task, style,
+            output, source, status, is_visible, is_manual_override, version,
+            response_time_ms, created_at
+       FROM ai_commentary
+      WHERE match_id = $1 AND is_visible = true
+      ORDER BY created_at ASC`,
+    [matchId]
+  );
+
+  if (aiResult.rows.length > 0) {
+    return aiResult.rows;
+  }
+
+  const fallbackResult = await query(
+    `SELECT d.deliveries_id AS delivery_id, d.over_number, d.ball_in_over,
             d.delivery_sequence, d.delivery_type, d.runs_batter, d.runs_extras,
             d.runs_total, d.is_wicket, d.is_boundary_four, d.is_boundary_six,
             i.innings_number,
@@ -215,7 +230,18 @@ const findCommentary = async (matchId) => {
      ORDER BY i.innings_number ASC, d.delivery_sequence ASC`,
     [matchId]
   );
-  return result.rows;
+  return fallbackResult.rows.map((row) => ({
+    ai_commentary_id: `fallback-${row.delivery_id}`,
+    match_id: matchId,
+    delivery_id: row.delivery_id,
+    task: row.is_wicket ? 'wicket_alert' : row.is_boundary_four || row.is_boundary_six ? 'boundary_special' : 'live_ball_short',
+    output: `${row.over_number}.${row.ball_in_over}: ${row.batter_name} faces ${row.bowler_name}. ${row.runs_total} run${row.runs_total === 1 ? '' : 's'}${row.is_wicket ? ', wicket' : ''}.`,
+    source: 'score_fallback',
+    status: 'visible',
+    is_visible: true,
+    is_manual_override: false,
+    created_at: null
+  }));
 };
 
 module.exports = {

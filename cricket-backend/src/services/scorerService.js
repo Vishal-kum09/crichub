@@ -6,6 +6,7 @@ const { withTransaction } = require('../../db');
 const repo = require('../repositories/scorerRepository');
 const logger = require('../../config/logger');
 const { AppError } = require('../middlewares/errorHandler');
+const commentaryService = require('./commentaryService');
 
 // ─── Enum mapping ───────────────────────────────────────────────────────────
 
@@ -550,6 +551,12 @@ const recordBall = async (matchId, input) => {
     database_transaction_status: 'COMMITTED'
   });
 
+  void commentaryService.triggerDeliveryCommentary(
+    result.log.match_id,
+    result.response.delivery.id,
+    input.scored_by
+  );
+
   return result.response;
 };
 
@@ -665,7 +672,7 @@ const wicketWizard = async (matchId, input) => {
 
 // ─── undo ───────────────────────────────────────────────────────────────────
 const undo = async (matchId, input) => {
-  return withTransaction(async (client) => {
+  const result = await withTransaction(async (client) => {
     const innings = await resolveActiveInnings(client, matchId, input.innings_id);
     const last = await repo.getLastDelivery(client, innings.innings_id);
     if (!last) throw new AppError('Nothing to undo', 400);
@@ -771,6 +778,10 @@ const undo = async (matchId, input) => {
       innings: presentInningsState(reopened)
     };
   });
+
+  void commentaryService.invalidateDeliveryCommentary(matchId, result.undone_delivery_id);
+
+  return result;
 };
 
 const presentAssignedMatch = (r) => ({

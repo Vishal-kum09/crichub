@@ -154,7 +154,35 @@ const getLiveState = async (req, res, next) => {
   }
 };
 
+
+
+// Function 1: Get Audio Settings handler
+const getAudioSettings = async (req, res) => {
+  try {
+    const matchId = req.params.id; 
+    const settings = await scorerService.getMatchAudioSettings(matchId);
+    res.status(200).json({ success: true, settings: settings || null });
+  } catch (error) {
+    console.error("Error getting audio settings:", error);
+    res.status(500).json({ success: false, error: 'Failed to fetch audio settings' });
+  }
+};
+
+// Function 2: Save Audio Settings handler
+const saveAudioSettings = async (req, res) => {
+  try {
+    const matchId = req.params.id;
+    const settingsData = req.body;
+    const updatedSettings = await scorerService.saveMatchAudioSettings(matchId, settingsData);
+    res.status(200).json({ success: true, settings: updatedSettings });
+  } catch (error) {
+    console.error("Error saving audio settings:", error);
+    res.status(400).json({ success: false, error: error.message });
+  }
+};
 module.exports = {
+  getAudioSettings,
+  saveAudioSettings,
   initialize,
   startSecondInnings,
   getLiveState,

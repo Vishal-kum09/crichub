@@ -4,7 +4,6 @@
 const { query } = require('../../db');
 
 // Map the viewer's status filter to real match_status enum values.
-// Map the viewer's status filter to real match_status enum values.
 const STATUS_FILTERS = {
   live: ['toss', 'live', 'innings_break'],
   scheduled: ['scheduled'],
@@ -86,8 +85,6 @@ const findMatchById = async (id) => {
   return result.rows[0] || null;
 };
 
-// ... (Keep your findInningsByMatch, findBattingCards, etc. exactly the same) ...
-
 // 🔥 UPGRADED findMatchesByTeam: Check host_club_id OR opponent_club_id
 const findMatchesByTeam = async (teamId, limit = 10) => {
   const result = await query(
@@ -98,8 +95,6 @@ const findMatchesByTeam = async (teamId, limit = 10) => {
   );
   return result.rows;
 };
-
-// ... (Keep the rest of the file exactly the same) ...
 
 const findInningsByMatch = async (matchId) => {
   const result = await query(
@@ -196,25 +191,39 @@ const findFallOfWickets = async (inningsId) => {
   return result.rows;
 };
 
-
-
 // Visible AI commentary for a match. Falls back to deterministic ball text when
 // the commentary module has not generated rows yet.
 const findCommentary = async (matchId) => {
+  // 1. Fetch AI Commentary with Joins for Delivery Details (fixes 0.0 bug) & Audio Generations (gets MP3)
   const aiResult = await query(
-    `SELECT ai_commentary_id, match_id, innings_id, delivery_id, task, style,
-            output, source, status, is_visible, is_manual_override, version,
-            response_time_ms, created_at
-       FROM ai_commentary
-      WHERE match_id = $1 AND is_visible = true
-      ORDER BY created_at ASC`,
+    `SELECT ac.ai_commentary_id, ac.match_id, ac.innings_id, ac.delivery_id, ac.task, ac.style,
+            ac.output, ac.source, ac.status, ac.is_visible, ac.is_manual_override, ac.version,
+            ac.response_time_ms, ac.created_at,
+            d.over_number, d.ball_in_over as ball_number, d.runs_total as runs,
+            bat.display_name AS batter_name, bow.display_name AS bowler_name,
+            ag.storage_bucket, ag.storage_object
+       FROM ai_commentary ac
+       LEFT JOIN deliveries d ON d.deliveries_id = ac.delivery_id
+       LEFT JOIN players bat ON bat.players_id = d.batter_id
+       LEFT JOIN players bow ON bow.players_id = d.bowler_id
+       LEFT JOIN audio_generations ag ON ag.commentary_id = ac.ai_commentary_id AND ag.status = 'ready'
+      WHERE ac.match_id = $1 AND ac.is_visible = true
+      ORDER BY ac.created_at ASC`,
     [matchId]
   );
 
   if (aiResult.rows.length > 0) {
-    return aiResult.rows;
+    // Construct the full HTTPS audio URL for the frontend player
+    return aiResult.rows.map(row => {
+      let audioUrl = null;
+      if (row.storage_bucket && row.storage_object) {
+        audioUrl = `https://storage.googleapis.com/${row.storage_bucket}/${row.storage_object}`;
+      }
+      return { ...row, audio_url: audioUrl };
+    });
   }
 
+  // 2. Fallback if AI hasn't generated anything yet
   const fallbackResult = await query(
     `SELECT d.deliveries_id AS delivery_id, d.over_number, d.ball_in_over,
             d.delivery_sequence, d.delivery_type, d.runs_batter, d.runs_extras,
@@ -230,6 +239,7 @@ const findCommentary = async (matchId) => {
      ORDER BY i.innings_number ASC, d.delivery_sequence ASC`,
     [matchId]
   );
+  
   return fallbackResult.rows.map((row) => ({
     ai_commentary_id: `fallback-${row.delivery_id}`,
     match_id: matchId,
@@ -240,11 +250,71 @@ const findCommentary = async (matchId) => {
     status: 'visible',
     is_visible: true,
     is_manual_override: false,
-    created_at: null
+    created_at: null,
+    // Explicitly passing these so the frontend UI does not default to 0.0
+    over_number: row.over_number,
+    ball_number: row.ball_in_over,
+    runs: row.runs_total,
+    batter_name: row.batter_name,
+    bowler_name: row.bowler_name
   }));
+};
+// src/repositories/matchRepository.js
+
+// 🔥 FETCH AUDIO SETTINGS
+const getAudioSettings = async (matchId) => {
+  // 🔥 FIX: Renamed 'query' to 'sql' so it doesn't conflict with the imported query() function
+  const sql = `
+    SELECT * FROM public.audio_match_settings 
+    WHERE match_id = $1
+  `;
+  const result = await query(sql, [matchId]); 
+  return result.rows[0] || null;
+};
+
+// 🔥 UPSERT AUDIO SETTINGS (Exact SQL from Handoff Doc)
+const upsertAudioSettings = async (matchId, data) => {
+  // 🔥 FIX: Renamed 'query' to 'sql'
+  const sql = `
+    INSERT INTO public.audio_match_settings (
+      match_id, audio_enabled, provider, provider_model, provider_voice, 
+      language_code, character_key, tone, speaking_rate, character_prompt
+    ) VALUES (
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+    ) ON CONFLICT (match_id) DO UPDATE SET 
+      audio_enabled = EXCLUDED.audio_enabled,
+      provider = EXCLUDED.provider,
+      provider_model = EXCLUDED.provider_model,
+      provider_voice = EXCLUDED.provider_voice,
+      language_code = EXCLUDED.language_code,
+      character_key = EXCLUDED.character_key,
+      tone = EXCLUDED.tone,
+      speaking_rate = EXCLUDED.speaking_rate,
+      character_prompt = EXCLUDED.character_prompt,
+      updated_at = NOW()
+    RETURNING *;
+  `;
+  
+  const values = [
+    matchId, 
+    data.audio_enabled, 
+    data.provider, 
+    data.provider_model, 
+    data.provider_voice, 
+    data.language_code, 
+    data.character_key, 
+    data.tone, 
+    data.speaking_rate, 
+    data.character_prompt || null
+  ];
+
+  const result = await query(sql, values);
+  return result.rows[0];
 };
 
 module.exports = {
+  getAudioSettings,
+  upsertAudioSettings,
   findMatches,
   findMatchById,
   findMatchesByTeam,

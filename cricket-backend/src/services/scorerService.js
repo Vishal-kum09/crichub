@@ -314,26 +314,33 @@ const initialize = async (matchId, input) => {
 
     // 2. Resolve or Create the Teams entries to satisfy the Foreign Key constraint
     const resolveTeamId = async (clubId, teamLabel) => {
-      // Look for a team created by ANY user belonging to this club
-      let tRes = await client.query(
-        `SELECT teams_id FROM teams WHERE created_by IN (SELECT user_id FROM users WHERE club_id = $1) LIMIT 1`, 
-        [clubId]
-      );
-      
-      if (tRes.rows.length === 0) {
-        // Find a user from this club to attach as the "creator" of the team
-        let userRes = await client.query(`SELECT user_id FROM users WHERE club_id = $1 LIMIT 1`, [clubId]);
-        const creatorId = userRes.rows.length > 0 ? userRes.rows[0].user_id : '00000000-0000-0000-0000-000000000000';
-        
-        // Insert without using the non-existent club_id column
-        tRes = await client.query(
-          `INSERT INTO teams (name, short_name, created_by, is_active, created_at) 
-             VALUES ($1, $2, $3, true, NOW()) RETURNING teams_id`,
-          [teamLabel, teamLabel.substring(0, 3).toUpperCase(), creatorId]
-        );
-      }
-      return tRes.rows[0].teams_id;
-    };
+  // 1. Sabse pehle check karo ki is naam ki team table mein already hai ya nahi
+  let tRes = await client.query(
+    `SELECT teams_id FROM teams WHERE name = $1 LIMIT 1`, 
+    [teamLabel]
+  );
+  
+  // 2. Agar team mil gayi, toh direct wahi ID use karo (No duplicate insert)
+  if (tRes.rows.length > 0) {
+    return tRes.rows[0].teams_id;
+  }
+  
+  // 3. Agar team NAHI mili, tabhi hum naya record banayenge
+  // Find a user from this club to attach as the "creator" of the team
+  let userRes = await client.query(`SELECT user_id FROM users WHERE club_id = $1 LIMIT 1`, [clubId]);
+  const creatorId = userRes.rows.length > 0 ? userRes.rows[0].user_id : '00000000-0000-0000-0000-000000000000';
+  
+  // Insert with ON CONFLICT safety check
+  tRes = await client.query(
+    `INSERT INTO teams (name, short_name, created_by, is_active, created_at) 
+     VALUES ($1, $2, $3, true, NOW()) 
+     ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name 
+     RETURNING teams_id`,
+    [teamLabel, teamLabel.substring(0, 3).toUpperCase(), creatorId]
+  );
+  
+  return tRes.rows[0].teams_id;
+};
 
     const finalBattingTeamId = await resolveTeamId(input.batting_team_id, input.metadata?.batting_team_label || 'Batting Team');
     const finalFieldingTeamId = await resolveTeamId(input.fielding_team_id, input.metadata?.fielding_team_label || 'Fielding Team');
@@ -1139,8 +1146,41 @@ const getLiveMatchState = async (matchId) => {
   });
 };
 
+const matchRepository = require('../repositories/matchRepository');
+
+// Function 1: Get Settings
+const getMatchAudioSettings = async (matchId) => {
+  return await matchRepository.getAudioSettings(matchId);
+};
+
+// Function 2: Save Settings with Validations
+const saveMatchAudioSettings = async (matchId, data) => {
+  const validProviders = ['gemini', 'google', 'google_chirp'];
+  const validCharacters = ['play_by_play', 'veteran', 'analyst', 'stadium'];
+  const validTones = ['calm', 'normal', 'energetic', 'dramatic'];
+
+  if (!validProviders.includes(data.provider)) {
+    throw new Error(`Invalid provider. Allowed: ${validProviders.join(', ')}`);
+  }
+  if (!validCharacters.includes(data.character_key)) {
+    throw new Error(`Invalid character. Allowed: ${validCharacters.join(', ')}`);
+  }
+  if (!validTones.includes(data.tone)) {
+    throw new Error(`Invalid tone. Allowed: ${validTones.join(', ')}`);
+  }
+  if (data.speaking_rate < 0.70 || data.speaking_rate > 1.20) {
+    throw new Error('Speaking rate must be between 0.70 and 1.20');
+  }
+
+  return await matchRepository.upsertAudioSettings(matchId, data);
+};
+
+
+
 module.exports = {
   initialize,
+  getMatchAudioSettings,
+  saveMatchAudioSettings,
   startSecondInnings,
   recordBall,
   wicketWizard,

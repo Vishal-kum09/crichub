@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import { ArrowLeft, Swords, TrendingUp, Compass, MessageSquare, ShieldAlert, Award, PieChart, MonitorPlay, Mic, Radio } from 'lucide-react';
 import { api } from '../../lib/api';
 import { buildCommentarySocketUrl, commentaryKey, getCommentaryHistory, getRealtimeCommentaryConfig } from '../../lib/commentaryApi';
-import { WagonWheelTab } from '../components/WagonWheeltab'; // Dhyan rakhein ki ye path aapke project ke hisaab se sahi ho
+import { WagonWheelTab } from '../components/WagonWheeltab';
+import { CommentaryItem } from '../components/CommentaryItem'; 
 
 interface MatchDetailProps {
   matchId: string;
@@ -70,16 +71,13 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
   const [scorecard, setScorecard] = useState<Scorecard | null>(null);
   const [loading, setLoading] = useState(true);
   
-  // 🔥 Tabs State
   const [activeTab, setActiveTab] = useState<'overview' | 'scorecard' | 'commentary' | 'analytics' | 'watch_live'>('overview');
   const [activeInningsIndex, setActiveInningsIndex] = useState<number>(0);
 
-  // 🔥 AI Commentary State & Refs
   const [commentaryList, setCommentaryList] = useState<any[]>([]);
   const [isWsConnected, setIsWsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
 
-  // 1. Fetch Scorecard Data
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -91,15 +89,12 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
     return () => { cancelled = true; };
   }, [matchId]);
 
-  // 🔥 2. FINAL PRODUCTION-READY: Fetch History & Connect Secure WebSocket
   useEffect(() => {
     let ws: WebSocket | null = null;
     let isMounted = true;
 
     const setupLiveCommentary = async () => {
       if (activeTab === 'commentary') {
-        
-        // A. Fetch Historical Data (Crash-Safe)
         getCommentaryHistory(matchId)
           .then(fetchedData => {
             if (!isMounted) return;
@@ -111,26 +106,20 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
           });
 
         try {
-          // B. 🔒 DYNAMIC TOKEN FETCH: Get secure token from your Node.js Backend
           const realtime = await getRealtimeCommentaryConfig();
-
           if (!isMounted || !realtime.enabled || !realtime.realtimeUrl || !realtime.token) return;
 
-          // C. Connect to GCP Realtime Gateway using the dynamic token
           const WS_URL = buildCommentarySocketUrl(realtime.realtimeUrl, matchId, realtime.token);
           ws = new WebSocket(WS_URL);
           wsRef.current = ws;
 
-          ws.onopen = () => {
-            if (isMounted) setIsWsConnected(true);
-          };
+          ws.onopen = () => { if (isMounted) setIsWsConnected(true); };
           
           ws.onmessage = (event) => {
             try {
               const payload = JSON.parse(event.data);
               const newCommentary = payload.data ? payload.data : payload;
 
-              // Deduplicate and prepend new live ball safely
               setCommentaryList(prev => {
                 const safePrev = Array.isArray(prev) ? prev : [];
                 if (safePrev.some(c => commentaryKey(c, -1) === commentaryKey(newCommentary, -2))) {
@@ -143,33 +132,26 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
             }
           };
 
-          ws.onclose = () => {
-            if (isMounted) setIsWsConnected(false);
-          };
+          ws.onclose = () => { if (isMounted) setIsWsConnected(false); };
 
         } catch (error) {
-          console.error("❌ Failed to authenticate realtime stream with backend", error);
+          console.error("❌ Failed to authenticate realtime stream", error);
         }
       }
     };
 
     setupLiveCommentary();
 
-    // D. Cleanup Function: Prevents memory leaks
     return () => {
       isMounted = false;
-      if (ws) {
-        ws.close();
-      }
+      if (ws) ws.close();
     };
   }, [activeTab, matchId]);
 
-  // Loading Skeleton
   if (loading) {
     return <div className="p-6 max-w-7xl mx-auto"><div className="animate-pulse space-y-4"><div className="h-32 bg-gray-200 rounded-xl" /><div className="h-12 bg-gray-200 rounded-lg" /><div className="h-64 bg-gray-200 rounded-xl" /></div></div>;
   }
 
-  // Error State
   if (!scorecard) {
     return (
       <div className="p-6 max-w-md mx-auto text-center mt-12 bg-white rounded-xl border border-gray-200 shadow-sm space-y-4">
@@ -201,9 +183,6 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
   return (
     <div className="min-h-screen bg-[#f4f5f7] pb-12 font-sans antialiased text-black">
       
-      {/* =========================================================================
-          FRAME 1: HEADER NAVIGATION
-         ========================================================================= */}
       <div className="sticky top-0 bg-white border-b border-gray-200 z-30 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
           <button
@@ -221,24 +200,18 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
 
       <div className="max-w-7xl mx-auto px-4 mt-4 space-y-4">
         
-        {/* =========================================================================
-            FRAME 2: CORE IMMERSIVE SCORE BANNER
-           ========================================================================= */}
         <div className="bg-gradient-to-br from-[#1a1c23] to-[#2d3142] rounded-2xl text-white shadow-xl overflow-hidden border border-gray-800">
           <div className="p-6 md:p-8 space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-              
               <div className="text-center md:text-left space-y-1 flex-1">
                 <h2 className="text-xl md:text-2xl font-black tracking-tight">{scorecard.team1_name}</h2>
                 <div className="text-3xl md:text-4xl font-extrabold tracking-tighter text-gray-100">
                   {team1Score || <span className="text-gray-500 text-lg font-normal">Yet to Bat</span>}
                 </div>
               </div>
-
               <div className="flex flex-col items-center justify-center">
                 <div className="w-10 h-10 rounded-full bg-gray-800/80 border border-gray-700 flex items-center justify-center font-black text-xs text-red-500 shadow-inner">VS</div>
               </div>
-
               <div className="text-center md:text-right space-y-1 flex-1">
                 <h2 className="text-xl md:text-2xl font-black tracking-tight">{scorecard.team2_name}</h2>
                 <div className="text-3xl md:text-4xl font-extrabold tracking-tighter text-gray-100">
@@ -257,9 +230,6 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
           </div>
         </div>
 
-        {/* =========================================================================
-            FRAME 3: MATRIX CONTROLLER TABS
-           ========================================================================= */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="flex overflow-x-auto scrollbar-none border-b border-gray-100 bg-gray-50/50">
             {immersiveTabs.map((tab) => {
@@ -283,12 +253,8 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
           </div>
         </div>
 
-        {/* =========================================================================
-            FRAME 4: RENDERING WORKSPACE LAYOUTS
-           ========================================================================= */}
         <div className="space-y-6">
           
-          {/* 1. OVERVIEW SCREEN COMPONENT */}
           {activeTab === 'overview' && (
             <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-6 animate-fadeIn">
               <h3 className="text-lg font-bold text-gray-900 border-b border-gray-100 pb-3">Tournament Intelligence Overview</h3>
@@ -300,7 +266,6 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
             </div>
           )}
 
-          {/* 2. DYNAMIC SCORECARD SCREEN COMPONENT */}
           {activeTab === 'scorecard' && (
             <div className="space-y-6 animate-fadeIn">
               {scorecard.innings.length > 1 && (
@@ -428,7 +393,6 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
             </div>
           )}
 
-          {/* 🔥 3. LIVE AI COMMENTARY WITH REALTIME SOCKET (CRASH-SAFE RENDER) */}
           {activeTab === 'commentary' && (
             <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-6 animate-fadeIn">
               <div className="flex justify-between items-center border-b border-gray-100 pb-3">
@@ -447,54 +411,64 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
               </div>
 
               <div className="space-y-4 max-w-3xl">
-                {/* Safe Array Check before mapping */}
                 {!Array.isArray(commentaryList) || commentaryList.length === 0 ? (
                   <p className="text-gray-500 text-sm italic">Waiting for commentary updates...</p>
                 ) : (
-                  commentaryList.filter(c => c && c.is_visible !== false).map((item, index) => {
-                    // Safe string checks to prevent .includes() crash
-                    const taskStr = typeof item.task === 'string' ? item.task : '';
-                    const isWicket = taskStr.includes('wicket');
-                    const isBoundary = taskStr.includes('boundary');
-                    
-                    // Fallback ID if AI ID is missing
-                    const uniqueKey = commentaryKey(item, index);
+                  [...commentaryList]
+                    .filter(c => c && c.is_visible !== false)
+                    .sort((a, b) => {
+                      // 🔥 FIX: Check both over/over_number and ball/ball_number
+                      const overA = a.over !== undefined ? a.over : (a.over_number !== undefined ? a.over_number : 0);
+                      const ballA = a.ball !== undefined ? a.ball : (a.ball_number !== undefined ? a.ball_number : 0);
+                      const overB = b.over !== undefined ? b.over : (b.over_number !== undefined ? b.over_number : 0);
+                      const ballB = b.ball !== undefined ? b.ball : (b.ball_number !== undefined ? b.ball_number : 0);
+                      
+                      if (overA !== overB) return overB - overA; 
+                      return ballB - ballA; 
+                    })
+                    .map((item, index) => {
+                      const taskStr = typeof item.task === 'string' ? item.task : '';
+                      const isWicket = taskStr.includes('wicket') || item.is_wicket;
+                      const isBoundary = taskStr.includes('boundary') || (item.runs !== undefined && item.runs >= 4);
+                      
+                      const uniqueKey = commentaryKey(item, index);
+                      
+                      // 🔥 FIX FOR 0.0: Fallbacks to over_number if 'over' is missing
+                      const overVal = item.over !== undefined ? item.over : (item.over_number !== undefined ? item.over_number : 0);
+                      const ballVal = item.ball !== undefined ? item.ball : (item.ball_number !== undefined ? item.ball_number : 0);
+                      const displayOver = `Over ${overVal}.${ballVal}`;
 
-                    return (
-                      <div key={uniqueKey} className={`flex gap-4 p-4 rounded-xl border ${isWicket ? 'border-red-100 bg-red-50/20' : isBoundary ? 'border-blue-100 bg-blue-50/20' : 'border-gray-100 bg-white'}`}>
-                        
-                        {/* Context Badge */}
-                        <span className={`font-black text-sm h-fit px-2.5 py-1 rounded-md shadow-sm ${isWicket ? 'text-white bg-black' : isBoundary ? 'text-blue-700 bg-blue-100' : 'text-[#e60023] bg-red-100'}`}>
-                          {isWicket ? 'OUT' : isBoundary ? 'BOUNDARY' : 'LIVE'}
-                        </span>
-                        
-                        {/* Output Text & Source Metadata */}
-                        <div className="space-y-2 w-full">
-                          <p className="text-sm md:text-base text-gray-800 leading-relaxed font-medium">
-                            {item.output || 'No commentary available'}
-                          </p>
-                          
-                          <div className="flex items-center gap-2 mt-2 border-t border-gray-100/50 pt-2">
-                            <p className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">
-                              Source: {item.source || 'AI Generation'}
-                            </p>
+                      return (
+                        <div key={uniqueKey} className="relative">
+                          <CommentaryItem
+                            overNumber={displayOver}
+                            bowler={item.bowler_name || item.bowler || 'Bowler'}
+                            batter={item.batter_name || item.batter || 'Batter'}
+                            runs={item.runs !== undefined ? item.runs : (item.runs_scored || 0)}
+                            text={item.output || 'No commentary available'}
+                            audioUrl={item.audio_url || item.audioUrl} 
+                            isWicket={isWicket}
+                            isBoundary={isBoundary}
+                          />
+
+                          <div className="absolute bottom-2 right-4 flex gap-2">
+                            <span className="text-[9px] text-gray-400 uppercase tracking-wider font-bold bg-white/80 px-1 rounded">
+                              Src: {item.source || 'AI'}
+                            </span>
                             {item.is_manual_override && (
-                              <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-bold">
+                              <span className="text-[9px] bg-yellow-100 text-yellow-700 px-1.5 rounded font-bold">
                                 Manual Edit
                               </span>
                             )}
                           </div>
                         </div>
-
-                      </div>
-                    );
-                  })
+                      );
+                    })
                 )}
               </div>
             </div>
           )}
 
-          {/* 4. MERGED ANALYTICS TAB */}
           {activeTab === 'analytics' && (
             <div className="space-y-6 animate-fadeIn">
               <WagonWheelTab matchId={matchId} />
@@ -526,7 +500,6 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
             </div>
           )}
 
-          {/* 5. WATCH LIVE TAB */}
           {activeTab === 'watch_live' && (
             <div className="p-4 bg-white rounded-2xl shadow-sm border border-gray-200 animate-fadeIn space-y-4">
               <div className="flex items-center justify-between mb-2">

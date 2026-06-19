@@ -13,6 +13,7 @@ import {
   BarChart3,
   Star,
   Bell,
+  Target,
   Bot, // 🔥 NAYA ICON ADD KIYA HAI
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -89,6 +90,12 @@ export function Sidebar({ currentPath, onNavigate, userRole }: SidebarProps) {
       icon: Bot,
       label: 'AI Agent',
       path: '/ai-agent',
+      roles: ['viewer', 'player', 'scorer', 'analyst', 'club_admin', 'super_admin'] as UserRole[]
+    },
+    {
+      icon: Target,
+      label: 'Ball Tracker',
+      path: '/BallTracker',
       roles: ['viewer', 'player', 'scorer', 'analyst', 'club_admin', 'super_admin'] as UserRole[]
     },
     { 

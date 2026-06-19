@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, ShieldAlert, Users, Landmark } from 'lucide-react';
 import { toast } from '../../lib/toast';
+import { api } from '../../lib/api'; 
 import { getMatchPreview, initializeMatch, setLiveSession } from '../../lib/scorerApi';
+import { AudioMatchSettings, AudioSettings } from '../components/AudioCommentarySetting';
 
 interface MatchSetupProps {
   onNavigate: (path: string, id?: string) => void;
@@ -43,13 +45,29 @@ export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
 
   // Step 4: UI Engine Configurations
   const [wagonWheel, setWagonWheel] = useState(true);
-  const [commentaryType, setCommentaryType] = useState('auto');
   const [nameDisplay, setNameDisplay] = useState('First Initial Last Name');
+  
+  // State hooks for commentary config
+  const [commentaryMode, setCommentaryMode] = useState('auto_with_manual_override');
+  const [commentaryStyle, setCommentaryStyle] = useState('broadcast_english');
 
-  // Hidden State: Loaded from DB, sent back on creation
+  // 🔥 Audio Settings State (LIFTED UP FOR SINGLE SAVE BUTTON)
+  const [audioSettings, setAudioSettings] = useState<AudioSettings>({
+    audio_enabled: true,
+    provider: 'gemini',
+    provider_model: 'gemini-2.5-flash-tts',
+    provider_voice: 'Fenrir',
+    language_code: 'en-GB',
+    character_key: 'veteran',
+    tone: 'normal',
+    speaking_rate: 1.00,
+    character_prompt: ''
+  });
+
+  // Hidden State
   const [matchType, setMatchType] = useState('T20');
-  const [totalOvers, setTotalOvers] = useState('20');
-  const [oversPerBowler, setOversPerBowler] = useState('4');
+  const [totalOvers, setTotalOvers] = useState('');
+  const [oversPerBowler, setOversPerBowler] = useState('');
   const [venue, setVenue] = useState('');
   const [ground, setGround] = useState('');
   const [country, setCountry] = useState('');
@@ -62,50 +80,12 @@ export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
   const totalSteps = 5;
   const stepsList = ['Schedule', 'Playing XI', 'Toss Field', 'Settings Config', 'Strike Deck'];
 
-  // MatchSetup.tsx (Snippet)
-const [commentaryMode, setCommentaryMode] = useState('auto_with_manual_override');
-const [commentaryStyle, setCommentaryStyle] = useState('broadcast_english');
-
-{/* Commentary Configuration */}
-<div className="space-y-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
-  <h4 className="font-bold text-gray-900">🎙️ AI Commentary Configuration</h4>
-  
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-    <div className="space-y-1">
-      <label className="text-xs font-bold text-gray-500">Operation Mode</label>
-      <select 
-        value={commentaryMode} 
-        onChange={(e) => setCommentaryMode(e.target.value)}
-        className="w-full p-2.5 bg-white border rounded-xl"
-      >
-        <option value="auto_with_manual_override">Auto (AI) + Manual Override</option>
-        <option value="manual_only">Manual Only (No AI)</option>
-        <option value="off">Disabled</option>
-      </select>
-    </div>
-
-    <div className="space-y-1">
-      <label className="text-xs font-bold text-gray-500">Commentary Style</label>
-      <select 
-        value={commentaryStyle} 
-        onChange={(e) => setCommentaryStyle(e.target.value)}
-        className="w-full p-2.5 bg-white border rounded-xl"
-      >
-        <option value="broadcast_english">Standard Broadcast (English)</option>
-        <option value="analytical">Data & Analytical Focus</option>
-        <option value="dramatic">Dramatic & Exciting</option>
-      </select>
-    </div>
-  </div>
-</div>
-
-
-
-  // FETCH: Load Assigned Match Administrative Parameters from Real DB Connection
+  // FETCH: Load Assigned Match Administrative Parameters + Existing Audio Settings
   useEffect(() => {
     if (!matchId) return;
 
     setLoading(true);
+    
     getMatchPreview(matchId)
       .then((data) => {
         setAdminMetadata(data);
@@ -127,44 +107,38 @@ const [commentaryStyle, setCommentaryStyle] = useState('broadcast_english');
         toast.error("Could not fetch assigned match rosters from server.");
       })
       .finally(() => setLoading(false));
+
+    // Fetch existing audio settings
+    api.get(`/api/scorer/matches/${matchId}/audio-settings`)
+      .then((res) => {
+        if (res.data && res.data.settings) {
+          setAudioSettings(res.data.settings);
+        }
+      })
+      .catch((err) => console.log('No existing audio settings found, defaults will apply.'));
+
   }, [matchId]);
-
-
 
   const canProceed = () => {
     switch (currentStep) {
-      case 1:
-        return teamA && teamB;
-      case 2:
-        return (
-          teamAPlayers.length === 11 &&
-          teamBPlayers.length === 11 &&
-          teamACaptain &&
-          teamBCaptain &&
-          teamAWicketKeeper &&
-          teamBWicketKeeper
-        );
-      case 3:
-        return tossWinner && tossDecision;
-      case 4:
-        return true; 
-      case 5:
-        return striker && nonStriker && openingBowler && striker !== nonStriker;
-      default:
-        return false;
+      case 1: return teamA && teamB;
+      case 2: return teamAPlayers.length === 11 && teamBPlayers.length === 11 && teamACaptain && teamBCaptain && teamAWicketKeeper && teamBWicketKeeper;
+      case 3: return tossWinner && tossDecision;
+      case 4: return true; 
+      case 5: return striker && nonStriker && openingBowler && striker !== nonStriker;
+      default: return false;
     }
   };
 
-  const playerIdFor = (name: string, pool: ServerPlayer[]) => {
-    return pool.find((p) => p.name === name)?.id || name;
-  };
+  const playerIdFor = (name: string, pool: ServerPlayer[]) => pool.find((p) => p.name === name)?.id || name;
 
+  // 🔥 THIS IS THE SINGLE LAUNCH FUNCTION DOING EVERYTHING
   const startMatch = async () => {
     if (matchId && teamAId && teamBId) {
       try {
-        // Automatically handles Local Derby tracking if both IDs match
         const isLocalDerby = teamAId === teamBId;
 
+        // 1️⃣ Initialize Match Config
         const res = await initializeMatch(matchId, {
           batting_team_id: battingTeam === teamA ? teamAId : teamBId,
           fielding_team_id: bowlingTeam === teamA ? teamAId : teamBId,
@@ -189,18 +163,26 @@ const [commentaryStyle, setCommentaryStyle] = useState('broadcast_english');
             is_local_derby: isLocalDerby,
             batting_team_label: battingTeam,
             fielding_team_label: bowlingTeam,
-            wagon_wheel_enabled: wagonWheel,
-            commentary_type: commentaryType,
+            wagon_wheel_enabled: wagonWheel, // Wagon Wheel Flag
+            commentary_mode: commentaryMode,
+            commentary_style: commentaryStyle,
             name_display_format: nameDisplay
           }
         } as any);
 
-        // 🔥 CRITICAL ADDITION: Generate the Player ID Map for the UI
+        // 2️⃣ Save Audio Settings in the SAME click event
+        try {
+          await api.post(`/api/scorer/matches/${matchId}/audio-settings`, audioSettings);
+          console.log("Audio Settings automatically saved on launch!");
+        } catch (audioErr) {
+          console.error("Failed to save audio settings, but match initialized:", audioErr);
+          toast.error("Match launched, but audio configuration failed to save.");
+        }
+
+        // 3️⃣ Set Local Scoring Session
         const fullPlayerPool = [...teamAPool, ...teamBPool];
         const generatedPlayerIdMap: { [key: string]: string } = {};
-        fullPlayerPool.forEach(player => {
-          generatedPlayerIdMap[player.name] = player.id;
-        });
+        fullPlayerPool.forEach(player => { generatedPlayerIdMap[player.name] = player.id; });
 
         setLiveSession({
           matchId,
@@ -215,12 +197,10 @@ const [commentaryStyle, setCommentaryStyle] = useState('broadcast_english');
           },         
           battingRoster: battingTeam === teamA ? teamAPlayers : teamBPlayers,
           fieldingRoster: bowlingTeam === teamA ? teamAPlayers : teamBPlayers,
-          
-          // Injecting the map so ScorerConsole can convert names to IDs instantly
           playerIdMap: generatedPlayerIdMap 
         });
 
-        toast.success('Live database scoring context initialized!');
+        toast.success('Match Config & Audio Settings Successfully Synced!');
         onNavigate('/scorer', matchId);
         return;
       } catch (err: any) {
@@ -238,19 +218,14 @@ const [commentaryStyle, setCommentaryStyle] = useState('broadcast_english');
       toast.error('Please complete all required fields configuration values.');
       return;
     }
-    if (currentStep < totalSteps) {
-      setCurrentStep(currentStep + 1);
-    } else {
-      void startMatch();
-    }
+    // If Step 5, launch the match (executes startMatch)
+    if (currentStep < totalSteps) setCurrentStep(currentStep + 1);
+    else void startMatch();
   };
 
   const handleBack = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    } else {
-      onNavigate('/scorer-dashboard');
-    }
+    if (currentStep > 1) setCurrentStep(currentStep - 1);
+    else onNavigate('/scorer-dashboard');
   };
 
   const togglePlayerSelection = (team: 'A' | 'B', playerName: string) => {
@@ -259,21 +234,15 @@ const [commentaryStyle, setCommentaryStyle] = useState('broadcast_english');
         setTeamAPlayers(teamAPlayers.filter(p => p !== playerName));
         if (teamACaptain === playerName) setTeamACaptain('');
         if (teamAWicketKeeper === playerName) setTeamAWicketKeeper('');
-      } else if (teamAPlayers.length < 11) {
-        setTeamAPlayers([...teamAPlayers, playerName]);
-      } else {
-        toast.error('Maximum 11 players allowed.');
-      }
+      } else if (teamAPlayers.length < 11) setTeamAPlayers([...teamAPlayers, playerName]);
+      else toast.error('Maximum 11 players allowed.');
     } else {
       if (teamBPlayers.includes(playerName)) {
         setTeamBPlayers(teamBPlayers.filter(p => p !== playerName));
         if (teamBCaptain === playerName) setTeamBCaptain('');
         if (teamBWicketKeeper === playerName) setTeamBWicketKeeper('');
-      } else if (teamBPlayers.length < 11) {
-        setTeamBPlayers([...teamBPlayers, playerName]);
-      } else {
-        toast.error('Maximum 11 players allowed.');
-      }
+      } else if (teamBPlayers.length < 11) setTeamBPlayers([...teamBPlayers, playerName]);
+      else toast.error('Maximum 11 players allowed.');
     }
   };
 
@@ -288,7 +257,6 @@ const [commentaryStyle, setCommentaryStyle] = useState('broadcast_english');
     <div className="min-h-screen bg-[#f4f5f7] py-8 px-4 text-black">
       <div className="max-w-4xl mx-auto">
         
-        {/* Header Metadata Frame */}
         <div className="mb-8 flex justify-between items-end">
           <div>
             <h1 className="text-3xl font-black text-gray-900 tracking-tight">Match Setup Controller</h1>
@@ -301,7 +269,6 @@ const [commentaryStyle, setCommentaryStyle] = useState('broadcast_english');
           )}
         </div>
 
-        {/* Timeline Bar */}
         <div className="mb-8 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm relative overflow-hidden">
           <div className="relative flex justify-between z-10 max-w-3xl mx-auto px-2">
             <div className="absolute top-5 left-8 right-8 h-1 bg-gray-100 -z-10 transform -translate-y-1/2 rounded" />
@@ -309,7 +276,6 @@ const [commentaryStyle, setCommentaryStyle] = useState('broadcast_english');
               className="absolute top-5 left-8 h-1 bg-emerald-600 -z-10 transform -translate-y-1/2 rounded transition-all duration-300" 
               style={{ width: `calc(${((currentStep - 1) / (totalSteps - 1)) * 100}% - 4rem)` }}
             />
-
             {[1, 2, 3, 4, 5].map((step, index) => (
               <div key={step} className="flex flex-col items-center gap-2 w-16 sm:w-20">
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black transition-all shadow-sm ${
@@ -326,17 +292,13 @@ const [commentaryStyle, setCommentaryStyle] = useState('broadcast_english');
           </div>
         </div>
 
-        {/* Dynamic Wizard Steps Renderer Panel */}
         <div className="bg-white rounded-3xl border border-gray-200 shadow-xl p-6 md:p-8 mb-6">
-          
-          {/* STEP 1: VERIFY TEAMS AND SCHEDULE */}
           {currentStep === 1 && (
             <div className="space-y-6 animate-fadeIn">
               <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
                 <Landmark className="text-[#e60023]" size={22} />
                 <h2 className="text-xl font-black text-gray-900">Step 1: Administrative Schedule Dispatch</h2>
               </div>
-              
               {matchId ? (
                 <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 text-center space-y-4">
                   <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Locked Fixture Matches Matrix</p>
@@ -351,7 +313,6 @@ const [commentaryStyle, setCommentaryStyle] = useState('broadcast_english');
             </div>
           )}
 
-          {/* STEP 2: DYNAMIC CHECKLIST SQUAD FOR PLAYING 11 */}
           {currentStep === 2 && (
             <div className="space-y-6 animate-fadeIn">
               <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
@@ -360,7 +321,6 @@ const [commentaryStyle, setCommentaryStyle] = useState('broadcast_english');
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Team A Checklist Block */}
                 <div className="space-y-4">
                   <h3 className="font-extrabold text-gray-800 text-sm bg-gray-50 p-2.5 rounded-lg border flex justify-between">
                     <span>{teamA} Pool</span>
@@ -393,7 +353,6 @@ const [commentaryStyle, setCommentaryStyle] = useState('broadcast_english');
                   )}
                 </div>
 
-                {/* Team B Checklist Block */}
                 <div className="space-y-4">
                   <h3 className="font-extrabold text-gray-800 text-sm bg-gray-50 p-2.5 rounded-lg border flex justify-between">
                     <span>{teamB} Pool</span>
@@ -429,7 +388,6 @@ const [commentaryStyle, setCommentaryStyle] = useState('broadcast_english');
             </div>
           )}
 
-          {/* STEP 3: TOSS DECISION */}
           {currentStep === 3 && (
             <div className="space-y-6 animate-fadeIn">
               <h2 className="text-xl font-black text-gray-900 border-b pb-2">Step 3: Toss Records</h2>
@@ -453,12 +411,12 @@ const [commentaryStyle, setCommentaryStyle] = useState('broadcast_english');
             </div>
           )}
 
-          {/* STEP 4: UI CONFIGURATIONS ENGINE */}
           {currentStep === 4 && (
             <div className="space-y-6 animate-fadeIn">
               <h2 className="text-xl font-black text-gray-900 border-b pb-2">Step 4: UI Engine Configurations</h2>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm font-bold">
+                
                 <div>
                   <label className="block text-gray-500 mb-1">Wagon-Wheel Tracking</label>
                   <select 
@@ -472,19 +430,6 @@ const [commentaryStyle, setCommentaryStyle] = useState('broadcast_english');
                 </div>
 
                 <div>
-                  <label className="block text-gray-500 mb-1">Commentary Module Engine</label>
-                  <select 
-                    value={commentaryType} 
-                    onChange={e => setCommentaryType(e.target.value)} 
-                    className="w-full p-3 border rounded-xl bg-white outline-none focus:border-[#e60023]"
-                  >
-                    <option value="auto">Auto-Generated System Sync</option>
-                    <option value="manual">Manual Entry Required</option>
-                    <option value="none">Disabled (No Commentary)</option>
-                  </select>
-                </div>
-
-                <div className="sm:col-span-2">
                   <label className="block text-gray-500 mb-1">Player UI Display Name Format</label>
                   <select 
                     value={nameDisplay} 
@@ -495,15 +440,67 @@ const [commentaryStyle, setCommentaryStyle] = useState('broadcast_english');
                     <option value="First Name Last Name">First Name Last Name (e.g., Jasprit Bumrah)</option>
                     <option value="First Name Last Initial">First Name Last Initial (e.g., Jasprit B)</option>
                   </select>
-                  <p className="text-[10px] text-gray-400 font-semibold mt-1.5 ml-1">
-                    This format dictates how player names appear across the scoring console, scorecard, and analytics views.
-                  </p>
                 </div>
+
+                {/* AI COMMENTARY CONFIGURATION */}
+                <div className="sm:col-span-2 space-y-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                  <h4 className="font-bold text-gray-900">🎙️ AI Commentary Configuration</h4>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-500">Operation Mode</label>
+                      <select 
+                        value={commentaryMode} 
+                        onChange={(e) => setCommentaryMode(e.target.value)}
+                        className="w-full p-2.5 bg-white border rounded-xl outline-none focus:border-[#e60023]"
+                      >
+                        <option value="auto_with_manual_override">Auto (AI) + Manual Override</option>
+                        <option value="manual_only">Manual Only (No AI)</option>
+                        <option value="off">Disabled</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-500">Commentary Style</label>
+                      <select 
+                        value={commentaryStyle} 
+                        onChange={(e) => setCommentaryStyle(e.target.value)}
+                        className="w-full p-2.5 bg-white border rounded-xl outline-none focus:border-[#e60023]"
+                        disabled={commentaryMode === 'off' || commentaryMode === 'manual_only'}
+                      >
+                        <option value="broadcast_english">Standard Broadcast (English)</option>
+                        <option value="analytical">Data & Analytical Focus</option>
+                        <option value="dramatic">Dramatic & Exciting</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Conditional Audio Settings Render */}
+              <div className="mt-8 pt-8 border-t border-gray-200">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">Broadcast & Audio Settings</h3>
+                {matchId ? (
+                  commentaryMode === 'off' || commentaryMode === 'manual_only' ? (
+                    <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl text-sm text-orange-800 flex items-center gap-2">
+                      <ShieldAlert size={18} />
+                      Audio commentary cannot be configured because AI Text Commentary mode is disabled or set to manual.
+                    </div>
+                  ) : (
+                    <AudioMatchSettings 
+                      settings={audioSettings} 
+                      onChange={setAudioSettings} 
+                    />
+                  )
+                ) : (
+                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-500 italic">
+                    Audio configurations will be available once the match instance is fully synced.
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* STEP 5: INITIAL INNING OPENERS DECK */}
           {currentStep === 5 && (
             <div className="space-y-6 animate-fadeIn">
               <h2 className="text-xl font-black text-gray-900 border-b pb-2">Step 5: Operational Launch Deck</h2>
@@ -531,7 +528,6 @@ const [commentaryStyle, setCommentaryStyle] = useState('broadcast_english');
 
         </div>
 
-        {/* BOTTOM NAVIGATION ACTION RUN BAR */}
         <div className="flex justify-between items-center">
           <button onClick={handleBack} className="px-6 py-3 bg-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-300 transition-all flex items-center gap-1.5 text-sm">
             <ArrowLeft size={16} />{currentStep === 1 ? 'Discard Setup' : 'Back'}

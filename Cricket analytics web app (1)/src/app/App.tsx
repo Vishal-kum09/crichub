@@ -8,6 +8,8 @@ import {AIChatTab} from './components/AIChatTab.tsx'
 import { SignIn } from './pages/SignIn';
 import { SignUp } from './pages/SignUp';
 import { ForgotPassword } from './pages/ForgotPassword';
+import BallTrajectory from './pages/BallTracker';
+
 
 import { Matches } from './pages/Matches';
 import { MatchDetail } from './pages/MatchDetail';
@@ -130,7 +132,9 @@ export default function App() {
     '/admin': 'Club Administration',
     '/super-admin': 'Super Administration',
     '/settings': 'Settings',
-    '/ai-agent': 'AI Agent', // 🔥 Added Title
+    '/ai-agent': 'AI Agent',
+    '/BallTracker': 'BallTracker',
+     // 🔥 Added Title
   };
 
   const pageTitle = pageTitles[currentRoute.path] || 'CricketHub';
@@ -173,7 +177,8 @@ export default function App() {
       // 👇 🔥 YAHAN ADD KIYA HAI AI AGENT KA ROUTE 🔥 👇
       case '/ai-agent':
         return <AIChatTab />;
-        
+      case '/BallTracker':
+        return <BallTrajectory/>;
       default:
         return <Matches onNavigate={navigate} />;
     }

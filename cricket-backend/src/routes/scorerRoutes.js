@@ -29,4 +29,7 @@ router.post('/matches/:id/ball', ctrl.recordBall);
 router.post('/matches/:id/wicket-wizard', ctrl.wicketWizard);
 router.post('/matches/:id/undo', ctrl.undo);
 
+router.get('/matches/:id/audio-settings', ctrl.getAudioSettings);
+router.post('/matches/:id/audio-settings', ctrl.saveAudioSettings);
+
 module.exports = router;

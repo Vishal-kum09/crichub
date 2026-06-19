@@ -13,6 +13,7 @@ import {
   BarChart3,
   Star,
   Bell,
+  Bot, // 🔥 NAYA ICON ADD KIYA HAI
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -29,12 +30,6 @@ export function Sidebar({ currentPath, onNavigate, userRole }: SidebarProps) {
 
   // All navigation items with precise role restrictions matrix mapping
   const allNavItems = [
-    {
-      icon: LayoutDashboard,
-      label: 'Dashboard',
-      path: '/dashboard',
-      roles: ['viewer', 'player', 'scorer', 'analyst', 'club_admin', 'super_admin'] as UserRole[]
-    },
     {
       icon: Trophy,
       label: 'Matches',
@@ -88,6 +83,13 @@ export function Sidebar({ currentPath, onNavigate, userRole }: SidebarProps) {
       label: 'Super Admin',
       path: '/super-admin',
       roles: ['super_admin'] as UserRole[]
+    },
+    // 🔥 NAYA AI AGENT TAB 🔥
+    {
+      icon: Bot,
+      label: 'AI Agent',
+      path: '/ai-agent',
+      roles: ['viewer', 'player', 'scorer', 'analyst', 'club_admin', 'super_admin'] as UserRole[]
     },
     { 
       icon: Bell,

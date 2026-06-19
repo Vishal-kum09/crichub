@@ -25,9 +25,6 @@ export function Matches({ onNavigate }: MatchesProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const formats = ['All', 'T20', 'ODI', 'Test'];
-  const statuses = ['All', 'Live', 'Scheduled', 'Completed'];
-
   // Universal Live Tournament Match Sync Engine
   useEffect(() => {
     let cancelled = false;
@@ -52,10 +49,15 @@ export function Matches({ onNavigate }: MatchesProps) {
 
   const filteredMatches = matches.filter((match) => {
     const matchesFormat = selectedFormat === 'All' || match.format === selectedFormat;
+    // Safety check for undefined properties before searching
+    const opponentSafe = match.opponent || '';
+    const venueSafe = match.venue || '';
+    
     const matchesSearch =
       searchQuery === '' ||
-      match.opponent.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      match.venue.toLowerCase().includes(searchQuery.toLowerCase());
+      opponentSafe.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      venueSafe.toLowerCase().includes(searchQuery.toLowerCase());
+      
     return matchesFormat && matchesSearch;
   });
 
@@ -63,124 +65,134 @@ export function Matches({ onNavigate }: MatchesProps) {
 
   return (
     <div className="space-y-4 lg:space-y-6">
+      
       {/* =========================================================================
-          TOP BANNER HEADER (Clean View Only)
+          TOP BANNER HEADER
          ========================================================================= */}
       <div>
         <h2 className="text-2xl font-semibold text-[#1a1a1a]">Matches</h2>
         <p className="text-sm text-[#666666]">Browse and monitor live tournament metrics</p>
       </div>
 
-      {/* Filter Row Viewport */}
-      <Card>
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 text-[#666666]">
-            <Filter size={18} />
-            <span className="font-medium text-sm lg:text-base">Filters</span>
-          </div>
-          <div className="flex flex-col gap-4">
-            <div>
-              <label className="block text-xs lg:text-sm mb-2">Format</label>
-              <div className="flex flex-wrap gap-2">
-                {formats.map((format) => (
-                  <button
-                    key={format}
-                    onClick={() => setSelectedFormat(format)}
-                    className={`px-3 lg:px-4 py-2 rounded-full text-xs lg:text-sm transition-colors min-h-[44px] touch-manipulation ${
-                      selectedFormat === format ? 'bg-[#e60023] text-white' : 'bg-[#f9f9f9] text-[#666666] hover:bg-[#f0f0f0]'
-                    }`}
-                  >
-                    {format}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs lg:text-sm mb-2">Status</label>
-              <div className="flex flex-wrap gap-2">
-                {statuses.map((status) => (
-                  <button
-                    key={status}
-                    onClick={() => setSelectedStatus(status)}
-                    className={`px-3 lg:px-4 py-2 rounded-full text-xs lg:text-sm transition-colors min-h-[44px] touch-manipulation ${
-                      selectedStatus === status ? 'bg-[#e60023] text-white' : 'bg-[#f9f9f9] text-[#666666] hover:bg-[#f0f0f0]'
-                    }`}
-                  >
-                    {status}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs lg:text-sm mb-2">Search</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#666666]" size={18} />
-                <input
-                  type="text"
-                  placeholder="Search opponent or venue..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-[#e0e0e0] rounded-lg focus:outline-none focus:border-[#e60023] text-base"
-                />
-              </div>
-            </div>
-          </div>
+      {/* =========================================================================
+          🔥 ULTRA-COMPACT FILTERS SECTION (Single Row) 🔥
+         ========================================================================= */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 animate-fadeIn">
+        <div className="flex items-center gap-2 mb-3">
+          <Filter size={16} className="text-[#e60023]" />
+          <h3 className="text-sm font-black text-gray-800 uppercase tracking-wider">Quick Filters</h3>
         </div>
-      </Card>
+        
+        {/* 🔥 All 3 items in a single Flex row on Desktop 🔥 */}
+        <div className="flex flex-col md:flex-row gap-3">
+          
+          {/* Format Dropdown */}
+          <select 
+            value={selectedFormat} 
+            onChange={(e) => setSelectedFormat(e.target.value)} 
+            className="w-full md:w-85 px-29 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-gray-700 focus:outline-none focus:border-[#e60023] focus:ring-1 focus:ring-[#e60023] cursor-pointer transition-all"
+          >
+            <option value="All">All Formats</option>
+            <option value="T20">T20</option>
+            <option value="50 Overs">50 Overs</option>
+            <option value="Multi Day">Multi Day</option>
+            <option value="National Cup(40 Overs)">National Cup(40 Overs)</option>
+            <option value="Custom">Custom</option>
+          </select>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Status Dropdown */}
+          <select 
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+            className="w-full md:w-85 px-30 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-gray-700 focus:outline-none focus:border-[#e60023] focus:ring-1 focus:ring-[#e60023] cursor-pointer transition-all"
+          >
+            <option value="All">All Statuses</option>
+            <option value="Live">Live</option>
+            <option value="Scheduled">Scheduled</option>
+            <option value="Completed">Completed</option>
+          </select>
+
+          {/* Search Bar - Takes up the remaining horizontal space (flex-1) */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} pointerEvents="none" />
+            <input 
+              type="text" 
+              placeholder="Search opponent team or venue..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#e60023] focus:ring-1 focus:ring-[#e60023] transition-all"
+            />
+          </div>
+          
+        </div>
+      </div>
+
+      {/* =========================================================================
+          🔥 MATCH CARDS GRID (3 columns on large screens) 🔥
+         ========================================================================= */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredMatches.map((match) => (
           <button
             key={match.id}
             onClick={() => onNavigate('/match', match.id)}
-            className="text-left bg-white border border-[#e0e0e0] rounded-2xl p-5 shadow-sm hover:shadow-lg hover:border-[#d0d0d0] transition-all"
+            className="text-left bg-white border border-[#e0e0e0] rounded-2xl p-4 shadow-sm hover:shadow-lg hover:border-[#e60023] transition-all group flex flex-col justify-between h-full"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2 mb-2">
+            <div>
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="flex items-center gap-2">
                   <Badge>{match.format}</Badge>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${match.status === 'In Progress' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-gray-100 text-gray-700 border border-gray-200'}`}>
                     {statusLabel(match.status)}
                   </span>
                 </div>
-                <h3 className="text-lg font-black text-[#1a1a1a]">{match.teamA}</h3>
-                <p className="text-xs font-bold text-[#999999] my-1">vs</p>
-                <h3 className="text-lg font-black text-[#1a1a1a]">{match.teamB}</h3>
               </div>
-              <div className="text-right min-w-[120px]">
+              
+              <h3 className="text-base font-black text-[#1a1a1a] leading-tight group-hover:text-[#e60023] transition-colors line-clamp-1">{match.teamA}</h3>
+              <p className="text-[10px] font-bold text-[#999999] my-1 uppercase">vs</p>
+              <h3 className="text-base font-black text-[#1a1a1a] leading-tight group-hover:text-[#e60023] transition-colors line-clamp-1">{match.teamB}</h3>
+            </div>
+            
+            <div className="mt-3 flex justify-between items-end">
+               <div>
+                  <div className="flex flex-col gap-0.5 text-xs font-bold text-[#666666]">
+                    <span className="truncate max-w-[150px]">{match.venue || 'TBD Venue'}</span>
+                    <span>{match.result || new Date(match.date).toLocaleDateString()}</span>
+                  </div>
+               </div>
+
+              <div className="text-right shrink-0 ml-2">
                 {match.status === 'In Progress' && match.liveScore ? (
                   <>
-                    <p className="text-[10px] font-black uppercase text-red-600">Live</p>
-                    <p className="text-2xl font-black text-[#1a1a1a] tabular-nums">{match.liveScore}</p>
+                    <p className="text-[10px] font-black uppercase text-red-600 flex items-center justify-end gap-1">
+                       <span className="w-1.5 h-1.5 bg-red-600 rounded-full animate-pulse"></span> Live
+                    </p>
+                    <p className="text-xl font-black text-[#1a1a1a] tabular-nums">{match.liveScore}</p>
                   </>
                 ) : match.status === 'Completed' || match.result ? (
-                  <div className="space-y-2">
-                    <p className="text-sm font-black text-[#1a1a1a] tabular-nums">{match.teamAScore || '-'}</p>
-                    <p className="text-sm font-black text-[#1a1a1a] tabular-nums">{match.teamBScore || '-'}</p>
+                  <div className="space-y-1">
+                    <p className="text-xs font-black text-[#1a1a1a] tabular-nums">{match.teamAScore || '-'}</p>
+                    <p className="text-xs font-black text-[#1a1a1a] tabular-nums">{match.teamBScore || '-'}</p>
                   </div>
                 ) : (
-                  <p className="text-sm font-bold text-[#666666]">{new Date(match.date).toLocaleDateString()}</p>
+                  <p className="text-xs font-bold text-[#666666]">{new Date(match.date).toLocaleDateString()}</p>
                 )}
               </div>
-            </div>
-            <div className="mt-4 pt-4 border-t border-[#f0f0f0] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-bold text-[#666666]">
-              <span>{match.venue}</span>
-              <span>{match.result || new Date(match.date).toLocaleDateString()}</span>
             </div>
           </button>
         ))}
       </div>
       
-
-      {/* Loader UI Overlays */}
+      {/* =========================================================================
+          LOADER & EMPTY STATES
+         ========================================================================= */}
       {loading && (
         <Card><div className="text-center py-8"><p className="text-[#666666]">Loading matches…</p></div></Card>
       )}
       {!loading && error && (
-        <Card><div className="text-center py-8"><p className="text-[#666666]">{error}</p></div></Card>
+        <Card><div className="text-center py-8"><p className="text-red-600 font-medium">{error}</p></div></Card>
       )}
       {!loading && !error && filteredMatches.length === 0 && (
-        <Card><div className="text-center py-8"><p className="text-[#666666]">No matches found</p></div></Card>
+        <Card><div className="text-center py-8"><p className="text-[#666666] font-medium">No matches found matching your filters.</p></div></Card>
       )}
     </div>
   );

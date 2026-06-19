@@ -3,12 +3,12 @@ import '../utils/suppressWarnings';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
 import { Toaster } from './components/ui/sonner';
-
+// 🔥 AI Chat Tab Imported Here
+import {AIChatTab} from './components/AIChatTab.tsx'
 import { SignIn } from './pages/SignIn';
 import { SignUp } from './pages/SignUp';
 import { ForgotPassword } from './pages/ForgotPassword';
 
-import { Dashboard } from './pages/Dashboard';
 import { Matches } from './pages/Matches';
 import { MatchDetail } from './pages/MatchDetail';
 import { MatchSetup } from './pages/MatchSetup';
@@ -25,7 +25,7 @@ import { ClubAdmin } from './pages/ClubAdmin';
 import { SuperAdmin } from './pages/SuperAdmin';
 import { Settings } from './pages/Settings';
 import { ScorerDashboard } from './pages/Assignedmatches.tsx';
-import { Notifications } from './components/notifications'; // 🔥 Added Notifications import
+import { Notifications } from './components/notifications'; 
 
 import {
   clearStoredToken,
@@ -112,7 +112,6 @@ export default function App() {
     );
   }
 
-  // 🔥 Added '/notifications' to page titles
   const pageTitles: Record<string, string> = {
     '/dashboard': 'Dashboard',
     '/notifications': 'Notifications', 
@@ -131,14 +130,13 @@ export default function App() {
     '/admin': 'Club Administration',
     '/super-admin': 'Super Administration',
     '/settings': 'Settings',
+    '/ai-agent': 'AI Agent', // 🔥 Added Title
   };
 
   const pageTitle = pageTitles[currentRoute.path] || 'CricketHub';
 
   const renderPage = () => {
     switch (currentRoute.path) {
-      case '/dashboard':
-        return <Dashboard onNavigate={navigate} />;
       case '/matches':
         return <Matches onNavigate={navigate} />;
       case '/match':
@@ -169,11 +167,15 @@ export default function App() {
         return <SuperAdmin />;
       case '/settings':
         return <Settings onNavigate={navigate} />;
-      // 🔥 Added the notifications case here
       case '/notifications':
         return <Notifications userRole={userRole} isApproved={true} />;
+      
+      // 👇 🔥 YAHAN ADD KIYA HAI AI AGENT KA ROUTE 🔥 👇
+      case '/ai-agent':
+        return <AIChatTab />;
+        
       default:
-        return <Dashboard onNavigate={navigate} />;
+        return <Matches onNavigate={navigate} />;
     }
   };
 

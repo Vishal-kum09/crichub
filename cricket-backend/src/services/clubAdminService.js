@@ -108,8 +108,10 @@ const createMatch = async (user, input) => {
     team1_id: finalTeam1Id,
     team2_id: finalTeam2Id,
     venue: input.venue,
-    city: input.city || null,
-    country: input.country || 'India',
+    city: input.city ,
+    country: input.country ,
+    address: input.address,
+    postcode: input.postcode,
     status: 'scheduled', // status match column ENUM state
     is_public: input.is_public ?? true,
     notes: input.notes || '', // Holds structural local derby strings or meta context cleanly

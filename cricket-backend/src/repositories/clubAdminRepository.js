@@ -81,14 +81,14 @@ const insertMatch = async (m) => {
   const r = await query(
     `INSERT INTO matches
        (match_date, start_time, format, ball_type, overs_per_match,
-        host_club_id, opponent_club_id, venue, scheduled_at, status, is_public, notes, created_by, created_at, updated_at)
-     VALUES ($1, $2, $3::match_format, $4, $5, $6, $7, $8, $9, $10::match_status, $11, $12, $13, NOW(), NOW())
+        host_club_id, opponent_club_id, venue, scheduled_at, status, is_public, notes, created_by, address,postcode,created_at, updated_at)
+     VALUES ($1, $2, $3::match_format, $4, $5, $6, $7, $8, $9, $10::match_status, $11, $12, $13,$14,$15, NOW(), NOW())
      RETURNING matches_id, status, scheduled_at, venue, overs_per_match,
                team1_id, team2_id, notes, created_by`,
     [
       m.match_date, m.start_time, m.format, m.ball_type, m.overs_per_match,
       m.host_club_id, m.opponent_club_id, m.venue, m.scheduled_at, m.status, m.is_public,
-      m.notes, m.created_by
+      m.notes, m.created_by, m.address, m.postcode
     ]
   );
   return r.rows[0];

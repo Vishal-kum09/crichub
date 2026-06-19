@@ -35,6 +35,8 @@ const CreateMatchSchema = z.object({
   venue_neutral: z.boolean().default(false),
   city: z.string().min(1),
   country: z.string().min(1),
+  address: z.string().optional(),
+  postcode: z.string().optional(),
   squad_player_ids: z.array(z.string()).default([]),
   team1_id: z.string().uuid().optional(),
   team2_id: z.string().uuid().optional(),
@@ -75,10 +77,10 @@ const createMatch = async (req, res, next) => {
     const matchSql = `
       INSERT INTO matches (
         host_club_id, opponent_club_id, match_date, start_time, scheduled_at, 
-        format, ball_type, overs_per_match, venue, pitch_num, venue_neutral, city, country, status, 
+        format, ball_type, overs_per_match, venue, pitch_num, venue_neutral, city, country,address,postcode, status, 
         notes, created_by, created_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW()) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,$17,$18, NOW()) 
       RETURNING matches_id;
     `;
     
@@ -86,7 +88,7 @@ const createMatch = async (req, res, next) => {
       adminClubId, 
       data.match_type === 'cross_club' ? data.opponent_club_id : adminClubId, 
       data.match_date, data.start_time, data.scheduled_at, data.format, data.ball_type, 
-      data.overs_per_match || 20, data.venue, data.pitch_num, data.venue_neutral, data.city, data.country, initialStatus,
+      data.overs_per_match , data.venue, data.pitch_num, data.venue_neutral, data.city, data.country,data.address,data.postcode, initialStatus,
       notes, adminUserId
     ];
 

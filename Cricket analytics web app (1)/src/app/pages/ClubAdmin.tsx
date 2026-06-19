@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Users, Trophy, Search, Calendar, CheckCircle, XCircle, Trash2, Edit, ArrowRight, ArrowLeft, ShieldCheck, UserPlus, Save, X, Radio } from 'lucide-react';
+import { Users, Trophy, Search, Calendar, CheckCircle, XCircle, Trash2, Edit, ArrowRight, ArrowLeft, ShieldCheck, UserPlus, Save, X, Radio,Clock,MapPin } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { toast } from '../../lib/toast';
@@ -72,13 +72,13 @@ export function ClubAdmin() {
   });
 
   const [matchForm, setMatchForm] = useState({ 
-    date: '', time: '', format: 'T20', ballType: 'leather', oversPerMatch: '20', 
-    venue: '', pitchNum: '', venueNeutral: false, city: '', country: '',
+    date: '', time: '', format: '', ballType: '', oversPerMatch: '', 
+    venue: '', pitchNum: '', venueNeutral: false, city: '', country: '',address:'',postcode:'',
     opponentClubId: '', selectedSquadIds: [] as string[], assignedScorerId: '' 
     , team1Id: '', team2Id: ''
   });
   
-  const [tournamentForm, setTournamentForm] = useState({ name: '', type: 'League', oversLimit: '20', maxTeams: '8', startDate: '', endDate: '' });
+  const [tournamentForm, setTournamentForm] = useState({ name: '', type: '', oversLimit: '', maxTeams: '', startDate: '', endDate: '' });
 
   const loadApprovals = () => {
     getPendingApprovals().then(setPendingApprovals).catch(() => setPendingApprovals([]));
@@ -348,12 +348,14 @@ export function ClubAdmin() {
         venue_neutral: matchForm.venueNeutral,
         city: matchForm.city,
         country: matchForm.country,
+        address: matchForm.address,
+        postcode: matchForm.postcode,
         squad_player_ids: matchForm.selectedSquadIds,
         assigned_scorer_id: matchForm.assignedScorerId
       });
 
       toast.success('Match scheduled successfully!');
-      setMatchForm({ date: '', time: '', format: 'T20', ballType: 'leather', oversPerMatch: '20', venue: '', pitchNum: '', venueNeutral: false, city: '', country: 'India', opponentClubId: '', selectedSquadIds: [], assignedScorerId: '', team1Id: '', team2Id: '' } as any);
+      setMatchForm({ date: '', time: '', format: '', ballType: '', oversPerMatch: '', venue: '', pitchNum: '', venueNeutral: false, city: '', country: '',address:'',postcode:'', opponentClubId: '', selectedSquadIds: [], assignedScorerId: '', team1Id: '', team2Id: '' } as any);
       setMatchTeamPlayers([]);
       setWizardStep(1);
       setActiveTab('my-matches');
@@ -643,17 +645,17 @@ export function ClubAdmin() {
                             </td>
 
                             <td className="p-4 text-sm font-bold text-gray-500 max-w-[180px] truncate">
-                              {match.venue || 'TBD'}
+                              {match.venue}
                             </td>
 
                             <td className="p-4">
                               <span className="inline-block rounded-lg bg-gray-100 px-2 py-0.5 text-xs font-black text-gray-700 uppercase">
-                                {match.format || 'T20'}
+                                {match.format }
                               </span>
                             </td>
 
                             <td className="p-4 text-sm font-black text-gray-700">
-                              {match.tournament || 'Club Bilateral'}
+                              {match.tournament}
                             </td>
 
                             <td className="p-4 text-right">
@@ -708,100 +710,181 @@ export function ClubAdmin() {
               </div>
             )}
             {wizardStep === 1 && (
-              <div className="space-y-4 animate-fadeIn">
-                {matchType === 'club' && (
-                  <div>
-                    <label className="block text-xs font-black text-gray-500 uppercase mb-1">Opponent Club *</label>
-                    <select value={matchForm.opponentClubId} onChange={(e) => setMatchForm({ ...matchForm, opponentClubId: e.target.value })} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white text-xs font-bold text-gray-800 focus:outline-none focus:border-[#e60023]">
-                      <option value="">-- Choose Registered Opponent Club --</option>
-                      {globalClubs?.map((club: any) => (
-                        <option key={club.id} value={club.id}>{club.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-black text-gray-500 uppercase mb-1">Your Team *</label>
-                    <select
-                      value={matchForm.team1Id}
-                      onChange={(e) => {
-                        setMatchForm({ ...matchForm, team1Id: e.target.value });
-                        loadMatchTeamPlayers(e.target.value);
-                      }}
-                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white text-xs font-bold text-gray-800 focus:outline-none focus:border-[#e60023]"
-                    >
-                      <option value="">-- Select Team --</option>
-                      {myTeams.map(team => <option key={team.id} value={team.id}>{team.name} ({team.player_count})</option>)}
-                    </select>
-                  </div>
-                  {matchType === 'local' && (
-                    <div>
-                      <label className="block text-xs font-black text-gray-500 uppercase mb-1">Opponent Team *</label>
-                      <select
-                        value={matchForm.team2Id}
-                        onChange={(e) => setMatchForm({ ...matchForm, team2Id: e.target.value })}
-                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white text-xs font-bold text-gray-800 focus:outline-none focus:border-[#e60023]"
-                      >
-                        <option value="">-- Select Team --</option>
-                        {myTeams.filter(team => team.id !== matchForm.team1Id).map(team => <option key={team.id} value={team.id}>{team.name} ({team.player_count})</option>)}
-                      </select>
-                    </div>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-black text-gray-500 uppercase mb-1">Format *</label>
-                    <select value={matchForm.format} onChange={(e) => setMatchForm({ ...matchForm, format: e.target.value })} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white text-xs font-bold focus:outline-none">
-                      <option value="T20">T20</option>
-                      <option value="50 Overs">50 Overs</option>
-                      <option value="Multi Day">Multi Day</option>
-                      <option value="National Cup">National Cup(40 Overs)</option>
-                      <option value="Custom">Custom</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-black text-gray-500 uppercase mb-1">Ball Type *</label>
-                    <select value={matchForm.ballType} onChange={(e) => setMatchForm({ ...matchForm, ballType: e.target.value })} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white text-xs font-bold focus:outline-none">
-                      <option value="Red Leather Ball">Red Leather Ball</option>
-                      <option value="White Leather Ball">White Leather Ball</option>
-                      <option value="Pink Leather Ball">Pink Leather Ball</option>
-                      <option value="Soft Ball">Soft Ball</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-black text-gray-500 uppercase mb-1">Overs Per Match *</label>
-                    <Input type="number" placeholder="20" required value={matchForm.oversPerMatch} onChange={(e) => setMatchForm({ ...matchForm, oversPerMatch: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-black text-gray-500 uppercase mb-1">Match Date *</label>
-                    <Input type="date" required value={matchForm.date} onChange={(e) => setMatchForm({ ...matchForm, date: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-black text-gray-500 uppercase mb-1">Start Time *</label>
-                    <Input type="time" required value={matchForm.time} onChange={(e) => setMatchForm({ ...matchForm, time: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-black text-gray-500 uppercase mb-1">Venue *</label>
-                    <Input type="text" placeholder="Ground/Stadium" required value={matchForm.venue} onChange={(e) => setMatchForm({ ...matchForm, venue: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-black text-gray-500 uppercase mb-1">City *</label>
-                    <Input type="text" placeholder="Match City" required value={matchForm.city} onChange={(e) => setMatchForm({ ...matchForm, city: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-black text-gray-500 uppercase mb-1">Country *</label>
-                    <Input type="text" placeholder="Country" required value={matchForm.country} onChange={(e) => setMatchForm({ ...matchForm, country: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-black text-gray-500 uppercase mb-1">Pitch Number</label>
-                    <Input type="number" placeholder="e.g. 1" value={matchForm.pitchNum} onChange={(e) => setMatchForm({ ...matchForm, pitchNum: e.target.value })} />
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 p-3 border border-gray-200 rounded-xl bg-gray-50 mt-2">
-                  <input type="checkbox" id="neutral_venue" checked={matchForm.venueNeutral} onChange={(e) => setMatchForm({ ...matchForm, venueNeutral: e.target.checked })} className="h-4 w-4 accent-[#e60023]" />
-                  <label htmlFor="neutral_venue" className="text-xs font-bold text-gray-700 cursor-pointer">Is this a Neutral Venue?</label>
-                </div>
+  <div className="space-y-4 animate-fadeIn">
+    
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {matchType === 'club' && (
+        <div>
+          <label className="block text-xs font-black text-gray-500 uppercase mb-1">Opponent Club *</label>
+          <select 
+            value={matchForm.opponentClubId} 
+            onChange={(e) => setMatchForm({ ...matchForm, opponentClubId: e.target.value })} 
+            className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white text-xs font-bold text-gray-800 focus:outline-none focus:border-[#e60023]"
+          >
+            <option value="">-- Choose Registered Opponent Club --</option>
+            {globalClubs?.map((club: any) => (
+              <option key={club.id} value={club.id}>{club.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {matchType === 'local' && (
+        <div>
+          <label className="block text-xs font-black text-gray-500 uppercase mb-1">Opponent Team *</label>
+          <select
+            value={matchForm.team2Id}
+            onChange={(e) => setMatchForm({ ...matchForm, team2Id: e.target.value })}
+            className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-red text-xs font-bold text-gray-800 focus:outline-none focus:border-[#e60023]"
+          >
+            <option value="">-- Select Team --</option>
+            {myTeams.filter(team => team.id !== matchForm.team1Id).map(team => <option key={team.id} value={team.id}>{team.name} ({team.player_count})</option>)}
+          </select>
+        </div>
+      )}
+
+      <div>
+        <label className="block text-xs font-black text-gray-500 uppercase mb-1">Your Team *</label>
+        <select
+          value={matchForm.team1Id}
+          onChange={(e) => {
+            setMatchForm({ ...matchForm, team1Id: e.target.value });
+            loadMatchTeamPlayers(e.target.value);
+          }}
+          className="w-full px-3 py-2.5 border border-[#e60023] rounded-xl bg-white-50/30 text-xs font-bold text-[#e60023] focus:outline-none focus:ring-1 focus:ring-[#e60023]"
+        >
+          <option value="">-- Select Team --</option>
+          {myTeams.map(team => <option key={team.id} value={team.id}>{team.name} ({team.player_count})</option>)}
+        </select>
+      </div>
+    </div>
+
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div>
+        <label className="block text-xs font-black text-gray-500 uppercase mb-1">Format *</label>
+        <select value={matchForm.format} onChange={(e) => setMatchForm({ ...matchForm, format: e.target.value })} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white text-xs font-bold focus:outline-none focus:border-[#e60023]">
+          <option value="T20">T20</option>
+          <option value="50 Overs">50 Overs</option>
+          <option value="Multi Day">Multi Day</option>
+          <option value="National Cup">National Cup(40 Overs)</option>
+          <option value="Custom">Custom</option>
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs font-black text-gray-500 uppercase mb-1">Ball Type *</label>
+        <select value={matchForm.ballType} onChange={(e) => setMatchForm({ ...matchForm, ballType: e.target.value })} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white text-xs font-bold focus:outline-none focus:border-[#e60023]">
+          <option value="Red Leather Ball">Red Leather Ball</option>
+          <option value="White Leather Ball">White Leather Ball</option>
+          <option value="Pink Leather Ball">Pink Leather Ball</option>
+          <option value="Soft Ball">Soft Ball</option>
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs font-black text-gray-500 uppercase mb-1">Overs Per Match *</label>
+        <Input type="number" placeholder="20" required value={matchForm.oversPerMatch} onChange={(e) => setMatchForm({ ...matchForm, oversPerMatch: e.target.value })} />
+      </div>
+    </div>
+
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div>
+        <label className="block text-xs font-black text-gray-500 uppercase mb-1">Match Date *</label>
+        <div className="relative">
+          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} pointerEvents="none" />
+          <input 
+            type="date" 
+            required 
+            value={matchForm.date} 
+            onChange={(e) => setMatchForm({ ...matchForm, date: e.target.value })}
+            className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#e60023] [&::-webkit-calendar-picker-indicator]:hidden"
+          />
+        </div>
+      </div>
+      <div>
+        <label className="block text-xs font-black text-gray-500 uppercase mb-1">Start Time *</label>
+        <div className="relative">
+          <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} pointerEvents="none" />
+          <input 
+            type="time" 
+            required 
+            value={matchForm.time} 
+            onChange={(e) => setMatchForm({ ...matchForm, time: e.target.value })}
+            className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#e60023] [&::-webkit-calendar-picker-indicator]:hidden"
+          />
+        </div>
+      </div>
+      <div>
+        <label className="block text-xs font-black text-gray-500 uppercase mb-1">Venue *</label>
+        <div className="relative">
+          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} pointerEvents="none" />
+          <input 
+            type="text" 
+            placeholder="Ground/Stadium" 
+            required 
+            value={matchForm.venue} 
+            onChange={(e) => setMatchForm({ ...matchForm, venue: e.target.value })}
+            className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#e60023]"
+          />
+        </div>
+      </div>
+      <div>
+        <label className="block text-xs font-black text-gray-500 uppercase mb-1 flex items-center gap-1">
+          Address <span className="text-gray-400 text-[10px] normal-case">(Optional)</span>
+        </label>
+        <input 
+          type="text" 
+          placeholder="e.g. Near Main Gate" 
+          value={matchForm.address || ''} 
+          onChange={(e) => setMatchForm({ ...matchForm, address: e.target.value })}
+          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#e60023] placeholder:text-gray-300"
+        />
+      </div>
+    </div>
+
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div>
+        <label className="block text-xs font-black text-gray-500 uppercase mb-1 flex items-center gap-1">City *</label>
+        <input 
+          type="text" 
+          placeholder="Match City" 
+          required 
+          value={matchForm.city} 
+          onChange={(e) => setMatchForm({ ...matchForm, city: e.target.value })}
+          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#e60023] placeholder:text-gray-300 transition-all"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-black text-gray-500 uppercase mb-1">Country *</label>
+        <input 
+          type="text" 
+          placeholder="Country" 
+          required 
+          value={matchForm.country} 
+          onChange={(e) => setMatchForm({ ...matchForm, country: e.target.value })}
+          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#e60023] placeholder:text-gray-300 transition-all"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-black text-gray-500 uppercase mb-1">PostCode / ZIP *</label>
+        <input 
+          type="text" 
+          placeholder="PostCode" 
+          required 
+          value={matchForm.postcode} 
+          onChange={(e) => setMatchForm({ ...matchForm, postcode: e.target.value })}
+          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#e60023] placeholder:text-gray-300 transition-all"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-black text-gray-500 uppercase mb-1">Pitch Number</label>
+        <input 
+          type="number" 
+          placeholder="e.g. 1" 
+          value={matchForm.pitchNum} 
+          onChange={(e) => setMatchForm({ ...matchForm, pitchNum: e.target.value })}
+          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#e60023] placeholder:text-gray-300 transition-all"
+        />
+      </div>
+    </div>
                 <Button onClick={() => {
                   if (!matchForm.team1Id) { toast.error("Choose your team."); return; }
                   if (matchType === 'local' && !matchForm.team2Id) { toast.error("Choose opponent team."); return; }
@@ -1206,6 +1289,5 @@ export function ClubAdmin() {
           </div>
         )}
       </div>
-    </div>
-  );
-}
+  </div>
+  );}

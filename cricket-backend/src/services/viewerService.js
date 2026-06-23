@@ -30,13 +30,14 @@ const getScorecard = async (matchId) => {
   const innings = await matchRepo.findInningsByMatch(matchId);
   const cards = [];
   for (const inn of innings) {
-    const [batting, bowling, fallOfWickets, yetToBat] = await Promise.all([
+    const [batting, bowling, fallOfWickets, yetToBat, recentDeliveries] = await Promise.all([
       matchRepo.findBattingCards(inn.id, inn.batting_team_id),
       matchRepo.findBowlingFigures(inn.id),
       matchRepo.findFallOfWickets(inn.id),
-      matchRepo.findYetToBat(inn.id, inn.batting_team_id)
+      matchRepo.findYetToBat(inn.id, inn.batting_team_id),
+      matchRepo.findRecentDeliveries(inn.id)
     ]);
-    cards.push(present.presentInnings(inn, batting, bowling, fallOfWickets, yetToBat));
+    cards.push(present.presentInnings(inn, batting, bowling, fallOfWickets, yetToBat, recentDeliveries));
   }
 
   return present.presentScorecard(match, cards);

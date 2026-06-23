@@ -126,12 +126,38 @@ const createMatch = async (req, res, next) => {
 const acceptMatchRequest = async (req, res, next) => {
   try {
     const { match_id } = req.params; 
-    const { assigned_scorer_id, squad_player_ids } = req.body;
+    const {
+      assigned_scorer_id,
+      squad_player_ids = [],
+      team_id,
+      captain_id = null,
+      wicketkeeper_id = null
+    } = req.body;
     const { query } = require('../../db');
+    const adminUserId = req.user.user_id || req.user.id;
     
     if (!match_id || match_id === 'undefined') throw new AppError('Match ID missing', 400);
+    if (!team_id) throw new AppError('Select your team before accepting this match', 400);
+    if (!assigned_scorer_id) throw new AppError('Assign your club scorer before accepting this match', 400);
 
     await query('BEGIN');
+
+    const teamCheck = await query(
+      `SELECT teams_id
+         FROM teams
+        WHERE teams_id = $1
+          AND created_by IN (SELECT user_id FROM users WHERE club_id = $2)
+          AND is_active = true`,
+      [team_id, req.user.club_id]
+    );
+    if (teamCheck.rows.length === 0) throw new AppError('Selected team does not belong to your club', 403);
+
+    const scorerCheck = await query(
+      `SELECT user_id FROM users
+        WHERE user_id = $1 AND club_id = $2 AND account_role = 'Scorer'::account_role`,
+      [assigned_scorer_id, req.user.club_id]
+    );
+    if (scorerCheck.rows.length === 0) throw new AppError('Selected scorer does not belong to your club', 403);
 
     // Update match status to scheduled
     const matchUpd = await query(
@@ -140,11 +166,63 @@ const acceptMatchRequest = async (req, res, next) => {
     );
     
     if (matchUpd.rows.length === 0) throw new AppError('Match not found', 404);
+
+    const selectedPlayerIds = [...new Set(squad_player_ids.filter(Boolean))];
+    if (selectedPlayerIds.length > 0) {
+      const playerCheck = await query(
+        `SELECT players_id FROM players
+          WHERE club_id = $1 AND is_active = true AND players_id = ANY($2::uuid[])`,
+        [req.user.club_id, selectedPlayerIds]
+      );
+      if (playerCheck.rows.length !== selectedPlayerIds.length) {
+        throw new AppError('One or more selected players do not belong to your club', 403);
+      }
+
+      await query(
+        `INSERT INTO team_players (team_id, player_id, squad_role, joined_at)
+         SELECT $1, incoming.player_id, 'player'::squad_role_enum, CURRENT_DATE
+           FROM unnest($2::uuid[]) AS incoming(player_id)
+          WHERE NOT EXISTS (
+            SELECT 1 FROM team_players tp
+             WHERE tp.team_id = $1 AND tp.player_id = incoming.player_id AND tp.left_at IS NULL
+          )`,
+        [team_id, selectedPlayerIds]
+      );
+    }
+
+    if (captain_id) {
+      await query(
+        `UPDATE team_players
+            SET squad_role = CASE WHEN player_id = $3 THEN 'captain'::squad_role_enum ELSE 'player'::squad_role_enum END
+          WHERE team_id = $1
+            AND left_at IS NULL
+            AND player_id IN (
+              SELECT players_id FROM players WHERE club_id = $2 AND is_active = true
+            )`,
+        [team_id, req.user.club_id, captain_id]
+      );
+    }
+
+    let notes = {};
+    try {
+      notes = matchUpd.rows[0].notes ? JSON.parse(matchUpd.rows[0].notes) : {};
+    } catch (_) {
+      notes = {};
+    }
+    notes.team2_id = team_id;
+    notes.opponent_squad_player_ids = selectedPlayerIds;
+    notes.opponent_captain_id = captain_id;
+    notes.opponent_wicketkeeper_id = wicketkeeper_id;
+
+    await query(
+      'UPDATE matches SET notes = $1, updated_at = NOW() WHERE matches_id = $2',
+      [JSON.stringify(notes), match_id]
+    );
     
     // Assign opponent's scorer
     await query(
       'INSERT INTO scorer_assignments (match_id, scorer_id, assigned_by, created_at) VALUES ($1, $2, $3, NOW())', 
-      [match_id, assigned_scorer_id, req.user.id]
+      [match_id, assigned_scorer_id, adminUserId]
     );
 
     // 🔥 SEND NOTIFICATION TO OPPONENT SCORER

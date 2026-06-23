@@ -63,7 +63,7 @@ export function Sidebar({ currentPath, onNavigate, userRole }: SidebarProps) {
     },
     {
       icon: Users,
-      label: 'Teams',
+      label: 'Clubs',
       path: '/teams',
       roles: ['viewer', 'super_admin'] as UserRole[]
     },

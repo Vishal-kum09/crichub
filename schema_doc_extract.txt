@@ -1,0 +1,788 @@
+Database Schema Documentation
+Total Tables: 45
+Total Columns: 695
+ai_commentary
+ai_commentary_event_outbox
+ai_commentary_settings
+app_config
+audio_event_outbox
+audio_generations
+audit_logs
+batter_over_stats
+batting_scorecards
+bowler_over_stats
+bowling_figures
+bowling_spells
+cache_invalidations
+club
+clubs
+deliveries
+dismissals
+extras
+fall_of_wickets
+field_positions
+field_settings
+fixtures
+innings
+match_comments
+match_media
+match_officials
+matches
+notifications
+nv_play
+otp_verifications
+overs
+partnerships
+pitch_map_data
+player_career_stats
+players
+points_table
+roles
+run_outs
+scorer_assignments
+team_players
+teams
+tournament_teams
+tournaments
+user_sessions
+users
+Column || Data Type || Nullable || Default
+ai_commentary_id || uuid || NO || uuid_generate_v4()
+match_id || uuid || NO || 
+innings_id || uuid || YES || 
+delivery_id || uuid || YES || 
+over_id || uuid || YES || 
+task || character varying || NO || 
+style || character varying || NO || 'broadcast_english'::character varying
+output || text || NO || 
+source || character varying || NO || 
+status || character varying || NO || 
+is_visible || boolean || NO || true
+is_manual_override || boolean || NO || false
+replaced_commentary_id || uuid || YES || 
+version || integer || NO || 1
+attempts || smallint || NO || 0
+response_time_ms || integer || NO || 0
+errors || jsonb || YES || 
+token_usage || jsonb || YES || 
+source_payload || jsonb || YES || 
+created_by || uuid || YES || 
+created_at || timestamp with time zone || NO || now()
+Column || Data Type || Nullable || Default
+event_id || uuid || NO || uuid_generate_v4()
+commentary_id || uuid || YES || 
+match_id || uuid || NO || 
+event_type || character varying || NO || 
+ordering_key || character varying || NO || 
+payload || jsonb || NO || 
+status || character varying || NO || 'pending'::character varying
+attempts || integer || NO || 0
+next_attempt_at || timestamp with time zone || NO || now()
+last_error || text || YES || 
+published_at || timestamp with time zone || YES || 
+created_at || timestamp with time zone || NO || now()
+updated_at || timestamp with time zone || NO || now()
+Column || Data Type || Nullable || Default
+match_id || uuid || NO || 
+mode || character varying || NO || 'auto_with_manual_override'::character varying
+language || character varying || NO || 'en'::character varying
+default_style || character varying || NO || 'broadcast_english'::character varying
+live_delay_seconds || smallint || NO || 3
+live_retry_attempts || smallint || NO || 2
+fallback_enabled || boolean || NO || true
+auto_publish || boolean || NO || true
+updated_by || uuid || YES || 
+updated_at || timestamp with time zone || NO || now()
+Column || Data Type || Nullable || Default
+app_config_key || character varying || NO || 
+value || text || NO || 
+description || text || YES || 
+is_secret || boolean || NO || false
+updated_by || uuid || YES || 
+updated_at || timestamp with time zone || NO || now()
+Column || Data Type || Nullable || Default
+id || uuid || NO || gen_random_uuid()
+event_type || text || NO || 
+aggregate_type || text || NO || 'audio_generation'::text
+aggregate_id || uuid || NO || 
+commentary_id || uuid || NO || 
+payload || jsonb || NO || 
+status || text || NO || 'pending'::text
+attempts || integer || NO || 0
+next_attempt_at || timestamp with time zone || NO || now()
+published_at || timestamp with time zone || YES || 
+last_error || text || YES || 
+created_at || timestamp with time zone || NO || now()
+updated_at || timestamp with time zone || NO || now()
+Column || Data Type || Nullable || Default
+id || uuid || NO || gen_random_uuid()
+source_event_id || uuid || NO || 
+source_event_type || text || NO || 
+commentary_id || uuid || NO || 
+language_code || text || NO || 'en-IN'::text
+provider || text || NO || 
+provider_model || text || NO || 
+provider_voice || text || NO || 
+storage_bucket || text || NO || 
+storage_object || text || NO || 
+content_type || text || NO || 'audio/mpeg'::text
+duration_ms || integer || YES || 
+status || text || NO || 'pending'::text
+is_active || boolean || NO || true
+error_message || text || YES || 
+generation_latency_ms || integer || YES || 
+estimated_cost_usd || numeric || YES || 
+created_at || timestamp with time zone || NO || now()
+updated_at || timestamp with time zone || NO || now()
+completed_at || timestamp with time zone || YES || 
+Column || Data Type || Nullable || Default
+audit_logs_id || uuid || NO || uuid_generate_v4()
+match_id || uuid || YES || 
+user_id || uuid || YES || 
+action || character varying || NO || 
+table_name || character varying || NO || 
+record_id || uuid || NO || 
+old_values || jsonb || YES || 
+new_values || jsonb || YES || 
+ip_address || inet || YES || 
+created_at || timestamp with time zone || NO || now()
+Column || Data Type || Nullable || Default
+batter_over_stats_id || uuid || NO || uuid_generate_v4()
+innings_id || uuid || NO || 
+batter_id || uuid || NO || 
+over_number || smallint || NO || 
+runs || smallint || NO || 0
+balls || smallint || NO || 0
+fours || smallint || NO || 0
+sixes || smallint || NO || 0
+Column || Data Type || Nullable || Default
+batting_scorecards_id || uuid || NO || uuid_generate_v4()
+innings_id || uuid || NO || 
+player_id || uuid || NO || 
+batting_position || smallint || NO || 
+runs_scored || smallint || NO || 0
+balls_faced || integer || NO || 0
+fours || smallint || NO || 0
+sixes || smallint || NO || 0
+dot_balls_faced || smallint || NO || 0
+strike_rate || numeric || YES || 
+minutes_batted || smallint || YES || 
+is_dismissed || boolean || NO || false
+dismissal_id || uuid || YES || 
+came_in_at_over || numeric || YES || 
+dismissed_at_over || numeric || YES || 
+Column || Data Type || Nullable || Default
+bowler_over_stats_id || uuid || NO || uuid_generate_v4()
+innings_id || uuid || NO || 
+bowler_id || uuid || NO || 
+over_number || smallint || NO || 
+runs_conceded || smallint || NO || 0
+wickets || smallint || NO || 0
+fours || smallint || NO || 0
+sixes || smallint || NO || 0
+dot_balls || smallint || NO || 0
+is_maiden || boolean || NO || false
+wides || smallint || NO || 0
+no_balls || smallint || NO || 0
+Column || Data Type || Nullable || Default
+bowling_figures_id || uuid || NO || uuid_generate_v4()
+innings_id || uuid || NO || 
+player_id || uuid || NO || 
+overs_bowled || numeric || NO || 0
+balls_bowled || smallint || NO || 0
+runs_conceded || smallint || NO || 0
+wickets || smallint || NO || 0
+maidens || smallint || NO || 0
+wides || smallint || NO || 0
+no_balls || smallint || NO || 0
+dot_balls || smallint || NO || 0
+boundaries_hit || smallint || NO || 0
+sixes_hit || smallint || NO || 0
+economy_rate || numeric || YES || 
+bowling_sr || numeric || YES || 
+bowling_avg || numeric || YES || 
+top_speed || numeric || YES || 
+average_speed || numeric || YES || 
+dot_ball_percent || numeric || YES || 
+primary_movement || USER-DEFINED || YES || 
+Column || Data Type || Nullable || Default
+bowling_spells_id || uuid || NO || uuid_generate_v4()
+innings_id || uuid || NO || 
+bowler_id || uuid || NO || 
+spell_number || smallint || NO || 
+from_over || smallint || NO || 
+to_over || smallint || NO || 
+overs_count || numeric || NO || 
+runs_conceded || smallint || NO || 
+wickets || smallint || NO || 
+avg_speed_start || numeric || YES || 
+avg_speed_end || numeric || YES || 
+speed_variance || numeric || YES || 
+max_speed_in_spell || numeric || YES || 
+Column || Data Type || Nullable || Default
+cache_invalidations_id || uuid || NO || uuid_generate_v4()
+cache_key || character varying || NO || 
+trigger_event || character varying || NO || 
+invalidated_at || timestamp with time zone || NO || now()
+Column || Data Type || Nullable || Default
+club_id || uuid || NO || gen_random_uuid()
+club_name || character varying || NO || 
+display_name || character varying || YES || 
+home_ground || character varying || YES || 
+country || character varying || YES || 'India'::character varying
+admin_user_id || uuid || YES || 
+admin_email || character varying || NO || 
+admin_first_name || character varying || NO || 
+admin_last_name || character varying || NO || 
+admin_phone || character varying || YES || 
+password_hash || text || NO || 
+is_approved || boolean || YES || false
+created_at || timestamp with time zone || YES || now()
+Column || Data Type || Nullable || Default
+clubs_id || uuid || NO || uuid_generate_v4()
+name || character varying || NO || 
+home_ground || character varying || YES || 
+contact_number || character varying || YES || 
+email || character varying || YES || 
+country || character varying || YES || 
+display_initials || character varying || YES || 
+logo_url || text || YES || 
+owner_name || character varying || YES || 
+is_approved || boolean || NO || false
+created_at || timestamp with time zone || NO || now()
+Column || Data Type || Nullable || Default
+deliveries_id || uuid || NO || uuid_generate_v4()
+innings_id || uuid || NO || 
+over_id || uuid || NO || 
+over_number || smallint || NO || 
+ball_in_over || smallint || NO || 
+delivery_sequence || integer || NO || 
+bowler_id || uuid || NO || 
+batter_id || uuid || NO || 
+non_striker_id || uuid || NO || 
+delivery_type || USER-DEFINED || NO || 
+runs_batter || smallint || NO || 0
+runs_extras || smallint || NO || 0
+runs_total || smallint || NO || 0
+ball_speed || numeric || YES || 
+movement_type || USER-DEFINED || YES || 
+spin_rate || integer || YES || 
+swing_degree || real || YES || 
+is_dot || boolean || NO || false
+is_boundary_four || boolean || NO || false
+is_boundary_six || boolean || NO || false
+is_wicket || boolean || NO || false
+pitch_x || real || YES || 
+pitch_y || real || YES || 
+pitch_z || real || YES || 
+pitch_length || USER-DEFINED || YES || 
+shot_type || USER-DEFINED || YES || 
+wagon_x || real || YES || 
+wagon_y || real || YES || 
+wagon_z || real || YES || 
+idempotency_key || uuid || YES || 
+scored_by || uuid || NO || 
+deleted_at || timestamp with time zone || YES || 
+created_at || timestamp with time zone || NO || now()
+field_area || character varying || YES || 
+shot_angle || character varying || YES || 
+batsman_hand || character varying || YES || 
+Column || Data Type || Nullable || Default
+dismissals_id || uuid || NO || uuid_generate_v4()
+delivery_id || uuid || NO || 
+innings_id || uuid || NO || 
+dismissed_batter_id || uuid || NO || 
+bowler_id || uuid || YES || 
+dismissal_type || USER-DEFINED || NO || 
+is_caught_behind || boolean || NO || false
+is_caught_and_bowled || boolean || NO || false
+direct_hit || boolean || NO || false
+end_broken || USER-DEFINED || YES || 
+primary_fielder_id || uuid || YES || 
+secondary_fielder_id || uuid || YES || 
+runs_at_fall || smallint || NO || 
+balls_at_fall || integer || NO || 
+over_at_fall || numeric || NO || 
+wicket_number || smallint || NO || 
+Column || Data Type || Nullable || Default
+id || uuid || NO || uuid_generate_v4()
+innings_id || uuid || NO || 
+delivery_id || uuid || NO || 
+extra_type || USER-DEFINED || NO || 
+runs || smallint || NO || 
+Column || Data Type || Nullable || Default
+id || uuid || NO || uuid_generate_v4()
+innings_id || uuid || NO || 
+wicket_number || smallint || NO || 
+dismissed_batter_id || uuid || NO || 
+runs_at_fall || smallint || NO || 
+balls_at_fall || integer || NO || 
+over_at_fall || numeric || NO || 
+Column || Data Type || Nullable || Default
+field_positions_id || uuid || NO || uuid_generate_v4()
+field_setting_id || uuid || NO || 
+player_id || uuid || NO || 
+position_name || character varying || NO || 
+x || real || NO || 
+y || real || NO || 
+is_in_circle || boolean || NO || false
+Column || Data Type || Nullable || Default
+field_settings_id || uuid || NO || uuid_generate_v4()
+innings_id || uuid || NO || 
+delivery_id || uuid || NO || 
+over_number || smallint || NO || 
+bowler_id || uuid || NO || 
+fielding_side || USER-DEFINED || NO || 
+notes || text || YES || 
+created_at || timestamp with time zone || NO || now()
+Column || Data Type || Nullable || Default
+fixtures_id || uuid || NO || uuid_generate_v4()
+tournament_id || uuid || NO || 
+match_id || uuid || YES || 
+stage || USER-DEFINED || NO || 
+fixture_number || smallint || NO || 
+team1_id || uuid || YES || 
+team2_id || uuid || YES || 
+scheduled_at || timestamp with time zone || YES || 
+venue || character varying || YES || 
+Column || Data Type || Nullable || Default
+innings_id || uuid || NO || uuid_generate_v4()
+match_id || uuid || NO || 
+innings_number || smallint || NO || 
+batting_team_id || uuid || NO || 
+fielding_team_id || uuid || NO || 
+status || USER-DEFINED || NO || 'in_progress'::innings_status
+total_runs || smallint || NO || 0
+total_wickets || smallint || NO || 0
+total_balls || integer || NO || 0
+extras_wides || smallint || NO || 0
+extras_no_balls || smallint || NO || 0
+extras_leg_byes || smallint || NO || 0
+extras_byes || smallint || NO || 0
+extras_penalties || smallint || NO || 0
+total_extras || smallint || NO || 0
+target_runs || smallint || YES || 
+follow_on || boolean || NO || false
+started_at || timestamp with time zone || YES || 
+completed_at || timestamp with time zone || YES || 
+Column || Data Type || Nullable || Default
+match_comments_id || uuid || NO || uuid_generate_v4()
+match_id || uuid || NO || 
+author_id || uuid || NO || 
+content || text || NO || 
+is_pinned || boolean || NO || false
+created_at || timestamp with time zone || NO || now()
+updated_at || timestamp with time zone || NO || now()
+Column || Data Type || Nullable || Default
+match_media_id || uuid || NO || uuid_generate_v4()
+match_id || uuid || NO || 
+media_type || USER-DEFINED || NO || 
+storage_path || text || NO || 
+caption || text || YES || 
+uploaded_by || uuid || NO || 
+uploaded_at || timestamp with time zone || NO || now()
+Column || Data Type || Nullable || Default
+match_officials_id || uuid || NO || uuid_generate_v4()
+match_id || uuid || NO || 
+official_name || character varying || NO || 
+role || USER-DEFINED || NO || 
+Column || Data Type || Nullable || Default
+matches_id || uuid || NO || uuid_generate_v4()
+external_match_id || character varying || YES || 
+match_date || date || NO || 
+start_time || time without time zone || NO || 
+tournament_id || uuid || YES || 
+format || USER-DEFINED || NO || 
+ball_type || character varying || NO || 
+overs_per_match || smallint || YES || 
+host_club_id || uuid || NO || 
+opponent_club_id || uuid || NO || 
+venue || character varying || YES || 
+pitch_num || smallint || YES || 
+venue_neutral || boolean || YES || 
+city || character varying || YES || 
+country || character varying || YES || 
+scheduled_at || timestamp with time zone || NO || 
+started_at || timestamp with time zone || YES || 
+completed_at || timestamp with time zone || YES || 
+status || USER-DEFINED || NO || 'scheduled'::match_status
+toss_winner_id || uuid || YES || 
+toss_decision || USER-DEFINED || YES || 
+result_type || USER-DEFINED || YES || 
+result_margin || smallint || YES || 
+winning_team_id || uuid || YES || 
+result_summary || text || YES || 
+is_public || boolean || NO || true
+notes || text || YES || 
+created_by || uuid || YES || 
+created_at || timestamp with time zone || NO || now()
+updated_at || timestamp with time zone || NO || now()
+Column || Data Type || Nullable || Default
+notifications_id || uuid || NO || uuid_generate_v4()
+user_id || uuid || NO || 
+match_id || uuid || YES || 
+type || USER-DEFINED || NO || 
+title || character varying || NO || 
+body || text || NO || 
+data || jsonb || YES || 
+is_read || boolean || NO || false
+scheduled_for || timestamp with time zone || YES || 
+created_at || timestamp with time zone || NO || now()
+read_at || timestamp with time zone || YES || 
+Column || Data Type || Nullable || Default
+competition || text || YES || 
+match || text || YES || 
+date || date || YES || 
+start_time || time without time zone || YES || 
+innings || integer || YES || 
+over || integer || YES || 
+ball || integer || YES || 
+innings_ball || integer || YES || 
+batter || text || YES || 
+batter_id || text || YES || 
+bowler || text || YES || 
+bowler_id || text || YES || 
+runs || integer || YES || 
+extra_runs || integer || YES || 
+bowler_extra_runs || integer || YES || 
+extra || text || YES || 
+penalty_runs || numeric || YES || 
+runs_awarded_to || numeric || YES || 
+penalty || numeric || YES || 
+ball_outcome || numeric || YES || 
+line || numeric || YES || 
+length || numeric || YES || 
+shot || numeric || YES || 
+feet || numeric || YES || 
+secondary_feet || numeric || YES || 
+connection || numeric || YES || 
+delivery || numeric || YES || 
+speed || numeric || YES || 
+appeal_type || text || YES || 
+on_field_decision || text || YES || 
+referral_decision || text || YES || 
+wicket || text || YES || 
+dismissed_batter || text || YES || 
+fieldx || numeric || YES || 
+fieldy || numeric || YES || 
+arrivalx || numeric || YES || 
+arrivaly || numeric || YES || 
+events || character varying || YES || 
+user_events || character varying || YES || 
+around_the_wicket || boolean || YES || 
+keeper_up || boolean || YES || 
+fielder1 || character varying || YES || 
+fielder1_events || character varying || YES || 
+fielder1_position || character varying || YES || 
+fielder2 || character varying || YES || 
+fielder2_events || character varying || YES || 
+fielder2_position || character varying || YES || 
+fielder3 || character varying || YES || 
+fielder3_events || character varying || YES || 
+fielder3_position || character varying || YES || 
+fielder4 || character varying || YES || 
+fielder4_events || character varying || YES || 
+fielder4_position || character varying || YES || 
+batting_hand || text || YES || 
+bowler_type || text || YES || 
+timestamp || timestamp without time zone || YES || 
+runs_saved_or_lost || integer || YES || 
+toss_won_by || text || YES || 
+toss_decision || text || YES || 
+ground_end || text || YES || 
+non_striker || text || YES || 
+non_striker_id || text || YES || 
+team_runs || integer || YES || 
+team_wickets || integer || YES || 
+batting_position || integer || YES || 
+power_play || numeric || YES || 
+day || integer || YES || 
+session || integer || YES || 
+pitch_number || character varying || YES || 
+umpire || text || YES || 
+result || text || YES || 
+winning_team || text || YES || 
+losing_team || text || YES || 
+batting_team || text || YES || 
+bowling_team || text || YES || 
+venue || text || YES || 
+north_boundary || numeric || YES || 
+south_boundary || numeric || YES || 
+east_boundary || numeric || YES || 
+west_boundary || numeric || YES || 
+user || text || YES || 
+analysis_key_moment || character varying || YES || 
+video_key_moment || character varying || YES || 
+breaks || text || YES || 
+temperature_c || numeric || YES || 
+humidity || numeric || YES || 
+pressure_hpa || numeric || YES || 
+legal_ball || boolean || YES || 
+actual_ball || integer || YES || 
+free_hit || boolean || YES || 
+partnership_number || integer || YES || 
+cumulative_batter_balls || integer || YES || 
+cumulative_batter_runs || integer || YES || 
+bowling_spell || integer || YES || 
+bowling_over_in_spell || integer || YES || 
+batter_coming_in_over || integer || YES || 
+run_rate_at_start || numeric || YES || 
+run_rate_after || numeric || YES || 
+req_run_rate_at_start || numeric || YES || 
+req_run_rate_after || numeric || YES || 
+pitchx || numeric || YES || 
+pitchy || numeric || YES || 
+releasex || numeric || YES || 
+releasey || numeric || YES || 
+releasez || numeric || YES || 
+releasex_external || numeric || YES || 
+releasey_external || numeric || YES || 
+releasez_external || numeric || YES || 
+releasey_vision_ai || numeric || YES || 
+releasez_vision_ai || numeric || YES || 
+bouncespeed || numeric || YES || 
+stumpspeed || numeric || YES || 
+dropspeed || numeric || YES || 
+impactx || numeric || YES || 
+impacty || numeric || YES || 
+impactz || numeric || YES || 
+landingx || numeric || YES || 
+landingy || numeric || YES || 
+deviation || numeric || YES || 
+swingangle || numeric || YES || 
+dropangle || numeric || YES || 
+bounceangle || numeric || YES || 
+releaseangle || numeric || YES || 
+releaseaccelerationy || numeric || YES || 
+releaseaccelerationz || numeric || YES || 
+pastx || numeric || YES || 
+pasty || numeric || YES || 
+pastz || numeric || YES || 
+speed_radar || numeric || YES || 
+speed_external || numeric || YES || 
+analyst_pitch_length || numeric || YES || 
+analyst_pitch_line || numeric || YES || 
+external_pitchx || numeric || YES || 
+external_pitchy || numeric || YES || 
+analyst_arrival_line || numeric || YES || 
+analyst_arrival_height || numeric || YES || 
+ball_type || text || YES || 
+ball_colour || text || YES || 
+pitchside_fielder_1_x || numeric || YES || 
+pitchside_fielder_1_y || numeric || YES || 
+pitchside_fielder_2_x || numeric || YES || 
+pitchside_fielder_2_y || numeric || YES || 
+pitchside_fielder_3_x || numeric || YES || 
+pitchside_fielder_3_y || numeric || YES || 
+pitchside_fielder_4_x || numeric || YES || 
+pitchside_fielder_4_y || numeric || YES || 
+pitchside_fielder_5_x || numeric || YES || 
+pitchside_fielder_5_y || numeric || YES || 
+pitchside_fielder_6_x || numeric || YES || 
+pitchside_fielder_6_y || numeric || YES || 
+pitchside_fielder_7_x || numeric || YES || 
+pitchside_fielder_7_y || numeric || YES || 
+pitchside_fielder_8_x || numeric || YES || 
+pitchside_fielder_8_y || numeric || YES || 
+pitchside_fielder_9_x || numeric || YES || 
+pitchside_fielder_9_y || numeric || YES || 
+match_type || character varying || YES || 
+Column || Data Type || Nullable || Default
+otp_verifications_id || uuid || NO || uuid_generate_v4()
+email || character varying || NO || 
+code || character varying || NO || 
+expires_at || timestamp with time zone || NO || 
+verified || boolean || NO || false
+created_at || timestamp with time zone || NO || now()
+Column || Data Type || Nullable || Default
+overs_id || uuid || NO || uuid_generate_v4()
+innings_id || uuid || NO || 
+over_number || smallint || NO || 
+bowler_id || uuid || NO || 
+runs_scored || smallint || NO || 0
+wickets_taken || smallint || NO || 0
+legal_balls || smallint || NO || 0
+dot_balls || smallint || NO || 0
+boundaries_four || smallint || NO || 0
+boundaries_six || smallint || NO || 0
+wides || smallint || NO || 0
+no_balls || smallint || NO || 0
+is_maiden || boolean || NO || false
+cumulative_runs || smallint || NO || 
+cumulative_wickets || smallint || NO || 
+run_rate || numeric || NO || 
+phase || USER-DEFINED || NO || 
+Column || Data Type || Nullable || Default
+partnerships_id || uuid || NO || uuid_generate_v4()
+innings_id || uuid || NO || 
+wicket_number || smallint || NO || 
+batter1_id || uuid || NO || 
+batter2_id || uuid || NO || 
+runs || smallint || NO || 0
+balls || integer || NO || 0
+batter1_runs || smallint || NO || 0
+batter1_balls || smallint || NO || 0
+batter2_runs || smallint || NO || 0
+batter2_balls || smallint || NO || 0
+started_at_runs || smallint || NO || 
+ended_at_runs || smallint || YES || 
+Column || Data Type || Nullable || Default
+pitch_map_data_id || uuid || NO || uuid_generate_v4()
+delivery_id || uuid || NO || 
+innings_id || uuid || NO || 
+bowler_id || uuid || NO || 
+batter_id || uuid || NO || 
+x || real || NO || 
+y || real || NO || 
+z || real || NO || 
+length_label || USER-DEFINED || YES || 
+line_label || USER-DEFINED || YES || 
+recorded_at || timestamp with time zone || NO || now()
+Column || Data Type || Nullable || Default
+player_career_stats_id || uuid || NO || uuid_generate_v4()
+player_id || uuid || NO || 
+format || USER-DEFINED || NO || 
+matches_played || integer || NO || 0
+innings_batted || integer || NO || 0
+total_runs || integer || NO || 0
+balls_faced || integer || NO || 0
+highest_score || smallint || NO || 0
+batting_average || numeric || YES || 
+batting_sr || numeric || YES || 
+total_fours || integer || NO || 0
+total_sixes || integer || NO || 0
+centuries || smallint || NO || 0
+fifties || smallint || NO || 0
+innings_bowled || integer || NO || 0
+overs_bowled || numeric || NO || 0
+runs_conceded || integer || NO || 0
+wickets_taken || integer || NO || 0
+bowling_average || numeric || YES || 
+bowling_economy || numeric || YES || 
+bowling_sr || numeric || YES || 
+three_wicket_haul || smallint || NO || 0
+five_wicket_hauls || smallint || NO || 0
+top_speed || numeric || YES || 
+average_speed || numeric || YES || 
+lethal_ball_type || USER-DEFINED || YES || 
+most_accurate_line || USER-DEFINED || YES || 
+updated_at || timestamp with time zone || NO || now()
+Column || Data Type || Nullable || Default
+players_id || uuid || NO || uuid_generate_v4()
+full_name || character varying || NO || 
+display_name || character varying || NO || 
+date_of_birth || date || YES || 
+batting_style || character varying || YES || 
+bowling_style || character varying || YES || 
+primary_role || character varying || NO || 
+jersey_number || smallint || YES || 
+photo_url || text || YES || 
+nationality || character varying || YES || 
+is_active || boolean || NO || true
+created_at || timestamp with time zone || NO || now()
+gender || text || YES || 
+club_id || uuid || YES || 
+contact_number || text || YES || 
+Column || Data Type || Nullable || Default
+point_table_id || uuid || NO || uuid_generate_v4()
+tournament_id || uuid || NO || 
+team_id || uuid || NO || 
+group_name || character varying || YES || 
+played || smallint || NO || 0
+won || smallint || NO || 0
+lost || smallint || NO || 0
+tied || smallint || NO || 0
+no_result || smallint || NO || 0
+win_points || smallint || NO || 0
+bonus_points || smallint || YES || 0
+total_points || smallint || NO || 0
+net_run_rate || numeric || NO || 0
+updated_at || timestamp with time zone || NO || now()
+Column || Data Type || Nullable || Default
+roles_id || smallint || NO || 
+name || character varying || NO || 
+description || text || YES || 
+can_create_match || boolean || NO || false
+can_score || boolean || NO || false
+can_export || boolean || NO || false
+can_manage_users || boolean || NO || false
+Column || Data Type || Nullable || Default
+id || uuid || NO || uuid_generate_v4()
+dismissal_id || uuid || NO || 
+direct_hit || boolean || NO || false
+end_broken || USER-DEFINED || NO || 
+primary_fielder_id || uuid || YES || 
+secondary_fielder_id || uuid || YES || 
+Column || Data Type || Nullable || Default
+scorer_assignments_id || uuid || NO || uuid_generate_v4()
+match_id || uuid || NO || 
+scorer_id || uuid || NO || 
+assigned_by || uuid || YES || 
+invite_token || uuid || YES || 
+token_expires_at || timestamp with time zone || YES || 
+accepted_at || timestamp with time zone || YES || 
+revoked_at || timestamp with time zone || YES || 
+created_at || timestamp with time zone || NO || now()
+Column || Data Type || Nullable || Default
+team_players_id || uuid || NO || uuid_generate_v4()
+team_id || uuid || NO || 
+player_id || uuid || NO || 
+jersey_number || smallint || YES || 
+squad_role || USER-DEFINED || NO || 
+joined_at || date || YES || 
+left_at || date || YES || 
+Column || Data Type || Nullable || Default
+teams_id || uuid || NO || uuid_generate_v4()
+name || character varying || NO || 
+short_name || character varying || NO || 
+logo_url || text || YES || 
+home_ground || character varying || YES || 
+country || character varying || YES || 
+created_by || uuid || YES || 
+is_active || boolean || NO || true
+created_at || timestamp with time zone || NO || now()
+Column || Data Type || Nullable || Default
+tournament_teams_id || uuid || NO || uuid_generate_v4()
+tournament_id || uuid || NO || 
+team_id || uuid || NO || 
+group_name || character varying || YES || 
+seed || smallint || YES || 
+registered_at || timestamp with time zone || NO || now()
+Column || Data Type || Nullable || Default
+tournaments_id || uuid || NO || uuid_generate_v4()
+name || character varying || NO || 
+format || USER-DEFINED || NO || 
+match_format || USER-DEFINED || NO || 
+no_of_overs_match || smallint || YES || 
+start_date || date || NO || 
+end_date || date || YES || 
+host_team || character varying || YES || 
+logo_url || text || YES || 
+status || USER-DEFINED || NO || 'upcoming'::tournament_status
+created_by || uuid || NO || 
+created_at || timestamp with time zone || NO || now()
+Column || Data Type || Nullable || Default
+user_sessions_id || uuid || NO || uuid_generate_v4()
+user_id || uuid || NO || 
+ip_address || inet || YES || 
+user_agent || text || YES || 
+logged_in_at || timestamp with time zone || NO || now()
+logged_out_at || timestamp with time zone || YES || 
+Column || Data Type || Nullable || Default
+user_id || uuid || NO || uuid_generate_v4()
+email || character varying || NO || 
+first_name || character varying || NO || 
+last_name || character varying || NO || 
+display_name || character varying || NO || 
+role || USER-DEFINED || NO || 'viewer'::platform_role
+avatar_url || text || YES || 
+is_active || boolean || NO || true
+last_login_at || timestamp with time zone || YES || 
+created_at || timestamp with time zone || NO || now()
+updated_at || timestamp with time zone || NO || now()
+password_hash || character varying || YES || 
+phone || character varying || YES || 
+club_id || uuid || YES || 
+is_approved || boolean || NO || false
+account_role || USER-DEFINED || NO || 'Viewer'::account_role
+gender || text || YES || 

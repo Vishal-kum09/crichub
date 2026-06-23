@@ -35,7 +35,7 @@ export function Teams({ onNavigate }: TeamsProps) {
     <div className="space-y-4 lg:space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl lg:text-2xl font-semibold">Teams</h2>
+        <h2 className="text-xl lg:text-2xl font-semibold">Clubs</h2>
       </div>
 
       {(loading || teams.length === 0) && (
@@ -46,15 +46,15 @@ export function Teams({ onNavigate }: TeamsProps) {
         </Card>
       )}
 
-      {/* Teams Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+      {/* Clubs Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {teams.map((team) => (
           <Card
             key={team.id}
             className="cursor-pointer hover:border-2 hover:border-[#e60023] transition-all active:scale-98"
             onClick={() => onNavigate('/team', team.id)}
           >
-            <div className="space-y-3 lg:space-y-4">
+            <div className="space-y-3">
               {/* Team Logo Placeholder */}
               <div className="w-14 h-14 lg:w-16 lg:h-16 bg-[#e60023]/10 rounded-full flex items-center justify-center">
                 <Trophy className="text-[#e60023]" size={28} />
@@ -62,27 +62,24 @@ export function Teams({ onNavigate }: TeamsProps) {
 
               {/* Team Info */}
               <div>
-                <h3 className="text-lg lg:text-xl font-semibold mb-1">{team.name}</h3>
+                <h3 className="text-base lg:text-lg font-semibold mb-1">{team.name}</h3>
                 <p className="text-xs lg:text-sm text-[#666666]">{team.competition}</p>
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-2 gap-3 lg:gap-4 pt-3 lg:pt-4 border-t border-[#e0e0e0]">
+              <div className="grid grid-cols-3 gap-2 pt-3 border-t border-[#e0e0e0]">
                 <div>
-                  <p className="text-xs lg:text-sm text-[#666666]">Players</p>
-                  <p className="text-lg lg:text-xl font-semibold tabular-nums">{team.playerCount}</p>
+                  <p className="text-xs text-[#666666]">Matches</p>
+                  <p className="text-lg font-semibold tabular-nums">{team.matchCount}</p>
                 </div>
                 <div>
-                  <p className="text-xs lg:text-sm text-[#666666]">Matches</p>
-                  <p className="text-lg lg:text-xl font-semibold tabular-nums">{team.matchCount}</p>
+                  <p className="text-xs text-[#666666]">Won</p>
+                  <p className="text-lg font-semibold tabular-nums text-[#10b981]">{team.wins}</p>
                 </div>
-              </div>
-
-              {/* Win/Loss */}
-              <div className="flex gap-2 text-xs lg:text-sm">
-                <span className="text-[#10b981] tabular-nums">{team.wins}W</span>
-                <span className="text-[#666666]">-</span>
-                <span className="text-[#ef4444] tabular-nums">{team.losses}L</span>
+                <div>
+                  <p className="text-xs text-[#666666]">Lost</p>
+                  <p className="text-lg font-semibold tabular-nums text-[#ef4444]">{team.losses}</p>
+                </div>
               </div>
             </div>
           </Card>

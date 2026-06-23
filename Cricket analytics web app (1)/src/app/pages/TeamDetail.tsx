@@ -7,7 +7,7 @@ import { ArrowLeft, Trophy } from 'lucide-react';
 
 interface TeamDetailProps {
   teamId: string;
-  onNavigate: (path: string) => void;
+  onNavigate: (path: string, id?: string) => void;
 }
 
 // /api/viewer/teams/:id returns the Team fields plus its squad and matches.
@@ -16,7 +16,7 @@ type TeamDetailResponse = Team & { squad: Player[]; matches: Match[] };
 export function TeamDetail({ teamId, onNavigate }: TeamDetailProps) {
   const [team, setTeam] = useState<TeamDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'squad' | 'matches' | 'stats'>('squad');
+  const [activeTab, setActiveTab] = useState<'matches' | 'squad' | 'stats'>('matches');
 
   useEffect(() => {
     let cancelled = false;
@@ -58,12 +58,12 @@ export function TeamDetail({ teamId, onNavigate }: TeamDetailProps) {
   }
 
   const teamPlayers = team.squad ?? [];
-  const teamMatches = (team.matches ?? []).slice(0, 5);
+  const teamMatches = team.matches ?? [];
   const winRate = team.matchCount > 0 ? ((team.wins / team.matchCount) * 100).toFixed(1) : '0.0';
 
   const tabs = [
+    { id: 'matches', label: 'Matches' },
     { id: 'squad', label: 'Squad' },
-    { id: 'matches', label: 'Recent Matches' },
     { id: 'stats', label: 'Team Stats' },
   ] as const;
 
@@ -75,7 +75,7 @@ export function TeamDetail({ teamId, onNavigate }: TeamDetailProps) {
         className="flex items-center gap-2 text-[#e60023] hover:underline"
       >
         <ArrowLeft size={18} />
-        <span>Back to Teams</span>
+        <span>Back to Clubs</span>
       </button>
 
       {/* Team Header */}
@@ -175,22 +175,36 @@ export function TeamDetail({ teamId, onNavigate }: TeamDetailProps) {
 
       {activeTab === 'matches' && (
         <Card>
-          <h3 className="text-xl font-semibold mb-4">Recent Matches</h3>
-          <div className="space-y-3">
+          <h3 className="text-xl font-semibold mb-4">Matches Played</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[680px] text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide text-[#666666] border-b border-[#e0e0e0]">
+                  <th className="py-3 px-2">Date</th>
+                  <th className="py-3 px-2">Match</th>
+                  <th className="py-3 px-2">Venue</th>
+                  <th className="py-3 px-2">Result</th>
+                  <th className="py-3 px-2 text-right">Score</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#f0f0f0]">
             {teamMatches.map((match) => (
-              <div key={match.id} className="p-4 bg-[#f9f9f9] rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="font-semibold">
-                    {match.teamA} vs {match.teamB}
-                  </p>
+              <tr key={match.id} onClick={() => onNavigate('/match', match.id)} className="cursor-pointer hover:bg-[#f9f9f9] transition-colors">
+                <td className="py-3 px-2 text-[#666666]">{new Date(match.date).toLocaleDateString()}</td>
+                <td className="py-3 px-2 font-semibold">{match.teamA} vs {match.teamB}</td>
+                <td className="py-3 px-2 text-[#666666]">{match.venue}</td>
+                <td className="py-3 px-2">
                   <Badge variant={match.status === 'Won' ? 'won' : match.status === 'Lost' ? 'lost' : 'scheduled'}>
-                    {match.status}
+                    {match.result || match.status}
                   </Badge>
-                </div>
-                <p className="text-sm text-[#666666]">{new Date(match.date).toLocaleDateString()}</p>
-                {match.result && <p className="text-sm mt-1">{match.result}</p>}
-              </div>
+                </td>
+                <td className="py-3 px-2 text-right tabular-nums text-[#666666]">
+                  {[match.teamAScore, match.teamBScore].filter(Boolean).join(' / ') || '-'}
+                </td>
+              </tr>
             ))}
+              </tbody>
+            </table>
           </div>
         </Card>
       )}

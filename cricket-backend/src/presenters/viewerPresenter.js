@@ -108,7 +108,7 @@ const presentTeam = (row) => ({
 });
 
 // One innings of the scorecard, assembled from the per-innings tables.
-const presentInnings = (inn, batting, bowling, fallOfWickets, yetToBat) => ({
+const presentInnings = (inn, batting, bowling, fallOfWickets, yetToBat, recentDeliveries = []) => ({
   innings_id: inn.id,
   innings_number: inn.innings_number,
   batting_team_id: inn.batting_team_id,
@@ -121,6 +121,7 @@ const presentInnings = (inn, batting, bowling, fallOfWickets, yetToBat) => ({
     wickets: num(inn.total_wickets),
     balls: num(inn.total_balls)
   },
+  target_runs: num(inn.target_runs),
   extras: {
     total: num(inn.total_extras),
     no_balls: num(inn.extras_no_balls),
@@ -155,7 +156,24 @@ const presentInnings = (inn, batting, bowling, fallOfWickets, yetToBat) => ({
     over_at_fall: num(f.over_at_fall),
     dismissed_player: f.dismissed_player
   })),
-  yet_to_bat: yetToBat.map((y) => y.display_name)
+  yet_to_bat: yetToBat.map((y) => y.display_name),
+  recent_deliveries: recentDeliveries.map((d) => ({
+    delivery_id: d.delivery_id,
+    over_number: num(d.over_number),
+    ball_in_over: num(d.ball_in_over),
+    delivery_sequence: num(d.delivery_sequence),
+    bowler_id: d.bowler_id,
+    batter_id: d.batter_id,
+    non_striker_id: d.non_striker_id,
+    delivery_type: d.delivery_type,
+    runs_batter: num(d.runs_batter),
+    runs_extras: num(d.runs_extras),
+    runs_total: num(d.runs_total),
+    is_wicket: d.is_wicket === true,
+    is_boundary_four: d.is_boundary_four === true,
+    is_boundary_six: d.is_boundary_six === true,
+    extra_type: d.extra_type || null
+  }))
 });
 
 // Full scorecard envelope: match meta + per-innings cards.
@@ -166,6 +184,7 @@ const presentScorecard = (match, innings) => ({
   date: match.match_date,
   format: match.format,
   competition: match.competition || '',
+  total_overs: num(match.overs_per_match),
   team1_id: match.team1_id,
   team1_name: match.team1_name,
   team2_id: match.team2_id,

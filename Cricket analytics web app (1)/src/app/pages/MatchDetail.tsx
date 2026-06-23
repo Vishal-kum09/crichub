@@ -37,6 +37,23 @@ interface FowRow {
   over_at_fall: number;
   dismissed_player: string;
 }
+interface RecentDelivery {
+  delivery_id: string;
+  over_number: number;
+  ball_in_over: number;
+  delivery_sequence: number;
+  bowler_id: string;
+  batter_id: string;
+  non_striker_id: string;
+  delivery_type: string;
+  runs_batter: number;
+  runs_extras: number;
+  runs_total: number;
+  is_wicket: boolean;
+  is_boundary_four: boolean;
+  is_boundary_six: boolean;
+  extra_type: string | null;
+}
 interface Innings {
   innings_id: string;
   innings_number: number;
@@ -44,11 +61,13 @@ interface Innings {
   fielding_team_name: string;
   status: string;
   total: { runs: number; wickets: number; balls: number };
+  target_runs?: number;
   extras: { total: number; no_balls: number; wides: number; byes: number; leg_byes: number };
   batting: BattingRow[];
   bowling: BowlingRow[];
   fall_of_wickets: FowRow[];
   yet_to_bat: string[];
+  recent_deliveries?: RecentDelivery[];
 }
 interface Scorecard {
   match_id: string;
@@ -56,6 +75,7 @@ interface Scorecard {
   venue: string;
   date: string;
   format: string;
+  total_overs?: number;
   competition: string;
   team1_name: string;
   team2_name: string;
@@ -66,6 +86,27 @@ interface Scorecard {
 const oversFromBalls = (balls: number) => `${Math.floor(balls / 6)}.${balls % 6}`;
 const batterLabel = (b: BattingRow) =>
   `${b.name}${b.is_captain ? ' (©)' : ''}${b.is_wicket_keeper ? ' (WK)' : ''}`;
+
+const extraLabel = (type: string | null) => {
+  const map: Record<string, string> = { wide: 'WD', no_ball: 'NB', bye: 'B', leg_bye: 'LB', penalty: 'P' };
+  return type ? (map[type] || type.replace(/_/g, ' ').toUpperCase()) : 'EX';
+};
+
+const ballOutcome = (delivery: RecentDelivery) => {
+  if (delivery.is_wicket) return 'W';
+  if (delivery.is_boundary_six) return '6';
+  if (delivery.is_boundary_four) return '4';
+  if (delivery.runs_extras > 0) return `${delivery.runs_total}${extraLabel(delivery.extra_type)}`;
+  return delivery.runs_batter === 0 ? '•' : String(delivery.runs_batter);
+};
+
+const ballOutcomeClass = (delivery: RecentDelivery) => {
+  if (delivery.is_wicket) return 'bg-red-600 text-white';
+  if (delivery.is_boundary_six) return 'bg-purple-600 text-white';
+  if (delivery.is_boundary_four) return 'bg-green-600 text-white';
+  if (delivery.runs_extras > 0) return 'bg-gray-200 text-gray-700';
+  return 'bg-gray-100 text-gray-600';
+};
 
 export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
   const [scorecard, setScorecard] = useState<Scorecard | null>(null);
@@ -179,6 +220,23 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
 
   const team1Score = scoreFor(scorecard.team1_name);
   const team2Score = scoreFor(scorecard.team2_name);
+  const liveInnings = scorecard.innings.find((inn) => inn.status === 'in_progress') || scorecard.innings[scorecard.innings.length - 1] || null;
+  const firstInnings = scorecard.innings.find((inn) => inn.innings_number === 1);
+  const recentDeliveries = liveInnings?.recent_deliveries ?? [];
+  const latestDelivery = recentDeliveries[recentDeliveries.length - 1];
+  const currentBatters = liveInnings?.batting.filter((b) => b.dismissal === 'not out').slice(0, 2) ?? [];
+  const recentBowlerIds = Array.from(new Set([...recentDeliveries].reverse().map((d) => d.bowler_id).filter(Boolean)));
+  const currentBowlers = recentBowlerIds
+    .slice(0, 2)
+    .map((bowlerId) => liveInnings?.bowling.find((b) => b.player_id === bowlerId))
+    .filter(Boolean) as BowlingRow[];
+  const targetRuns = liveInnings && liveInnings.innings_number > 1
+    ? (liveInnings.target_runs || ((firstInnings?.total.runs ?? 0) + 1))
+    : 0;
+  const ballsRemaining = liveInnings && scorecard.total_overs
+    ? Math.max((scorecard.total_overs * 6) - liveInnings.total.balls, 0)
+    : 0;
+  const runsNeeded = targetRuns ? Math.max(targetRuns - (liveInnings?.total.runs ?? 0), 0) : 0;
 
   return (
     <div className="min-h-screen bg-[#f4f5f7] pb-12 font-sans antialiased text-black">
@@ -256,12 +314,120 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
         <div className="space-y-6">
           
           {activeTab === 'overview' && (
-            <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-6 animate-fadeIn">
-              <h3 className="text-lg font-bold text-gray-900 border-b border-gray-100 pb-3">Tournament Intelligence Overview</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
+            <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm space-y-3 animate-fadeIn">
+              <h3 className="text-sm font-black text-gray-900 border-b border-gray-100 pb-2 uppercase tracking-wide">Tournament Intelligence Overview</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                 <div className="bg-gray-50 p-4 rounded-xl border border-gray-100"><p className="text-gray-400 font-medium mb-0.5">Format Architecture</p><p className="font-bold text-gray-900 text-base">{scorecard.format}</p></div>
                 <div className="bg-gray-50 p-4 rounded-xl border border-gray-100"><p className="text-gray-400 font-medium mb-0.5">League Competition</p><p className="font-bold text-gray-900 text-base">{scorecard.competition || 'Corporate Cup'}</p></div>
                 <div className="bg-gray-50 p-4 rounded-xl border border-gray-100"><p className="text-gray-400 font-medium mb-0.5">Arena Host Venue</p><p className="font-bold text-gray-900 text-base">{scorecard.venue || '—'}</p></div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'overview' && liveInnings && (
+            <div className="bg-white rounded-2xl p-4 md:p-5 border border-gray-200 shadow-sm space-y-4 animate-fadeIn">
+              <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 border-b border-gray-100 pb-3">
+                <div>
+                  <p className="text-[11px] font-black text-[#e60023] uppercase tracking-widest">Live Match Summary</p>
+                  <h3 className="text-lg font-black text-gray-900">{liveInnings.batting_team_name}</h3>
+                </div>
+                <div className="text-left sm:text-right">
+                  <p className="text-2xl md:text-3xl font-black text-gray-900 tabular-nums">
+                    {liveInnings.total.runs}/{liveInnings.total.wickets}
+                  </p>
+                  <p className="text-xs font-bold text-gray-500">
+                    {oversFromBalls(liveInnings.total.balls)} Ov | Extras: {liveInnings.extras.total} (NB {liveInnings.extras.no_balls}, WD {liveInnings.extras.wides})
+                  </p>
+                </div>
+              </div>
+
+              {targetRuns > 0 && (
+                <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm font-black text-amber-900">
+                  Target: {targetRuns} | {liveInnings.batting_team_name} needs {runsNeeded} runs from {ballsRemaining} balls
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div className="overflow-x-auto rounded-xl border border-gray-200">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-400">
+                      <tr>
+                        <th className="p-3 text-left">Batters</th>
+                        <th className="p-3 text-center">R</th>
+                        <th className="p-3 text-center">B</th>
+                        <th className="p-3 text-center">4s</th>
+                        <th className="p-3 text-center">6s</th>
+                        <th className="p-3 text-center">SR</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {(currentBatters.length ? currentBatters : liveInnings.batting.slice(0, 2)).map((b, index) => (
+                        <tr key={b.player_id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                          <td className="p-3 font-black text-gray-900">{b.name}{latestDelivery?.batter_id === b.player_id ? '*' : ''}</td>
+                          <td className="p-3 text-center font-black text-[#e60023]">{b.runs}</td>
+                          <td className="p-3 text-center font-semibold text-gray-600">{b.balls}</td>
+                          <td className="p-3 text-center text-gray-600">{b.fours}</td>
+                          <td className="p-3 text-center text-gray-600">{b.sixes}</td>
+                          <td className="p-3 text-center font-semibold text-gray-700">{b.strike_rate}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="overflow-x-auto rounded-xl border border-gray-200">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-400">
+                      <tr>
+                        <th className="p-3 text-left">Bowlers</th>
+                        <th className="p-3 text-center">O</th>
+                        <th className="p-3 text-center">M</th>
+                        <th className="p-3 text-center">R</th>
+                        <th className="p-3 text-center">W</th>
+                        <th className="p-3 text-center">Econ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {(currentBowlers.length ? currentBowlers : liveInnings.bowling.slice(0, 2)).map((b, index) => (
+                        <tr key={b.player_id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                          <td className="p-3 font-black text-gray-900">{b.name}</td>
+                          <td className="p-3 text-center font-semibold text-gray-700">{b.overs}</td>
+                          <td className="p-3 text-center text-gray-600">{b.maidens}</td>
+                          <td className="p-3 text-center text-gray-600">{b.runs}</td>
+                          <td className="p-3 text-center font-black text-green-600">{b.wickets}</td>
+                          <td className="p-3 text-center font-semibold text-gray-700">{b.economy}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-black uppercase tracking-wide text-gray-500">Recent Balls</p>
+                <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                  {recentDeliveries.length === 0 ? (
+                    <span className="text-xs font-bold text-gray-400">No deliveries recorded yet.</span>
+                  ) : recentDeliveries.map((delivery, index) => {
+                    const previous = recentDeliveries[index - 1];
+                    const showOverLabel = !previous || previous.over_number !== delivery.over_number;
+                    const overRuns = recentDeliveries
+                      .filter((item) => item.over_number === delivery.over_number)
+                      .reduce((sum, item) => sum + item.runs_total, 0);
+                    return (
+                      <div key={delivery.delivery_id} className="flex items-center gap-2">
+                        {showOverLabel && (
+                          <span className="shrink-0 text-[10px] font-black text-gray-400 uppercase tracking-wide border-l border-gray-300 pl-2">
+                            Over {delivery.over_number} | {overRuns} runs
+                          </span>
+                        )}
+                        <span className={`shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-xs font-black tabular-nums ${ballOutcomeClass(delivery)}`}>
+                          {ballOutcome(delivery)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}
@@ -286,36 +452,6 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
 
               {scorecard.innings[activeInningsIndex] ? (
                 <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-                      <p className="text-xs font-bold text-gray-400 uppercase">Total</p>
-                      <p className="text-3xl font-black text-gray-900 tabular-nums">
-                        {scorecard.innings[activeInningsIndex].total.runs}/{scorecard.innings[activeInningsIndex].total.wickets}
-                      </p>
-                      <p className="text-sm font-medium text-gray-500">
-                        {oversFromBalls(scorecard.innings[activeInningsIndex].total.balls)} Overs
-                      </p>
-                    </div>
-                    <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-                      <p className="text-xs font-bold text-gray-400 uppercase">Extras</p>
-                      <p className="text-3xl font-black text-gray-900 tabular-nums">
-                        {scorecard.innings[activeInningsIndex].extras.total}
-                      </p>
-                      <p className="text-sm font-medium text-gray-500">
-                        NB {scorecard.innings[activeInningsIndex].extras.no_balls}, WD {scorecard.innings[activeInningsIndex].extras.wides}, B {scorecard.innings[activeInningsIndex].extras.byes}, LB {scorecard.innings[activeInningsIndex].extras.leg_byes}
-                      </p>
-                    </div>
-                    <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-                      <p className="text-xs font-bold text-gray-400 uppercase">Total Wickets</p>
-                      <p className="text-3xl font-black text-gray-900 tabular-nums">
-                        {scorecard.innings[activeInningsIndex].total.wickets}
-                      </p>
-                      <p className="text-sm font-medium text-gray-500">
-                        {10 - scorecard.innings[activeInningsIndex].total.wickets > 0 ? `${10 - scorecard.innings[activeInningsIndex].total.wickets} wickets in hand` : 'All out'}
-                      </p>
-                    </div>
-                  </div>
-
                   <div className="bg-white rounded-2xl p-4 md:p-6 border border-gray-200 shadow-sm overflow-hidden">
                     <h4 className="text-base md:text-lg font-black text-gray-900 mb-4 flex items-center gap-2">🏏 {scorecard.innings[activeInningsIndex].batting_team_name} Batting Lineup</h4>
                     <div className="overflow-x-auto">

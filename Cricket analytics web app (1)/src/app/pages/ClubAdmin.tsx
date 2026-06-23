@@ -59,7 +59,12 @@ export function ClubAdmin() {
   const [incomingInvites, setIncomingInvites] = useState<any[]>([]);
   const [selectedInvite, setSelectedInvite] = useState<any | null>(null);
   const [inviteWizardStep, setInviteWizardStep] = useState<number>(1);
+  const [inviteTeamId, setInviteTeamId] = useState<string>('');
+  const [inviteTeamPlayers, setInviteTeamPlayers] = useState<RosterMember[]>([]);
   const [inviteSquadIds, setInviteSquadIds] = useState<string[]>([]);
+  const [invitePlayerSearch, setInvitePlayerSearch] = useState('');
+  const [inviteCaptainId, setInviteCaptainId] = useState('');
+  const [inviteWicketKeeperId, setInviteWicketKeeperId] = useState('');
   const [inviteScorerId, setInviteScorerId] = useState<string>('');
 
   const [assignScorerId, setAssignScorerId] = useState<Record<string, string>>({});
@@ -121,6 +126,27 @@ export function ClubAdmin() {
       });
   };
 
+  const loadInviteTeamPlayers = (teamId: string) => {
+    setInviteTeamId(teamId);
+    setInviteCaptainId('');
+    setInviteWicketKeeperId('');
+    setInvitePlayerSearch('');
+    if (!teamId) {
+      setInviteTeamPlayers([]);
+      setInviteSquadIds([]);
+      return;
+    }
+    getClubTeamPlayers(teamId)
+      .then((players) => {
+        setInviteTeamPlayers(players);
+        setInviteSquadIds(players.map((player) => player.id));
+      })
+      .catch(() => {
+        setInviteTeamPlayers([]);
+        setInviteSquadIds([]);
+      });
+  };
+
   useEffect(() => { 
     loadApprovals(); 
     loadIncomingInvites();
@@ -155,18 +181,27 @@ export function ClubAdmin() {
 
   const handleAcceptMatchInviteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!inviteTeamId) { toast.error("Select your team for this match."); return; }
     if (inviteSquadIds.length === 0) { toast.error("Select squad players for this match."); return; }
     if (!inviteScorerId) { toast.error("Please assign your club scorer."); return; }
 
     try {
       await api.put(`/api/club-admin/matches/${selectedInvite.matches_id || selectedInvite.id}/accept`, {
+        team_id: inviteTeamId,
         squad_player_ids: inviteSquadIds,
+        captain_id: inviteCaptainId || null,
+        wicketkeeper_id: inviteWicketKeeperId || null,
         assigned_scorer_id: inviteScorerId
       });
 
       toast.success('Match accepted and scheduled live!');
       setSelectedInvite(null);
+      setInviteTeamId('');
+      setInviteTeamPlayers([]);
       setInviteSquadIds([]);
+      setInvitePlayerSearch('');
+      setInviteCaptainId('');
+      setInviteWicketKeeperId('');
       setInviteScorerId('');
       setInviteWizardStep(1);
       loadIncomingInvites();
@@ -177,7 +212,12 @@ export function ClubAdmin() {
   };
 
   const handleToggleInviteSquadMember = (playerId: string) => {
-    setInviteSquadIds(prev => prev.includes(playerId) ? prev.filter(id => id !== playerId) : [...prev, playerId]);
+    setInviteSquadIds(prev => {
+      const updated = prev.includes(playerId) ? prev.filter(id => id !== playerId) : [...prev, playerId];
+      if (!updated.includes(inviteCaptainId)) setInviteCaptainId('');
+      if (!updated.includes(inviteWicketKeeperId)) setInviteWicketKeeperId('');
+      return updated;
+    });
   };
 
   const handleAddPlayerSubmit = async (e: React.FormEvent) => {
@@ -388,6 +428,14 @@ export function ClubAdmin() {
     const matchesSearch = !query || `${player.name} ${player.role}`.toLowerCase().includes(query);
     return matchesSearch && !matchTeamPlayerIds.has(player.id);
   });
+  const inviteSquadSet = new Set(inviteSquadIds);
+  const inviteSelectedPlayers = myPlayers.filter((player) => inviteSquadSet.has(player.id));
+  const inviteTeamPlayerIds = new Set(inviteTeamPlayers.map((player) => player.id));
+  const filteredInviteClubPlayers = myPlayers.filter((player) => {
+    const query = invitePlayerSearch.trim().toLowerCase();
+    const matchesSearch = !query || `${player.name} ${player.role}`.toLowerCase().includes(query);
+    return matchesSearch && !inviteTeamPlayerIds.has(player.id);
+  });
 
   return (
     <div className="space-y-6 text-black w-full px-2 sm:px-4 max-w-7xl mx-auto">
@@ -437,7 +485,12 @@ export function ClubAdmin() {
                         <button 
                           onClick={() => {
                             setSelectedInvite(invite);
+                            setInviteTeamId('');
+                            setInviteTeamPlayers([]);
                             setInviteSquadIds([]);
+                            setInvitePlayerSearch('');
+                            setInviteCaptainId('');
+                            setInviteWicketKeeperId('');
                             setInviteScorerId('');
                             setInviteWizardStep(1);
                           }}
@@ -460,32 +513,105 @@ export function ClubAdmin() {
                   </div>
 
                   <div className="flex gap-2 text-[10px] font-black">
-                    <span className={`px-2 py-0.5 rounded-md ${inviteWizardStep === 1 ? 'bg-[#e60023] text-white shadow-sm' : 'bg-gray-100 text-gray-400'}`}>1. CHOOSE SQUAD ({inviteSquadIds.length})</span>
+                    <span className={`px-2 py-0.5 rounded-md ${inviteWizardStep === 1 ? 'bg-[#e60023] text-white shadow-sm' : 'bg-gray-100 text-gray-400'}`}>1. SELECT YOUR TEAM ({inviteSquadIds.length})</span>
                     <span className={`px-2 py-0.5 rounded-md ${inviteWizardStep === 2 ? 'bg-[#e60023] text-white shadow-sm' : 'bg-gray-100 text-gray-400'}`}>2. CHOOSE SCORER</span>
                   </div>
 
                   {inviteWizardStep === 1 && (
-                    <div className="space-y-3">
-                      <p className="text-xs text-gray-500 font-bold">Select players from your roster to form the match squad:</p>
-                      {myPlayers.length === 0 ? (
-                        <div className="text-center py-4 text-xs text-gray-400 font-bold">No players found in your roster.</div>
-                      ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1 bg-white rounded-xl border border-gray-200">
-                          {myPlayers.map((player) => {
-                            const isSelected = inviteSquadIds.includes(player.id);
-                            return (
-                              <div key={player.id} onClick={() => handleToggleInviteSquadMember(player.id)} className={`p-2.5 border rounded-lg flex items-center justify-between cursor-pointer transition-all ${isSelected ? 'border-[#e60023] bg-red-50/30 font-extrabold' : 'border-gray-200 hover:bg-gray-50/40'}`}>
-                                <div>
-                                  <p className="text-xs text-gray-900 font-bold">{player.name}</p>
-                                  <p className="text-[10px] text-gray-400 capitalize">{player.role || 'Player'}</p>
-                                </div>
-                                <input type="checkbox" checked={isSelected} readOnly className="rounded border-gray-300 accent-[#e60023] h-3.5 w-3.5" />
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-black text-gray-500 uppercase mb-1.5">Select Your Team *</label>
+                        <select
+                          value={inviteTeamId}
+                          onChange={(e) => loadInviteTeamPlayers(e.target.value)}
+                          className="w-full px-3 py-2.5 border border-[#e60023] rounded-xl bg-white text-xs font-bold text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#e60023]"
+                        >
+                          <option value="">-- Select team from your club --</option>
+                          {myTeams.map((team) => (
+                            <option key={team.id} value={team.id}>{team.name} ({team.player_count})</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {inviteTeamId && (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                          <div className="border border-gray-200 rounded-xl bg-white overflow-hidden">
+                            <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                              <p className="text-xs font-black text-gray-700">Team Players</p>
+                              <span className="text-[10px] font-black text-[#e60023]">{inviteSquadIds.length} selected</span>
+                            </div>
+                            <div className="max-h-56 overflow-y-auto p-2 space-y-2">
+                              {inviteTeamPlayers.length === 0 ? (
+                                <div className="text-center py-5 text-xs text-gray-400 font-bold">No players listed in this team.</div>
+                              ) : inviteTeamPlayers.map((player) => {
+                                const isSelected = inviteSquadIds.includes(player.id);
+                                return (
+                                  <div key={player.id} onClick={() => handleToggleInviteSquadMember(player.id)} className={`p-2.5 border rounded-lg flex items-center justify-between cursor-pointer transition-all ${isSelected ? 'border-[#e60023] bg-red-50/30 font-extrabold' : 'border-gray-200 hover:bg-gray-50/40'}`}>
+                                    <div>
+                                      <p className="text-xs text-gray-900 font-bold">{player.name}</p>
+                                      <p className="text-[10px] text-gray-400 capitalize">{player.role || 'Player'}</p>
+                                    </div>
+                                    <input type="checkbox" checked={isSelected} readOnly className="rounded border-gray-300 accent-[#e60023] h-3.5 w-3.5" />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="border border-gray-200 rounded-xl bg-white overflow-hidden">
+                            <div className="px-3 py-2 bg-gray-50 border-b border-gray-100">
+                              <p className="text-xs font-black text-gray-700 mb-2">Other Club Players</p>
+                              <div className="relative">
+                                <Search size={14} className="absolute left-2.5 top-2.5 text-gray-400" />
+                                <input
+                                  value={invitePlayerSearch}
+                                  onChange={(e) => setInvitePlayerSearch(e.target.value)}
+                                  placeholder="Search players"
+                                  className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-xs font-bold focus:outline-none focus:border-[#e60023]"
+                                />
                               </div>
-                            );
-                          })}
+                            </div>
+                            <div className="max-h-56 overflow-y-auto p-2 space-y-2">
+                              {filteredInviteClubPlayers.length === 0 ? (
+                                <div className="text-center py-5 text-xs text-gray-400 font-bold">No extra players found.</div>
+                              ) : filteredInviteClubPlayers.map((player) => {
+                                const isSelected = inviteSquadIds.includes(player.id);
+                                return (
+                                  <div key={player.id} onClick={() => handleToggleInviteSquadMember(player.id)} className={`p-2.5 border rounded-lg flex items-center justify-between cursor-pointer transition-all ${isSelected ? 'border-[#e60023] bg-red-50/30 font-extrabold' : 'border-gray-200 hover:bg-gray-50/40'}`}>
+                                    <div>
+                                      <p className="text-xs text-gray-900 font-bold">{player.name}</p>
+                                      <p className="text-[10px] text-gray-400 capitalize">{player.role || 'Player'}</p>
+                                    </div>
+                                    <input type="checkbox" checked={isSelected} readOnly className="rounded border-gray-300 accent-[#e60023] h-3.5 w-3.5" />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
                         </div>
                       )}
+
+                      {inviteSelectedPlayers.length > 0 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                          <div>
+                            <label className="block text-[11px] font-black text-gray-400 mb-1">Captain (Optional)</label>
+                            <select value={inviteCaptainId} onChange={(e) => setInviteCaptainId(e.target.value)} className="w-full text-xs p-2 border rounded-xl bg-white font-semibold outline-none focus:border-[#e60023]">
+                              <option value="">No captain selected</option>
+                              {inviteSelectedPlayers.map((player) => <option key={player.id} value={player.id}>{player.name}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-black text-gray-400 mb-1">Wicket Keeper (Optional)</label>
+                            <select value={inviteWicketKeeperId} onChange={(e) => setInviteWicketKeeperId(e.target.value)} className="w-full text-xs p-2 border rounded-xl bg-white font-semibold outline-none focus:border-[#e60023]">
+                              <option value="">No keeper selected</option>
+                              {inviteSelectedPlayers.map((player) => <option key={player.id} value={player.id}>{player.name}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                      )}
+
                       <Button onClick={() => {
+                        if (!inviteTeamId) { toast.error("Select your team."); return; }
                         if (inviteSquadIds.length === 0) { toast.error("Pick at least one squad member."); return; }
                         setInviteWizardStep(2);
                       }} variant="primary" className="w-full flex items-center justify-center gap-1 font-bold text-xs bg-[#e60023] text-white py-2.5 rounded-lg border-none">

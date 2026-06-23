@@ -173,6 +173,33 @@ const findBowlingFigures = async (inningsId) => {
   return result.rows;
 };
 
+const findRecentDeliveries = async (inningsId, limit = 18) => {
+  const result = await query(
+    `SELECT d.deliveries_id AS delivery_id,
+            d.over_number,
+            d.ball_in_over,
+            d.delivery_sequence,
+            d.bowler_id,
+            d.batter_id,
+            d.non_striker_id,
+            d.delivery_type,
+            d.runs_batter,
+            d.runs_extras,
+            d.runs_total,
+            d.is_wicket,
+            d.is_boundary_four,
+            d.is_boundary_six,
+            e.extra_type
+       FROM deliveries d
+       LEFT JOIN extras e ON e.delivery_id = d.deliveries_id
+      WHERE d.innings_id = $1 AND d.deleted_at IS NULL
+      ORDER BY d.delivery_sequence DESC
+      LIMIT $2`,
+    [inningsId, limit]
+  );
+  return result.rows.reverse();
+};
+
 // Fall of wickets, derived from dismissals (the dedicated fall_of_wickets
 // table is not populated). runs_at_fall is exposed as score_at_fall.
 const findFallOfWickets = async (inningsId) => {
@@ -322,6 +349,7 @@ module.exports = {
   findBattingCards,
   findYetToBat,
   findBowlingFigures,
+  findRecentDeliveries,
   findFallOfWickets,
   findCommentary
 };

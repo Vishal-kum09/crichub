@@ -15,7 +15,7 @@ import {
   Star,
   Bell,
   Target,
-  Bot, // 🔥 NAYA ICON ADD KIYA HAI
+  Bot, // 🔥 NAYA ICON
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -25,9 +25,10 @@ interface SidebarProps {
   currentPath: string;
   onNavigate: (path: string) => void;
   userRole: UserRole;
+  userName?: string; // 🔥 NAYA: Dynamic name accept karne ke liye prop add kiya
 }
 
-export function Sidebar({ currentPath, onNavigate, userRole }: SidebarProps) {
+export function Sidebar({ currentPath, onNavigate, userRole, userName }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   // All navigation items with precise role restrictions matrix mapping
@@ -92,7 +93,6 @@ export function Sidebar({ currentPath, onNavigate, userRole }: SidebarProps) {
       path: '/super-admin',
       roles: ['super_admin'] as UserRole[]
     },
-    // 🔥 NAYA AI AGENT TAB 🔥
     {
       icon: Bot,
       label: 'AI Agent',
@@ -131,6 +131,17 @@ export function Sidebar({ currentPath, onNavigate, userRole }: SidebarProps) {
     club_admin: 'Club Admin',
     super_admin: 'Super Admin',
   };
+
+  // 🔥 UPDATE: `Users?.full_name` hata kar prop `userName` use kiya. Fallback aapka naam hi rakha hai.
+  const displayName = userName || "Vishal Kumar Singh"; 
+
+  // Initials generator
+  const getInitials = (name: string) => {
+    if (!name) return "U";
+    return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  };
+
+  const userInitials = getInitials(displayName);
 
   return (
     <>
@@ -203,10 +214,12 @@ export function Sidebar({ currentPath, onNavigate, userRole }: SidebarProps) {
           <div className="p-4 border-t border-[#2a2a2a]">
             <div className="flex items-center gap-3 px-4 py-3">
               <div className="w-10 h-10 rounded-full bg-[#e60023] flex items-center justify-center shadow-md">
-                <span className="font-bold text-sm">VK</span>
+                {/* 🔥 UPDATE: Hardcoded "VK" replaced with dynamic variable */}
+                <span className="font-bold text-sm">{userInitials}</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold truncate">Vishal Kumar Singh</p>
+                {/* 🔥 UPDATE: Hardcoded name replaced with dynamic variable */}
+                <p className="text-sm font-bold truncate">{displayName}</p>
                 <p className="text-xs text-[#999999] font-semibold">{roleDisplayNames[userRole]}</p>
               </div>
             </div>

@@ -2,7 +2,7 @@ import { Bot, Sparkles } from 'lucide-react';
 
 export function AIChatTab() {
   // 🔥 Replace this with your colleague's actual deployed FRONTEND link on GCP
-  const HER_CHATBOT_URL = "https://cricket-ai-ui-106171733624.us-central1.run.app/"; 
+  const HER_CHATBOT_URL = "https://cricket-scorer-ui-106171733624.us-central1.run.app/"; 
 
   return (
     <div className="flex flex-col h-[calc(100vh-6rem)] bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden animate-fadeIn">

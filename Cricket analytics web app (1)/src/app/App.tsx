@@ -207,7 +207,7 @@ export default function App() {
     <>
       <Toaster position="top-right" richColors />
       <div className="min-h-screen bg-[#f9f9f9] flex">
-        <Sidebar currentPath={currentRoute.path} onNavigate={navigate} userRole={userRole} />
+        <Sidebar currentPath={currentRoute.path} onNavigate={navigate} userRole={userRole} userName={displayName}/>
         <div className="flex-1 lg:ml-60">
           <TopBar
             title={pageTitle}

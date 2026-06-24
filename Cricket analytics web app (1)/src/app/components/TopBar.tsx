@@ -23,29 +23,6 @@ export function TopBar({ title, onLogout, userName = 'User', userRole = 'viewer'
 
       {/* Right Section */}
       <div className="flex items-center gap-2 lg:gap-4 flex-1 justify-end">
-        {/* Search Input Box */}
-        <div className={`relative ${showSearch ? 'flex-1 md:flex-none' : ''}`}>
-          {showSearch || window.innerWidth >= 768 ? (
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#666666]" size={18} />
-              <input
-                type="text"
-                placeholder="Search..."
-                className="bg-[#1a1a1a] text-white pl-10 pr-4 py-2 rounded-lg border border-[#2a2a2a] w-full md:w-48 lg:w-64 focus:outline-none focus:border-[#e60023] text-sm"
-                onBlur={() => setShowSearch(false)}
-                autoFocus={showSearch}
-              />
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowSearch(true)}
-              className="p-2 text-white hover:bg-[#1a1a1a] rounded-lg md:hidden transition-colors"
-            >
-              <Search size={20} />
-            </button>
-          )}
-        </div>
-
         {/* Profile Avatar Trigger */}
         <div className="relative">
           <button

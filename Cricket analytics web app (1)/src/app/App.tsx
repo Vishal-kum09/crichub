@@ -16,6 +16,7 @@ import { MatchDetail } from './pages/MatchDetail';
 import { MatchSetup } from './pages/MatchSetup';
 import { ScorerConsole } from './pages/ScorerConsole';
 import { Analytics } from './pages/Analytics';
+import ClubAnalytics from './pages/ClubAnalytics';
 import NVPlayAnalytics from './pages/NVPlayAnalytics';
 import { PlayerPerformance } from './pages/PlayerPerformance';
 import { Teams } from './pages/Teams';
@@ -122,6 +123,9 @@ export default function App() {
     '/match-setup': 'Match Setup',
     '/scorer': 'Scorer Console',
     '/assigned-matches': 'Scorer Console Dashboard',
+    '/club-analytics': 'Club Analytics',
+    '/club-analytics/match': 'Match Analysis',
+    '/club-analytics/player': 'Player Analysis',
     '/analytics': 'Analytics',
     '/nv-play-analytics': 'NV Play Analytics',
     '/my-performances': 'My Performances',
@@ -151,6 +155,12 @@ export default function App() {
         return <ScorerConsole matchId={currentRoute.params?.id} onNavigate={navigate} />;
       case '/assigned-matches':
         return <ScorerDashboard onNavigate={navigate} />;
+      case '/club-analytics':
+        return <ClubAnalytics onNavigate={navigate} />;
+      case '/club-analytics/match':
+        return <ClubAnalytics matchId={currentRoute.params?.id} onNavigate={navigate} />;
+      case '/club-analytics/player':
+        return <ClubAnalytics playerId={currentRoute.params?.id} onNavigate={navigate} />;
       case '/analytics':
         return <Analytics matchId={currentRoute.params?.id} onNavigate={navigate} />;
       case '/nv-play-analytics':

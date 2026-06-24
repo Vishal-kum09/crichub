@@ -108,7 +108,11 @@ export async function getMe(): Promise<AuthUser & { phone?: string }> {
 
 export async function listApprovedClubs(): Promise<{ id: string; name: string }[]> {
   const { data } = await api.get('/api/auth/clubs');
-  return data.clubs;
+  const raw = data?.clubs ?? (Array.isArray(data) ? data : []);
+  return raw.map((club: any) => ({
+    id: String(club.club_id || club.id),
+    name: club.club_name || club.name || club.display_name || 'Unnamed Club',
+  }));
 }
 
 export const defaultRouteForRole = (role: AppUserRole): string => {

@@ -101,6 +101,9 @@ app.use('/api/player', require('./src/routes/playerRoutes'));
 // Analyst routes
 app.use('/api/analyst', require('./src/routes/analystRoutes'));
 
+// Club analytics (club admin + scorer)
+app.use('/api/club-analytics', require('./src/routes/clubAnalyticsRoutes'));
+
 // Add this line where your other app.use('/api/...', ...) routes are:
 app.use('/api/notifications', require('./src/routes/notificationRoutes')); // Adjust the path if your routes folder is not inside 'src'
 

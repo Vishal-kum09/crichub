@@ -7,6 +7,7 @@ const repo = require('../repositories/scorerRepository');
 const logger = require('../../config/logger');
 const { AppError } = require('../middlewares/errorHandler');
 const commentaryService = require('./commentaryService');
+const { getScoringRules } = require('../utils/matchNotes');
 
 // ─── Enum mapping ───────────────────────────────────────────────────────────
 
@@ -36,7 +37,16 @@ const phaseFor = (overNumber, oversPerMatch) => {
 };
 
 // ─── Core scoring math ──────────────────────────────────────────────────────
-const ballMath = (deliveryType, runsOffBat, extraRuns) => {
+const ballMath = (deliveryType, runsOffBat, extraRuns, rules = {}) => {
+  const widePenalty = Number.isFinite(Number(rules.wide_penalty_runs))
+    ? Math.max(1, Number(rules.wide_penalty_runs))
+    : 1;
+  const noBallPenalty = Number.isFinite(Number(rules.no_ball_penalty_runs))
+    ? Math.max(1, Number(rules.no_ball_penalty_runs))
+    : 1;
+  const wideCountsAsBall = rules.wide_counts_as_ball === true;
+  const noBallCountsAsBall = rules.no_ball_counts_as_ball === true;
+
   const m = {
     deliveryType,
     runsBatter: 0,
@@ -65,25 +75,25 @@ const ballMath = (deliveryType, runsOffBat, extraRuns) => {
 
     case 'no_ball':
       m.runsBatter = runsOffBat;
-      m.runsExtras = 1;
-      m.runsTotal = 1 + runsOffBat;
-      m.countsOver = false;
+      m.runsExtras = noBallPenalty;
+      m.runsTotal = noBallPenalty + runsOffBat;
+      m.countsOver = noBallCountsAsBall;
       m.batterFaces = true;
-      m.bowlerConceded = 1 + runsOffBat;
-      m.extras.no_balls = 1;
-      m.extras.total = 1;
+      m.bowlerConceded = noBallPenalty + runsOffBat;
+      m.extras.no_balls = noBallPenalty;
+      m.extras.total = noBallPenalty;
       m.isFour = runsOffBat === 4;
       m.isSix = runsOffBat === 6;
       break;
 
     case 'wide':
-      m.runsExtras = 1 + extraRuns;
-      m.runsTotal = 1 + extraRuns;
-      m.countsOver = false;
+      m.runsExtras = widePenalty + extraRuns;
+      m.runsTotal = widePenalty + extraRuns;
+      m.countsOver = wideCountsAsBall;
       m.batterFaces = false;
-      m.bowlerConceded = 1 + extraRuns;
-      m.extras.wides = 1 + extraRuns;
-      m.extras.total = 1 + extraRuns;
+      m.bowlerConceded = widePenalty + extraRuns;
+      m.extras.wides = widePenalty + extraRuns;
+      m.extras.total = widePenalty + extraRuns;
       break;
 
     case 'leg_bye':
@@ -410,6 +420,7 @@ const recordBall = async (matchId, input) => {
 
     const match = await repo.getMatch(client, innings.match_id);
     const oversPerMatch = match ? match.overs_per_match : null;
+    const scoringRules = getScoringRules(match?.notes);
 
     const crease = await resolveCrease(client, input.innings_id, {
       strikerId: input.striker_id,
@@ -423,7 +434,7 @@ const recordBall = async (matchId, input) => {
       );
     }
 
-    const m = ballMath(deliveryType, input.runs_off_bat, input.extra_runs);
+    const m = ballMath(deliveryType, input.runs_off_bat, input.extra_runs, scoringRules);
 
     const legalBefore = innings.total_balls;
     const overNumber = Math.floor(legalBefore / 6) + 1;
@@ -875,7 +886,9 @@ const undo = async (matchId, input) => {
     const last = await repo.getLastDelivery(client, innings.innings_id);
     if (!last) throw new AppError('Nothing to undo', 400);
 
-    const m = ballMath(last.delivery_type, last.runs_batter, last.runs_extras);
+    const match = await repo.getMatch(client, innings.match_id);
+    const scoringRules = getScoringRules(match?.notes);
+    const m = ballMath(last.delivery_type, last.runs_batter, last.runs_extras, scoringRules);
     const dismissal = await repo.getDismissalForDelivery(client, last.deliveries_id);
 
     let wicketDelta = 0;
@@ -1062,6 +1075,7 @@ const getMatchPreview = async (scorerId, matchId) => {
     total_overs: match.overs_per_match,
     overs_per_bowler: match.overs_per_match ? Math.floor(match.overs_per_match / 5) : 4,
     status: match.status,
+    scoring_rules: getScoringRules(match.notes),
     team1_roster: team1Roster,
     team2_roster: team2Roster
   };

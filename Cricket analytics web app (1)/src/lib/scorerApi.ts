@@ -216,6 +216,13 @@
     return data.matches as AssignedMatch[];
   }
 
+  export interface ScoringRules {
+    wide_counts_as_ball: boolean;
+    wide_penalty_runs: number;
+    no_ball_counts_as_ball: boolean;
+    no_ball_penalty_runs: number;
+  }
+
   export interface MatchPreview {
     match_id: string;
     team1_id: string;
@@ -229,6 +236,7 @@
     total_overs: number;
     overs_per_bowler: number;
     status: string;
+    scoring_rules?: ScoringRules;
     team1_roster: { id: string; name: string; role: string }[];
     team2_roster: { id: string; name: string; role: string }[];
   }

@@ -40,7 +40,11 @@ const CreateMatchSchema = z.object({
   squad_player_ids: z.array(z.string()).default([]),
   team1_id: z.string().uuid().optional(),
   team2_id: z.string().uuid().optional(),
-  assigned_scorer_id: z.string().uuid()
+  assigned_scorer_id: z.string().uuid(),
+  wide_counts_as_ball: z.boolean().optional(),
+  wide_penalty_runs: z.number().int().min(1).max(10).optional(),
+  no_ball_counts_as_ball: z.boolean().optional(),
+  no_ball_penalty_runs: z.number().int().min(1).max(10).optional(),
 });
 
 const TeamSchema = z.object({
@@ -68,11 +72,22 @@ const createMatch = async (req, res, next) => {
     let initialStatus = data.match_type === 'cross_club' ? 'pending_opponent' : 'scheduled';
     
     // 🔥 EXACT MATCHES TABLE INSERTION (Removed the redundant 'teams' table check entirely)
-    const notes = JSON.stringify({
+    const notesPayload = {
       team1_id: data.team1_id || null,
       team2_id: data.team2_id || null,
-      squad_player_ids: data.squad_player_ids || []
-    });
+      squad_player_ids: data.squad_player_ids || [],
+    };
+
+    if (data.format === 'Custom') {
+      notesPayload.scoring_rules = {
+        wide_counts_as_ball: data.wide_counts_as_ball === true,
+        wide_penalty_runs: data.wide_penalty_runs ?? 1,
+        no_ball_counts_as_ball: data.no_ball_counts_as_ball === true,
+        no_ball_penalty_runs: data.no_ball_penalty_runs ?? 1,
+      };
+    }
+
+    const notes = JSON.stringify(notesPayload);
 
     const matchSql = `
       INSERT INTO matches (

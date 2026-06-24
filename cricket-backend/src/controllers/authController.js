@@ -126,7 +126,7 @@ const me = async (req, res, next) => {
 const listClubs = async (req, res, next) => {
   try {
     const clubs = await authService.listApprovedClubs();
-    res.status(200).json(clubs);
+    res.status(200).json({ clubs });
   } catch (err) { next(err); }
 };
 

@@ -80,7 +80,11 @@ export function ClubAdmin() {
     date: '', time: '', format: '', ballType: '', oversPerMatch: '', 
     venue: '', pitchNum: '', venueNeutral: false, city: '', country: '',address:'',postcode:'',
     opponentClubId: '', selectedSquadIds: [] as string[], assignedScorerId: '' 
-    , team1Id: '', team2Id: ''
+    , team1Id: '', team2Id: '',
+    wideCountsAsBall: false,
+    widePenaltyRuns: '1',
+    noBallCountsAsBall: false,
+    noBallPenaltyRuns: '1',
   });
   
   const [tournamentForm, setTournamentForm] = useState({ name: '', type: '', oversLimit: '', maxTeams: '', startDate: '', endDate: '' });
@@ -391,11 +395,17 @@ export function ClubAdmin() {
         address: matchForm.address,
         postcode: matchForm.postcode,
         squad_player_ids: matchForm.selectedSquadIds,
-        assigned_scorer_id: matchForm.assignedScorerId
+        assigned_scorer_id: matchForm.assignedScorerId,
+        ...(matchForm.format === 'Custom' ? {
+          wide_counts_as_ball: matchForm.wideCountsAsBall,
+          wide_penalty_runs: Number(matchForm.widePenaltyRuns) || 1,
+          no_ball_counts_as_ball: matchForm.noBallCountsAsBall,
+          no_ball_penalty_runs: Number(matchForm.noBallPenaltyRuns) || 1,
+        } : {}),
       });
 
       toast.success('Match scheduled successfully!');
-      setMatchForm({ date: '', time: '', format: '', ballType: '', oversPerMatch: '', venue: '', pitchNum: '', venueNeutral: false, city: '', country: '',address:'',postcode:'', opponentClubId: '', selectedSquadIds: [], assignedScorerId: '', team1Id: '', team2Id: '' } as any);
+      setMatchForm({ date: '', time: '', format: '', ballType: '', oversPerMatch: '', venue: '', pitchNum: '', venueNeutral: false, city: '', country: '',address:'',postcode:'', opponentClubId: '', selectedSquadIds: [], assignedScorerId: '', team1Id: '', team2Id: '', wideCountsAsBall: false, widePenaltyRuns: '1', noBallCountsAsBall: false, noBallPenaltyRuns: '1' } as any);
       setMatchTeamPlayers([]);
       setWizardStep(1);
       setActiveTab('my-matches');
@@ -1011,10 +1021,65 @@ export function ClubAdmin() {
         />
       </div>
     </div>
+                {matchForm.format === 'Custom' && (
+                  <div className="border border-orange-200 bg-orange-50/60 rounded-xl p-4 space-y-4">
+                    <h4 className="text-xs font-black uppercase text-orange-800">Custom Scoring Rules</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <p className="text-xs font-bold text-gray-700">Is Wide ball count in over?</p>
+                        <div className="flex gap-4">
+                          <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
+                            <input type="radio" name="wideCounts" checked={matchForm.wideCountsAsBall === true} onChange={() => setMatchForm({ ...matchForm, wideCountsAsBall: true })} className="accent-[#e60023]" />
+                            Yes
+                          </label>
+                          <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
+                            <input type="radio" name="wideCounts" checked={matchForm.wideCountsAsBall === false} onChange={() => setMatchForm({ ...matchForm, wideCountsAsBall: false })} className="accent-[#e60023]" />
+                            No
+                          </label>
+                        </div>
+                        {matchForm.wideCountsAsBall && (
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-500 mb-1">Runs for wide ball</label>
+                            <input type="number" min={1} max={10} value={matchForm.widePenaltyRuns} onChange={(e) => setMatchForm({ ...matchForm, widePenaltyRuns: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-xs font-bold text-gray-700">Is No Ball count in over?</p>
+                        <div className="flex gap-4">
+                          <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
+                            <input type="radio" name="noBallCounts" checked={matchForm.noBallCountsAsBall === true} onChange={() => setMatchForm({ ...matchForm, noBallCountsAsBall: true })} className="accent-[#e60023]" />
+                            Yes
+                          </label>
+                          <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
+                            <input type="radio" name="noBallCounts" checked={matchForm.noBallCountsAsBall === false} onChange={() => setMatchForm({ ...matchForm, noBallCountsAsBall: false })} className="accent-[#e60023]" />
+                            No
+                          </label>
+                        </div>
+                        {matchForm.noBallCountsAsBall && (
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-500 mb-1">Runs for no ball</label>
+                            <input type="number" min={1} max={10} value={matchForm.noBallPenaltyRuns} onChange={(e) => setMatchForm({ ...matchForm, noBallPenaltyRuns: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <Button onClick={() => {
                   if (!matchForm.team1Id) { toast.error("Choose your team."); return; }
                   if (matchType === 'local' && !matchForm.team2Id) { toast.error("Choose opponent team."); return; }
                   if (matchType === 'club' && !matchForm.opponentClubId) { toast.error("Choose an opponent club."); return; }
+                  if (matchForm.format === 'Custom') {
+                    if (matchForm.wideCountsAsBall && (!matchForm.widePenaltyRuns || Number(matchForm.widePenaltyRuns) < 1)) {
+                      toast.error('Enter valid runs for wide ball when wide counts in over.');
+                      return;
+                    }
+                    if (matchForm.noBallCountsAsBall && (!matchForm.noBallPenaltyRuns || Number(matchForm.noBallPenaltyRuns) < 1)) {
+                      toast.error('Enter valid runs for no ball when no ball counts in over.');
+                      return;
+                    }
+                  }
                   if (!matchForm.date || !matchForm.venue || !matchForm.city || !matchForm.country) { toast.error("Complete all required fields."); return; }
                   setWizardStep(2);
                 }} variant="primary" className="w-full flex items-center justify-center gap-1 font-bold text-xs py-3 rounded-xl bg-[#e60023] hover:bg-red-700 text-white border-none shadow-sm">

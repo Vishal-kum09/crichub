@@ -16,6 +16,7 @@ import {
   getLiveSession,
   setLiveSession,
   getLiveMatchState,
+  getMatchPreview,
   toExtraType,
   type InningsState,
   type LiveSession,
@@ -23,6 +24,7 @@ import {
   type ChaseInfo,
   type InningsBreakInfo,
   type MatchResultInfo,
+  type ScoringRules,
 } from '../../lib/scorerApi';
 
 interface ScorerConsoleProps {
@@ -149,6 +151,13 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
     penalties: 0,
   });
 
+  const [scoringRules, setScoringRules] = useState<ScoringRules>({
+    wide_counts_as_ball: false,
+    wide_penalty_runs: 1,
+    no_ball_counts_as_ball: false,
+    no_ball_penalty_runs: 1,
+  });
+
   // Dialog states
   const [showOthersDialog, setShowOthersDialog] = useState(false);
   const [showWicketDialog, setShowWicketDialog] = useState(false);
@@ -228,6 +237,17 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
       if (ws) ws.close();
     };
   }, [activeTab, matchId]);
+
+  useEffect(() => {
+    if (!matchId) return;
+    getMatchPreview(matchId)
+      .then((preview) => {
+        if (preview.scoring_rules) {
+          setScoringRules(preview.scoring_rules);
+        }
+      })
+      .catch(() => {});
+  }, [matchId]);
 
   const syncFromInnings = (innings: InningsState) => {
     setScore(innings.total_runs);
@@ -460,8 +480,10 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
     if (!isLive) return;
     setCurrentExtraType(currentExtraType === extraType ? null : extraType);
 
-    if (extraType === 'wide' || extraType === 'no-ball') {
-      setCurrentExtras(1);
+    if (extraType === 'wide') {
+      setCurrentExtras(scoringRules.wide_penalty_runs);
+    } else if (extraType === 'no-ball') {
+      setCurrentExtras(scoringRules.no_ball_penalty_runs);
     } else {
       setCurrentExtras(0);
     }
@@ -540,7 +562,7 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
       const extraType = toExtraType(currentExtraType);
       const runsOffBat = extraType === 'NB' || extraType === 'None' ? currentRuns : 0;
       const extraRuns =
-        extraType === 'WD' ? Math.max(0, currentExtras - 1)
+        extraType === 'WD' ? Math.max(0, currentExtras - scoringRules.wide_penalty_runs)
         : extraType === 'B' || extraType === 'LB' ? currentRuns
         : 0;
       const payload = {
@@ -1101,19 +1123,25 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
                   <div className="mt-3">
                     <p className="text-sm text-[#666666] mb-2">Additional runs from {currentExtraType}</p>
                     <div className="grid grid-cols-5 gap-2">
-                      {[0, 1, 2, 3, 4].map(extra => (
+                      {[0, 1, 2, 3, 4].map(extra => {
+                        const basePenalty = currentExtraType === 'wide'
+                          ? scoringRules.wide_penalty_runs
+                          : scoringRules.no_ball_penalty_runs;
+                        const totalExtra = basePenalty + extra;
+                        return (
                         <button
                           key={extra}
-                          onClick={() => setCurrentExtras(1 + extra)}
+                          onClick={() => setCurrentExtras(totalExtra)}
                           className={`p-2 rounded-lg font-semibold ${
-                            currentExtras === 1 + extra
+                            currentExtras === totalExtra
                               ? 'bg-orange-600 text-white'
                               : 'bg-orange-100 text-orange-900 hover:bg-orange-200'
                           }`}
                         >
                           +{extra}
                         </button>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}

@@ -8,7 +8,7 @@ interface SignUpProps {
 }
 
 interface ClubOption {
-  id: number;
+  id: string;
   name: string;
 }
 
@@ -50,7 +50,13 @@ export function SignUp({ onNavigate }: SignUpProps) {
   useEffect(() => {
     api.get('/api/auth/clubs')
       .then(res => {
-        setClubsList(res.data.clubs ?? []);
+        const raw = res.data?.clubs ?? (Array.isArray(res.data) ? res.data : []);
+        setClubsList(
+          raw.map((club: any) => ({
+            id: String(club.club_id || club.id),
+            name: club.club_name || club.name || club.display_name || 'Unnamed Club',
+          }))
+        );
       })
       .catch(() => console.warn("Failed to fetch club directory attributes."));
   }, []);
@@ -134,7 +140,7 @@ export function SignUp({ onNavigate }: SignUpProps) {
           password: password,
           phone: phone || undefined,
           display_name: displayName || `${firstName} ${lastName}`,
-          club_id: isAffiliatedWithClub && selectedClubId !== '' ? Number(selectedClubId) : undefined,
+          club_id: isAffiliatedWithClub && selectedClubId ? selectedClubId : undefined,
           account_role: isAffiliatedWithClub ? selectedRole : 'Viewer',
           player_profile: isAffiliatedWithClub && selectedRole === 'Player' ? {
             date_of_birth: dob,

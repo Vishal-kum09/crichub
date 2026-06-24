@@ -11,6 +11,7 @@ import {
   ClipboardEdit,
   ClipboardList,
   BarChart3,
+  LineChart,
   Star,
   Bell,
   Target,
@@ -56,8 +57,14 @@ export function Sidebar({ currentPath, onNavigate, userRole }: SidebarProps) {
       roles: ['player'] as UserRole[]
     },
     {
+      icon: LineChart,
+      label: 'Club Analytics',
+      path: '/club-analytics',
+      roles: ['scorer', 'club_admin'] as UserRole[]
+    },
+    {
       icon: BarChart3,
-      label: 'Analytics',
+      label: 'NV-Play Analytics',
       path: '/nv-play-analytics',
       roles: ['analyst', 'super_admin', 'club_admin'] as UserRole[]
     },

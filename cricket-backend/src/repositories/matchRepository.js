@@ -220,23 +220,27 @@ const findFallOfWickets = async (inningsId) => {
 
 // Visible AI commentary for a match. Falls back to deterministic ball text when
 // the commentary module has not generated rows yet.
-const findCommentary = async (matchId) => {
+const findCommentary = async (matchId, inningsNumber = null) => {
+  const inningsFilter = inningsNumber ? 'AND d.innings_number = $2' : '';
+  const params = inningsNumber ? [matchId, inningsNumber] : [matchId];
+
   // 1. Fetch AI Commentary with Joins for Delivery Details (fixes 0.0 bug) & Audio Generations (gets MP3)
   const aiResult = await query(
     `SELECT ac.ai_commentary_id, ac.match_id, ac.innings_id, ac.delivery_id, ac.task, ac.style,
             ac.output, ac.source, ac.status, ac.is_visible, ac.is_manual_override, ac.version,
             ac.response_time_ms, ac.created_at,
-            d.over_number, d.ball_in_over as ball_number, d.runs_total as runs,
+            d.over_number, d.ball_in_over as ball_number, d.runs_total as runs, i.innings_number,
             bat.display_name AS batter_name, bow.display_name AS bowler_name,
             ag.storage_bucket, ag.storage_object
        FROM ai_commentary ac
        LEFT JOIN deliveries d ON d.deliveries_id = ac.delivery_id
+       LEFT JOIN innings i ON i.innings_id = d.innings_id
        LEFT JOIN players bat ON bat.players_id = d.batter_id
        LEFT JOIN players bow ON bow.players_id = d.bowler_id
        LEFT JOIN audio_generations ag ON ag.commentary_id = ac.ai_commentary_id AND ag.status = 'ready'
-      WHERE ac.match_id = $1 AND ac.is_visible = true
+      WHERE ac.match_id = $1 AND ac.is_visible = true ${inningsFilter.replace('d.innings_number', 'i.innings_number')}
       ORDER BY ac.created_at ASC`,
-    [matchId]
+    params
   );
 
   if (aiResult.rows.length > 0) {
@@ -251,6 +255,9 @@ const findCommentary = async (matchId) => {
   }
 
   // 2. Fallback if AI hasn't generated anything yet
+  const fallbackInningsFilter = inningsNumber ? 'AND i.innings_number = $2' : '';
+  const fallbackParams = inningsNumber ? [matchId, inningsNumber] : [matchId];
+
   const fallbackResult = await query(
     `SELECT d.deliveries_id AS delivery_id, d.over_number, d.ball_in_over,
             d.delivery_sequence, d.delivery_type, d.runs_batter, d.runs_extras,
@@ -262,9 +269,9 @@ const findCommentary = async (matchId) => {
      JOIN innings i ON i.innings_id = d.innings_id
      JOIN players bat ON bat.players_id = d.batter_id
      JOIN players bow ON bow.players_id = d.bowler_id
-     WHERE i.match_id = $1 AND d.deleted_at IS NULL
+     WHERE i.match_id = $1 AND d.deleted_at IS NULL ${fallbackInningsFilter}
      ORDER BY i.innings_number ASC, d.delivery_sequence ASC`,
-    [matchId]
+    fallbackParams
   );
   
   return fallbackResult.rows.map((row) => ({
@@ -281,6 +288,7 @@ const findCommentary = async (matchId) => {
     // Explicitly passing these so the frontend UI does not default to 0.0
     over_number: row.over_number,
     ball_number: row.ball_in_over,
+    innings_number: row.innings_number,
     runs: row.runs_total,
     batter_name: row.batter_name,
     bowler_name: row.bowler_name

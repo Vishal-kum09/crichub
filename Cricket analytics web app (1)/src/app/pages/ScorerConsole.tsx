@@ -120,6 +120,10 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
   const [showMatchCompleteDialog, setShowMatchCompleteDialog] = useState(false);
   const [showSecondInningsDialog, setShowSecondInningsDialog] = useState(false);
 
+  // Commentary state
+  const [commentaryInnings, setCommentaryInnings] = useState<1 | 2>(1);
+  const [commentarySort, setCommentarySort] = useState<'asc' | 'desc'>('desc');
+
   // Current ball state
   const [currentRuns, setCurrentRuns] = useState(0);
   const [currentExtras, setCurrentExtras] = useState(0);
@@ -1322,7 +1326,40 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
       )}
 
       {activeTab === 'commentary' && matchId && (
-        <ViewerCommentaryPanel matchId={matchId} enabled={activeTab === 'commentary'} />
+        <div className="h-full flex flex-col">
+          <div className="flex items-center justify-between shrink-0 mb-2 p-2 bg-gray-100 dark:bg-gray-900 rounded-lg">
+            <div className="flex gap-1 p-1 bg-gray-200 dark:bg-gray-800 rounded-md">
+              <button
+                onClick={() => setCommentaryInnings(1)}
+                className={`px-3 py-1 text-xs font-bold rounded ${commentaryInnings === 1 ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500'}`}
+              >
+                1st Innings
+              </button>
+              <button
+                onClick={() => setCommentaryInnings(2)}
+                disabled={inningsNumber < 2 && ballHistory.every(b => b.over < (matchTotalOvers || 20))}
+                className={`px-3 py-1 text-xs font-bold rounded disabled:opacity-50 ${commentaryInnings === 2 ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500'}`}
+              >
+                2nd Innings
+              </button>
+            </div>
+            <div className="flex gap-1 p-1 bg-gray-200 dark:bg-gray-800 rounded-md">
+              <button
+                onClick={() => setCommentarySort('desc')}
+                className={`px-3 py-1 text-xs font-bold rounded ${commentarySort === 'desc' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500'}`}
+              >
+                Recent First
+              </button>
+              <button
+                onClick={() => setCommentarySort('asc')}
+                className={`px-3 py-1 text-xs font-bold rounded ${commentarySort === 'asc' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500'}`}
+              >
+                Oldest First
+              </button>
+            </div>
+          </div>
+          <ViewerCommentaryPanel matchId={matchId} enabled={activeTab === 'commentary'} innings={commentaryInnings} sort={commentarySort} />
+        </div>
       )}
       </div>
 

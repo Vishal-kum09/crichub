@@ -116,6 +116,8 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'scorecard' | 'commentary' | 'analytics' | 'watch_live'>('overview');
   const [activeInningsIndex, setActiveInningsIndex] = useState<number>(0);
 
+  const [commentaryInnings, setCommentaryInnings] = useState<1 | 2>(1);
+  const [commentarySort, setCommentarySort] = useState<'asc' | 'desc'>('desc');
   const [commentaryList, setCommentaryList] = useState<any[]>([]);
   const [isWsConnected, setIsWsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
@@ -137,7 +139,7 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
 
     const setupLiveCommentary = async () => {
       if (activeTab === 'commentary') {
-        getCommentaryHistory(matchId)
+        getCommentaryHistory(matchId, commentaryInnings)
           .then(fetchedData => {
             if (!isMounted) return;
             setCommentaryList(fetchedData);
@@ -188,7 +190,7 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
       isMounted = false;
       if (ws) ws.close();
     };
-  }, [activeTab, matchId]);
+  }, [activeTab, matchId, commentaryInnings]);
 
   if (loading) {
     return <div className="p-6 max-w-7xl mx-auto"><div className="animate-pulse space-y-4"><div className="h-32 bg-gray-200 rounded-xl" /><div className="h-12 bg-gray-200 rounded-lg" /><div className="h-64 bg-gray-200 rounded-xl" /></div></div>;
@@ -529,6 +531,37 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
 
           {activeTab === 'commentary' && (
             <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-6 animate-fadeIn">
+              <div className="flex items-center justify-between shrink-0 -mt-2 -mx-2 mb-0 p-2 bg-gray-50 dark:bg-gray-900 rounded-t-xl border-b border-gray-200">
+                <div className="flex gap-1 p-1 bg-gray-200 dark:bg-gray-800 rounded-md">
+                  <button
+                    onClick={() => setCommentaryInnings(1)}
+                    className={`px-3 py-1 text-xs font-bold rounded ${commentaryInnings === 1 ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500'}`}
+                  >
+                    1st Innings
+                  </button>
+                  <button
+                    onClick={() => setCommentaryInnings(2)}
+                    disabled={scorecard.innings.length < 2}
+                    className={`px-3 py-1 text-xs font-bold rounded disabled:opacity-50 ${commentaryInnings === 2 ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500'}`}
+                  >
+                    2nd Innings
+                  </button>
+                </div>
+                <div className="flex gap-1 p-1 bg-gray-200 dark:bg-gray-800 rounded-md">
+                  <button
+                    onClick={() => setCommentarySort('desc')}
+                    className={`px-3 py-1 text-xs font-bold rounded ${commentarySort === 'desc' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500'}`}
+                  >
+                    Recent First
+                  </button>
+                  <button
+                    onClick={() => setCommentarySort('asc')}
+                    className={`px-3 py-1 text-xs font-bold rounded ${commentarySort === 'asc' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500'}`}
+                  >
+                    Oldest First
+                  </button>
+                </div>
+              </div>
               <div className="flex justify-between items-center border-b border-gray-100 pb-3">
                 <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
                   🎙️ Live AI Commentary Stream
@@ -549,13 +582,15 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
                   <p className="text-gray-500 text-sm italic">Waiting for commentary updates...</p>
                 ) : (
                   [...commentaryList]
-                    .filter(c => c && c.is_visible !== false)
+                    .filter(c => c && c.is_visible !== false && c.innings_number === commentaryInnings)
                     .sort((a, b) => {
                       // 🔥 FIX: Check both over/over_number and ball/ball_number
                       const overA = a.over !== undefined ? a.over : (a.over_number !== undefined ? a.over_number : 0);
                       const ballA = a.ball !== undefined ? a.ball : (a.ball_number !== undefined ? a.ball_number : 0);
                       const overB = b.over !== undefined ? b.over : (b.over_number !== undefined ? b.over_number : 0);
                       const ballB = b.ball !== undefined ? b.ball : (b.ball_number !== undefined ? b.ball_number : 0);
+                      
+                      if (commentarySort === 'asc') return overA !== overB ? overA - overB : ballA - ballB;
                       
                       if (overA !== overB) return overB - overA; 
                       return ballB - ballA; 

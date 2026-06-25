@@ -15,11 +15,12 @@ import {
   Star,
   Bell,
   Target,
+  Home,
   Bot, // 🔥 NAYA ICON
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
-type UserRole = 'viewer' | 'player' | 'scorer' | 'analyst' | 'club_admin' | 'super_admin';
+type UserRole = 'viewer' | 'player' | 'scorer' | 'analyst' | 'club_admin' | 'super_admin' | 'general_member';
 
 interface SidebarProps {
   currentPath: string;
@@ -58,6 +59,12 @@ export function Sidebar({ currentPath, onNavigate, userRole, userName }: Sidebar
       roles: ['player'] as UserRole[]
     },
     {
+      icon: Home,
+      label: 'My Club',
+      path: '/my-club',
+      roles: ['general_member'] as UserRole[],
+    },
+    {
       icon: LineChart,
       label: 'Club Analytics',
       path: '/club-analytics',
@@ -72,7 +79,7 @@ export function Sidebar({ currentPath, onNavigate, userRole, userName }: Sidebar
     {
       icon: Users,
       label: 'Clubs',
-      path: '/teams',
+      path: '/clubs',
       roles: ['viewer', 'super_admin'] as UserRole[]
     },
     {
@@ -129,6 +136,7 @@ export function Sidebar({ currentPath, onNavigate, userRole, userName }: Sidebar
     scorer: 'Scorer',
     analyst: 'Analyst',
     club_admin: 'Club Admin',
+    general_member: 'General Member',
     super_admin: 'Super Admin',
   };
 

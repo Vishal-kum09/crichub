@@ -1,5 +1,6 @@
 // Viewer service — composes read models from the repositories and maps them to
 // the shapes the frontend expects (see presenters/viewerPresenter). No mutations.
+const { query } = require('../../db');
 const matchRepo = require('../repositories/matchRepository');
 const teamRepo = require('../repositories/teamRepository');
 const playerRepo = require('../repositories/playerRepository');
@@ -52,12 +53,48 @@ const getCommentary = async (matchId) => {
 // ─── Teams ────────────────────────────────────────────────────────────────────
 
 const listTeams = async () => {
-  const rows = await teamRepo.findTeamsWithStats();
+  const result = await query(
+    `
+    SELECT
+      c.club_id AS id,
+      c.club_name AS name,
+      c.display_name,
+      c.country,
+      c.home_ground,
+      (SELECT COUNT(*) FROM matches m WHERE m.host_club_id = c.club_id OR m.opponent_club_id = c.club_id) AS total_matches,
+      (SELECT COUNT(*) FROM matches m WHERE m.winning_team_id = c.club_id) AS won,
+      (SELECT COUNT(*) FROM matches m WHERE m.winning_team_id IS NOT NULL AND m.winning_team_id != c.club_id AND (m.host_club_id = c.club_id OR m.opponent_club_id = c.club_id)) AS lost
+    FROM club c
+    WHERE c.is_approved = true
+    ORDER BY c.club_name ASC;
+    `
+  );
+  const rows = result.rows;
   return rows.map(present.presentTeam);
 };
 
 const getTeam = async (id) => {
-  const team = await teamRepo.findTeamWithStats(id);
+  // The original teamRepo.findTeamWithStats(id) was using incorrect column names.
+  // This updated query uses the correct `host_club_id` and `opponent_club_id`.
+  const teamResult = await query(
+    `
+    SELECT
+      c.club_id AS id,
+      c.club_name AS name,
+      c.display_name,
+      c.country,
+      c.home_ground,
+      (SELECT COUNT(*) FROM matches m WHERE m.host_club_id = c.club_id OR m.opponent_club_id = c.club_id) AS total_matches,
+      (SELECT COUNT(*) FROM matches m WHERE m.winning_team_id = c.club_id) AS won,
+      (SELECT COUNT(*) FROM matches m WHERE m.winning_team_id IS NOT NULL AND m.winning_team_id != c.club_id AND (m.host_club_id = c.club_id OR m.opponent_club_id = c.club_id)) AS lost
+    FROM club c
+    WHERE c.club_id = $1
+    `,
+    [id]
+  );
+
+  const team = teamResult.rows[0];
+
   if (!team) return null;
   const presented = present.presentTeam(team);
   const [squad, matches] = await Promise.all([

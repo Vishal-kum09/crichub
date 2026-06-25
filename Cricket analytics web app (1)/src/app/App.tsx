@@ -18,10 +18,10 @@ import { ScorerConsole } from './pages/ScorerConsole';
 import { Analytics } from './pages/Analytics';
 import ClubAnalytics from './pages/ClubAnalytics';
 import NVPlayAnalytics from './pages/NVPlayAnalytics';
-import { PlayerPerformance } from './pages/PlayerPerformance';
-import { Teams } from './pages/Teams';
-import { TeamDetail } from './pages/TeamDetail';
-import { Players } from './pages/Players';
+import { PlayerPerformance } from './pages/PlayerPerformance'; // This will be used for player-specific views
+import { Clubs } from './pages/Clubs.tsx'; // Renamed from Teams
+import { MyClub } from './pages/MyClub.tsx'; // New component for General Members
+import { ClubDetail } from './pages/ClubDetail.tsx'; // New component for club details
 import { PlayerDetail } from './pages/PlayerDetail';
 import { Admin } from './pages/Admin';
 import { ClubAdmin } from './pages/ClubAdmin';
@@ -29,6 +29,7 @@ import { SuperAdmin } from './pages/SuperAdmin';
 import { Settings } from './pages/Settings';
 import { ScorerDashboard } from './pages/Assignedmatches.tsx';
 import { Notifications } from './components/notifications'; 
+import { Players } from './pages/Players';
 
 import {
   clearStoredToken,
@@ -50,6 +51,7 @@ export default function App() {
   const [currentRoute, setCurrentRoute] = useState<Route>({ path: '/signin' });
   const [selectedTeam, setSelectedTeam] = useState('Cambridge Phoenix');
   const [userRole, setUserRole] = useState<AppUserRole>('viewer');
+  const [userClubId, setUserClubId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState('User');
 
   useEffect(() => {
@@ -62,6 +64,7 @@ export default function App() {
       .then((user) => {
         const role = toAppRole(user.role);
         setUserRole(role);
+        setUserClubId(user.club_id);
         setDisplayName(user.display_name);
         setIsAuthenticated(true);
         setCurrentRoute({ path: defaultRouteForRole(role) });
@@ -128,8 +131,9 @@ export default function App() {
     '/club-analytics/player': 'Player Analysis',
     '/analytics': 'Analytics',
     '/nv-play-analytics': 'NV Play Analytics',
-    '/my-performances': 'My Performances',
-    '/teams': 'Clubs',
+    '/my-performances': 'My Performances', // This remains for players
+    '/clubs': 'Clubs', // Updated path and title
+    '/my-club': 'My Club',
     '/team': 'Club Details',
     '/players': 'Players',
     '/player': 'Player Details',
@@ -137,6 +141,7 @@ export default function App() {
     '/super-admin': 'Super Administration',
     '/settings': 'Settings',
     '/ai-agent': 'AI Agent',
+    '/club': 'Club Details',
     '/BallTracker': 'BallTracker',
      // 🔥 Added Title
   };
@@ -167,10 +172,12 @@ export default function App() {
         return <NVPlayAnalytics />;
       case '/my-performances':
         return <PlayerPerformance />;
-      case '/teams':
-        return <Teams onNavigate={navigate} />;
-      case '/team':
-        return <TeamDetail teamId={currentRoute.params?.id || ''} onNavigate={navigate} />;
+      case '/clubs':
+        return <Clubs onNavigate={navigate} />;
+      case '/my-club':
+        return <MyClub clubId={userClubId || ''} onNavigate={navigate} />;
+      case '/club':
+        return <ClubDetail clubId={currentRoute.params?.id || ''} onNavigate={navigate} />;
       case '/players':
         return <Players onNavigate={navigate} />;
       case '/player':
@@ -217,7 +224,7 @@ export default function App() {
             userName={displayName}
             userRole={userRole}
           />
-          <main className="p-4 lg:p-6 pb-20 lg:pb-6 bg-[#f9f9f9]">
+          <main className="pb-20 lg:pb-6 bg-[#f9f9f9]">
             {renderPage()}
           </main>
         </div>

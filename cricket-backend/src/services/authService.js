@@ -59,7 +59,7 @@ const registerIndividual = async (data) => {
     const exec = (text, params) => client.query(text, params);
     
     const dynamicRole = data.account_role || 'Viewer';
-    const resolvedDisplayName = data.display_name || `${data.first_name} ${data.last_name}`;
+    const isGeneralMember = dynamicRole === 'General Members';
 
     // 1. FRESH CLUB INTEGRITY CHECK (Ensures assigned club exists in the new 'club' table)
     if (data.club_id) {
@@ -78,11 +78,11 @@ const registerIndividual = async (data) => {
       email: data.email,
       first_name: data.first_name,
       last_name: data.last_name,
-      display_name: resolvedDisplayName,
+      display_name: data.display_name || `${data.first_name} ${data.last_name}`,
       password_hash,
       phone: data.phone,
       club_id: data.club_id || null, // Correctly stores the clean club_id string
-      is_approved: false, 
+      is_approved: isGeneralMember, // General Members are auto-approved
       account_role: dynamicRole,
       platform_role: platformRoleFor(dynamicRole)
     }, exec);
@@ -261,6 +261,7 @@ const verifyOtp = async (email, code) => {
 
 // 🔥 MATCH WIZARD DROPDOWN: Returns approved records straight out of the fresh independent 'club' table
 const listApprovedClubs = async () => {
+  // This query is simplified to only fetch club names for dropdowns, fixing the SQL error.
   const result = await query(
     `SELECT club_id AS id, club_name AS name, display_name FROM club WHERE is_approved = true ORDER BY club_name ASC`
   );

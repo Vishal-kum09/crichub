@@ -41,7 +41,10 @@
   export interface InningsBreakInfo {
     innings_number: number;
     first_innings_score: string;
+    first_innings_overs?: string;
+    first_innings_extras?: number;
     target: number;
+    balls_in_match?: number | null;
     required_run_rate: number | null;
   }
 
@@ -191,8 +194,11 @@
     return data;
   }
 
-  export async function startSecondInnings(matchId: string): Promise<LiveMatchState> {
-    const { data } = await api.post(`/api/scorer/matches/${matchId}/start-second-innings`, {});
+  export async function startSecondInnings(
+    matchId: string,
+    payload: { striker_id: string; non_striker_id: string; bowler_id: string }
+  ): Promise<LiveMatchState> {
+    const { data } = await api.post(`/api/scorer/matches/${matchId}/start-second-innings`, payload);
     return data;
   }
 

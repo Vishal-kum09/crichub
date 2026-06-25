@@ -268,8 +268,8 @@ export function SignUp({ onNavigate }: SignUpProps) {
           <div className="space-y-3">
             <h4 className="text-xs font-black uppercase text-gray-400 tracking-wider flex items-center gap-1.5"><User size={14} /> Account Details</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1"><label>First Name *</label><input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full p-2.5 bg-gray-50 border rounded-xl text-black font-normal focus:ring-1 focus:ring-[#e60023]" placeholder="Vishal" /></div>
-              <div className="space-y-1"><label>Last Name *</label><input type="text" value={lastName} onChange={e => setLastName(e.target.value)} className="w-full p-2.5 bg-gray-50 border rounded-xl text-black font-normal focus:ring-1 focus:ring-[#e60023]" placeholder="Singh" /></div>
+              <div className="space-y-1"><label>First Name *</label><input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full p-2.5 bg-gray-50 border rounded-xl text-black font-normal focus:ring-1 focus:ring-[#e60023]" placeholder="Neil" /></div>
+              <div className="space-y-1"><label>Last Name *</label><input type="text" value={lastName} onChange={e => setLastName(e.target.value)} className="w-full p-2.5 bg-gray-50 border rounded-xl text-black font-normal focus:ring-1 focus:ring-[#e60023]" placeholder="Armstrong" /></div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -279,7 +279,7 @@ export function SignUp({ onNavigate }: SignUpProps) {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1"><label>Password (Min 8 Characters) *</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-2.5 bg-gray-50 border rounded-xl text-black font-normal focus:ring-1 focus:ring-[#e60023]" placeholder="••••••••" /></div>
-              <div className="space-y-1"><label>Public Profile Display Name</label><input type="text" value={displayName} onChange={e => setDisplayName(e.target.value)} className="w-full p-2.5 bg-gray-50 border rounded-xl text-black font-normal focus:ring-1 focus:ring-[#e60023]" placeholder="e.g. Vishal_Singh" /></div>
+              <div className="space-y-1"><label>Public Profile Display Name</label><input type="text" value={displayName} onChange={e => setDisplayName(e.target.value)} className="w-full p-2.5 bg-gray-50 border rounded-xl text-black font-normal focus:ring-1 focus:ring-[#e60023]" placeholder="e.g. Neil_Armstrong" /></div>
             </div>
 
             {/* Club Affiliation section for Individual Users */}
@@ -324,9 +324,9 @@ export function SignUp({ onNavigate }: SignUpProps) {
                           className="w-full p-2.5 bg-white border border-gray-300 rounded-xl font-bold focus:border-[#e60023] focus:ring-1 focus:ring-[#e60023] text-gray-900 cursor-pointer"
                         >
                           <option value="">-- Choose Role --</option>
-                          <option value="Scorer">🏏 Scorer</option>
+                          <option value="Scorer/Analyst">🏏 Scorer/Analyst</option>
                           <option value="Player">🛡️ Player</option>
-                          <option value="Analyst">📊 Analyst</option>
+                          <option value="General Members">👥 General Member</option>
                         </select>
                       </div>
                     </div>

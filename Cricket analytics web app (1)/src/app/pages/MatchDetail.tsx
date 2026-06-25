@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { buildCommentarySocketUrl, commentaryKey, getCommentaryHistory, getRealtimeCommentaryConfig } from '../../lib/commentaryApi';
 import { WagonWheelTab } from '../components/WagonWheeltab';
 import { CommentaryItem } from '../components/CommentaryItem'; 
+import { AudioCommentaryPlayer } from '../components/AudioCommentaryPlayer';
 
 interface MatchDetailProps {
   matchId: string;
@@ -311,19 +312,16 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
           </div>
         </div>
 
+        {/* 🔥 YAHAN ADD KIYA HAI AUDIO PLAYER 🔥 */}
+        <AudioCommentaryPlayer matchId={matchId} />
+
         <div className="space-y-6">
           
           {activeTab === 'overview' && (
-            <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm space-y-3 animate-fadeIn">
-              <h3 className="text-sm font-black text-gray-900 border-b border-gray-100 pb-2 uppercase tracking-wide">Tournament Intelligence Overview</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100"><p className="text-gray-400 font-medium mb-0.5">Format Architecture</p><p className="font-bold text-gray-900 text-base">{scorecard.format}</p></div>
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100"><p className="text-gray-400 font-medium mb-0.5">League Competition</p><p className="font-bold text-gray-900 text-base">{scorecard.competition || 'Corporate Cup'}</p></div>
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100"><p className="text-gray-400 font-medium mb-0.5">Arena Host Venue</p><p className="font-bold text-gray-900 text-base">{scorecard.venue || '—'}</p></div>
-              </div>
+            <div>
             </div>
           )}
-
+          
           {activeTab === 'overview' && liveInnings && (
             <div className="bg-white rounded-2xl p-4 md:p-5 border border-gray-200 shadow-sm space-y-4 animate-fadeIn">
               <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 border-b border-gray-100 pb-3">

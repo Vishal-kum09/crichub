@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Users, Trophy, Search, Calendar, CheckCircle, XCircle, Trash2, Edit, ArrowRight, ArrowLeft, ShieldCheck, UserPlus, Save, X, Radio,Clock,MapPin } from 'lucide-react';
 import { Button } from '../components/Button';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import { Input } from '../components/Input';
 import { toast } from '../../lib/toast';
 import { api } from '../../lib/api'; 
@@ -77,7 +79,7 @@ export function ClubAdmin() {
   });
 
   const [matchForm, setMatchForm] = useState({ 
-    date: '', time: '', format: '', ballType: '', oversPerMatch: '', 
+    matchDateTime: new Date(), format: '', ballType: '', oversPerMatch: '', 
     venue: '', pitchNum: '', venueNeutral: false, city: '', country: '',address:'',postcode:'',
     opponentClubId: '', selectedSquadIds: [] as string[], assignedScorerId: '' 
     , team1Id: '', team2Id: '',
@@ -375,14 +377,16 @@ export function ClubAdmin() {
     if (!matchForm.assignedScorerId) { toast.error("Assign a match scorer."); return; }
 
     try {
-      const scheduledAt = matchForm.date ? new Date(`${matchForm.date}T${matchForm.time || '10:00'}:00`).toISOString() : new Date().toISOString();
+      const scheduledAt = matchForm.matchDateTime.toISOString();
+      const matchDate = matchForm.matchDateTime.toISOString().split('T')[0];
+      const matchTime = matchForm.matchDateTime.toTimeString().split(' ')[0];
       await api.post('/api/club-admin/matches', {
         match_type: matchType === 'club' ? 'cross_club' : 'local',
         opponent_club_id: matchType === 'club' ? matchForm.opponentClubId : undefined,
         team1_id: matchForm.team1Id,
         team2_id: matchType === 'local' ? matchForm.team2Id : undefined,
-        match_date: matchForm.date,
-        start_time: matchForm.time ? `${matchForm.time}:00` : '10:00:00',
+        match_date: matchDate,
+        start_time: matchTime,
         scheduled_at: scheduledAt,
         format: matchForm.format,
         ball_type: matchForm.ballType,
@@ -405,7 +409,7 @@ export function ClubAdmin() {
       });
 
       toast.success('Match scheduled successfully!');
-      setMatchForm({ date: '', time: '', format: '', ballType: '', oversPerMatch: '', venue: '', pitchNum: '', venueNeutral: false, city: '', country: '',address:'',postcode:'', opponentClubId: '', selectedSquadIds: [], assignedScorerId: '', team1Id: '', team2Id: '', wideCountsAsBall: false, widePenaltyRuns: '1', noBallCountsAsBall: false, noBallPenaltyRuns: '1' } as any);
+      setMatchForm({ matchDateTime: new Date(), format: '', ballType: '', oversPerMatch: '', venue: '', pitchNum: '', venueNeutral: false, city: '', country: '',address:'',postcode:'', opponentClubId: '', selectedSquadIds: [], assignedScorerId: '', team1Id: '', team2Id: '', wideCountsAsBall: false, widePenaltyRuns: '1', noBallCountsAsBall: false, noBallPenaltyRuns: '1' } as any);
       setMatchTeamPlayers([]);
       setWizardStep(1);
       setActiveTab('my-matches');
@@ -921,30 +925,20 @@ export function ClubAdmin() {
       </div>
     </div>
 
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <div>
-        <label className="block text-xs font-black text-gray-500 uppercase mb-1">Match Date *</label>
+        <label className="block text-xs font-black text-gray-500 uppercase mb-1">Match Date & Time *</label>
         <div className="relative">
           <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} pointerEvents="none" />
-          <input 
-            type="date" 
-            required 
-            value={matchForm.date} 
-            onChange={(e) => setMatchForm({ ...matchForm, date: e.target.value })}
-            className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#e60023] [&::-webkit-calendar-picker-indicator]:hidden"
-          />
-        </div>
-      </div>
-      <div>
-        <label className="block text-xs font-black text-gray-500 uppercase mb-1">Start Time *</label>
-        <div className="relative">
-          <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} pointerEvents="none" />
-          <input 
-            type="time" 
-            required 
-            value={matchForm.time} 
-            onChange={(e) => setMatchForm({ ...matchForm, time: e.target.value })}
-            className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#e60023] [&::-webkit-calendar-picker-indicator]:hidden"
+          <DatePicker
+            selected={matchForm.matchDateTime}
+            onChange={(date: Date | null) => date && setMatchForm({ ...matchForm, matchDateTime: date })}
+            showTimeSelect
+            minDate={new Date()}
+            filterTime={(time) => new Date(time).getTime() > new Date().getTime()}
+            dateFormat="MMMM d, yyyy h:mm aa"
+            className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#e60023]"
+            timeIntervals={15}
           />
         </div>
       </div>
@@ -1072,7 +1066,7 @@ export function ClubAdmin() {
                   if (matchType === 'club' && !matchForm.opponentClubId) { toast.error("Choose an opponent club."); return; }
                   if (matchForm.format === 'Custom') {
                     if (matchForm.wideCountsAsBall && (!matchForm.widePenaltyRuns || Number(matchForm.widePenaltyRuns) < 1)) {
-                      toast.error('Enter valid runs for wide ball when wide counts in over.');
+                      toast.error('Enter valid runs for wide ball when wide counts as a ball.');
                       return;
                     }
                     if (matchForm.noBallCountsAsBall && (!matchForm.noBallPenaltyRuns || Number(matchForm.noBallPenaltyRuns) < 1)) {
@@ -1080,7 +1074,7 @@ export function ClubAdmin() {
                       return;
                     }
                   }
-                  if (!matchForm.date || !matchForm.venue || !matchForm.city || !matchForm.country) { toast.error("Complete all required fields."); return; }
+                  if (!matchForm.matchDateTime || !matchForm.venue || !matchForm.city || !matchForm.country) { toast.error("Complete all required fields."); return; }
                   setWizardStep(2);
                 }} variant="primary" className="w-full flex items-center justify-center gap-1 font-bold text-xs py-3 rounded-xl bg-[#e60023] hover:bg-red-700 text-white border-none shadow-sm">
                   Proceed to Squad Selection <ArrowRight size={14} />
@@ -1176,7 +1170,7 @@ export function ClubAdmin() {
                 <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl text-xs space-y-1.5 text-gray-500 font-semibold shadow-inner">
                   <h5 className="font-extrabold text-gray-800 flex items-center gap-1 mb-1 text-sm"><ShieldCheck className="text-green-600" size={16} /> Summary Checklist Telemetry</h5>
                   <p>• <span className="font-extrabold text-gray-700">Format Structure:</span> {matchForm.format} Match | <span className="capitalize">{matchForm.ballType}</span> Ball</p>
-                  <p>• <span className="font-extrabold text-gray-700">Venue Ground:</span> {matchForm.venue}, {matchForm.city} on {matchForm.date} @ {matchForm.time}</p>
+                  <p>• <span className="font-extrabold text-gray-700">Venue Ground:</span> {matchForm.venue}, {matchForm.city} on {matchForm.matchDateTime.toLocaleDateString()} @ {matchForm.matchDateTime.toLocaleTimeString()}</p>
                 </div>
                 <div className="flex gap-2">
                   <Button type="button" onClick={() => setWizardStep(2)} variant="secondary" className="flex-1 flex items-center justify-center gap-1 text-xs font-bold py-2.5 rounded-xl"><ArrowLeft size={14} /> Back</Button>

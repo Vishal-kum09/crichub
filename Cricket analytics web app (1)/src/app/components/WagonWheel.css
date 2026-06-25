@@ -1,3 +1,31 @@
+.wagon-wheel.compact {
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.wagon-wheel.compact svg {
+  flex: 1;
+  min-height: 0;
+  max-height: 100%;
+  width: 100%;
+  object-fit: contain;
+}
+
+.wagon-wheel.compact .wagon-status {
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.wagon-wheel.compact .wagon-status strong {
+  font-size: 11px;
+}
+
 .wagon-wheel {
   width: min(100%, 720px);
   position: relative;

@@ -255,10 +255,14 @@ const chaseInfoFor = (innings, oversPerMatch) => {
 const inningsBreakFor = (innings, oversPerMatch) => {
   if (!innings || innings.innings_number !== 1 || innings.status !== 'completed') return null;
   const target = Number(innings.total_runs || 0) + 1;
+  const totalBalls = Number(innings.total_balls || 0);
   return {
     innings_number: 1,
     first_innings_score: `${innings.total_runs}/${innings.total_wickets}`,
+    first_innings_overs: `${Math.floor(totalBalls / 6)}.${totalBalls % 6}`,
+    first_innings_extras: Number(innings.total_extras || 0),
     target,
+    balls_in_match: oversPerMatch ? oversPerMatch * 6 : null,
     required_run_rate: oversPerMatch ? Number((target / oversPerMatch).toFixed(2)) : null
   };
 };
@@ -1089,11 +1093,23 @@ const getLiveMatchState = async (matchId) => {
     if (!activeInnings) {
       const latest = await repo.getLatestInnings(client, matchId);
       if (latest && latest.innings_number === 1 && latest.status === 'completed') {
+        const secondBattingRoster = await repo.findTeamRoster(latest.fielding_team_id);
+        const secondFieldingRoster = await repo.findTeamRoster(latest.batting_team_id);
+        const playerNames = {};
+        const playerIdMap = {};
+        for (const player of [...secondBattingRoster, ...secondFieldingRoster]) {
+          playerNames[player.id] = player.name;
+          playerIdMap[player.name] = player.id;
+        }
         return {
           ok: true,
           match_id: matchId,
           innings: presentInningsState(latest),
           innings_break: inningsBreakFor(latest, match?.overs_per_match),
+          battingRoster: secondBattingRoster.map((p) => p.name),
+          fieldingRoster: secondFieldingRoster.map((p) => p.name),
+          playerNames,
+          playerIdMap,
           match_complete: false
         };
       }

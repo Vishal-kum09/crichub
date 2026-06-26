@@ -256,9 +256,9 @@ export function SignUp({ onNavigate }: SignUpProps) {
             <div className="bg-red-50/40 p-4 rounded-2xl border border-red-100/60 space-y-3 animate-fadeIn">
               <h4 className="text-xs font-black uppercase text-[#e60023] tracking-wider mb-1 flex items-center gap-1.5"><Building size={14} /> Club Metadata Specifications</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1"><label>Club Name *</label><input type="text" value={clubName} onChange={e => setClubName(e.target.value)} className="w-full p-2.5 bg-white border rounded-xl text-black font-normal focus:ring-1 focus:ring-[#e60023]" placeholder="e.g. Jamnagar Strikers" /></div>
-                <div className="space-y-1"><label>Club Initials</label><input type="text" value={clubInitials} onChange={e => setClubInitials(e.target.value)} className="w-full p-2.5 bg-white border rounded-xl text-black font-normal focus:ring-1 focus:ring-[#e60023]" placeholder="e.g. JS" /></div>
-                <div className="space-y-1"><label>Home Ground Venue</label><input type="text" value={homeGround} onChange={e => setHomeGround(e.target.value)} className="w-full p-2.5 bg-white border rounded-xl text-black font-normal focus:ring-1 focus:ring-[#e60023]" placeholder="e.g. Cricket Stadium" /></div>
+                <div className="space-y-1"><label>Club Name *</label><input type="text" value={clubName} onChange={e => setClubName(e.target.value)} className="w-full p-2.5 bg-white border rounded-xl text-black font-normal focus:ring-1 focus:ring-[#e60023]" placeholder="e.g. Thunder Strikers" /></div>
+                <div className="space-y-1"><label>Club Initials</label><input type="text" value={clubInitials} onChange={e => setClubInitials(e.target.value)} className="w-full p-2.5 bg-white border rounded-xl text-black font-normal focus:ring-1 focus:ring-[#e60023]" placeholder="e.g. TS" /></div>
+                <div className="space-y-1"><label>Home Ground Venue</label><input type="text" value={homeGround} onChange={e => setHomeGround(e.target.value)} className="w-full p-2.5 bg-white border rounded-xl text-black font-normal focus:ring-1 focus:ring-[#e60023]" placeholder="e.g. Lords Stadium" /></div>
                 <div className="space-y-1"><label>Country</label><input type="text" value={country} onChange={e => setCountry(e.target.value)} className="w-full p-2.5 bg-white border rounded-xl text-black font-normal focus:ring-1 focus:ring-[#e60023]" /></div>
               </div>
             </div>

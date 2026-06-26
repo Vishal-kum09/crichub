@@ -122,26 +122,7 @@ export function AudioMatchSettings({ settings, onChange }: AudioMatchSettingsPro
             </select>
           </div>
 
-          {/* Voice Engine (Provider) */}
-          <div>
-            <label className="block text-xs font-black text-gray-500 uppercase mb-2">AI Provider</label>
-            <select name="provider" value={settings.provider} onChange={handleChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-gray-800 focus:outline-none focus:border-[#e60023]">
-              <option value="gemini">Google Gemini</option>
-              <option value="google">Google Cloud TTS</option>
-              <option value="google_chirp">Google Chirp</option>
-            </select>
-          </div>
-
-          {/* Model */}
-          <div>
-            <label className="block text-xs font-black text-gray-500 uppercase mb-2">Model Version</label>
-            <select name="provider_model" value={settings.provider_model} onChange={handleChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-gray-800 focus:outline-none focus:border-[#e60023]">
-              <option value="gemini-2.5-flash-tts">Gemini 2.5 Flash TTS</option>
-              <option value="gemini-2.5-pro-tts">Gemini 2.5 Pro TTS</option>
-              <option value="chirp-3-hd">Chirp 3 HD</option>
-            </select>
-          </div>
-
+        
           {/* Voice Model */}
           <div>
             <label className="block text-xs font-black text-gray-500 uppercase mb-2">Voice Model</label>

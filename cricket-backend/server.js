@@ -10,6 +10,7 @@ const { testConnection } = require('./db');
 const { requestLogger } = require('./src/middlewares/requestLogger');
 const { errorHandler } = require('./src/middlewares/errorHandler');
 const { healthCheck } = require('./src/controllers/healthController');
+const userRoutes = require('./src/routes/userRoutes');
 
 const app = express();
 
@@ -101,6 +102,7 @@ app.use('/api/player', require('./src/routes/playerRoutes'));
 // Analyst routes
 app.use('/api/analyst', require('./src/routes/analystRoutes'));
 
+app.use('/api/users', userRoutes);
 // Club analytics (club admin + scorer)
 app.use('/api/club-analytics', require('./src/routes/clubAnalyticsRoutes'));
 

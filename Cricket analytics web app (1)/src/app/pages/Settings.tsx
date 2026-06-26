@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { User, Edit, Save, Shield, Palette, Trash2, AlertTriangle, X } from 'lucide-react';
+import { User, Edit, Save, Shield, Palette, AlertTriangle, X } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { toast } from '../../lib/toast';
@@ -12,25 +12,37 @@ interface SettingsProps {
 }
 
 export function Settings({ onNavigate }: SettingsProps) {
-  const [profile, setProfile] = useState({ name: '', email: '' });
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
-
-  const [passwordForm, setPasswordForm] = useState({ oldPassword: '', newPassword: '', confirmNewPassword: '' });
+  const [profile, setProfile] = useState({ 
+    firstName: '', 
+    lastName: '', 
+    email: '', 
+    role: '', 
+    phone: '', 
+    club: '' 
+  });
   
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ oldPassword: '', newPassword: '', confirmNewPassword: '' });
   const [theme, setTheme] = useState<Theme>('light');
-
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteForm, setDeleteForm] = useState({ password: '', reason: '' });
 
   // Effect to load user profile and preferences on component mount
   useEffect(() => {
     // Fetch the current user's profile data
-    api.get('/api/users/profile').then(response => {
-      setProfile({
-        name: response.data.display_name || response.data.name,
-        email: response.data.email,
-      });
-    }).catch(() => toast.error("Could not load user profile."));
+    api.get('/api/users/profile')
+      .then(response => {
+        const data = response.data;
+        setProfile({
+          firstName: data.first_name || '',
+          lastName: data.last_name || '',
+          email: data.email || '',
+          role: data.role || 'N/A',
+          phone: data.phone || '',
+          club: data.club_name || 'N/A',
+        });
+      })
+      .catch(() => toast.error("Could not load user profile."));
 
     // Load saved theme from local storage
     const savedTheme = localStorage.getItem('theme') as Theme | null;
@@ -41,12 +53,16 @@ export function Settings({ onNavigate }: SettingsProps) {
   }, []);
 
   const handleProfileSave = async () => {
-    if (!profile.name.trim()) {
-      toast.error('Name cannot be empty.');
+    if (!profile.firstName.trim() || !profile.lastName.trim()) {
+      toast.error('Name fields cannot be empty.');
       return;
     }
     try {
-      await api.put('/api/users/profile', { name: profile.name });
+      await api.put('/api/users/profile', { 
+        first_name: profile.firstName, 
+        last_name: profile.lastName,
+        phone: profile.phone
+      });
       toast.success('Profile updated successfully!');
       setIsEditingProfile(false);
     } catch (err) {
@@ -105,7 +121,7 @@ export function Settings({ onNavigate }: SettingsProps) {
 
       {/* Profile Section */}
       <div className="bg-white dark:bg-gray-800/50 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-6">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-bold flex items-center gap-2"><User size={20} /> User Profile</h2>
           <Button
             onClick={() => {
@@ -121,13 +137,24 @@ export function Settings({ onNavigate }: SettingsProps) {
             {isEditingProfile ? <><Save size={14} /> Save</> : <><Edit size={14} /> Edit</>}
           </Button>
         </div>
-        <div className="space-y-4">
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Full Name</label>
+            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">First Name</label>
             <Input
               type="text"
-              value={profile.name}
-              onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+              value={profile.firstName}
+              onChange={(e) => setProfile({ ...profile, firstName: e.target.value })}
+              disabled={!isEditingProfile}
+              className="dark:bg-gray-900 disabled:opacity-70"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Last Name</label>
+            <Input
+              type="text"
+              value={profile.lastName}
+              onChange={(e) => setProfile({ ...profile, lastName: e.target.value })}
               disabled={!isEditingProfile}
               className="dark:bg-gray-900 disabled:opacity-70"
             />
@@ -137,8 +164,36 @@ export function Settings({ onNavigate }: SettingsProps) {
             <Input
               type="email"
               value={profile.email}
-              disabled // Usually, email is not editable
+              disabled
+              className="dark:bg-gray-900 opacity-70 cursor-not-allowed"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Phone Number</label>
+            <Input
+              type="text"
+              value={profile.phone}
+              onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+              disabled={!isEditingProfile}
               className="dark:bg-gray-900 disabled:opacity-70"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Account Role</label>
+            <Input
+              type="text"
+              value={profile.role}
+              disabled
+              className="bg-gray-50 dark:bg-gray-900 opacity-70 cursor-not-allowed"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Associated Club</label>
+            <Input
+              type="text"
+              value={profile.club}
+              disabled
+              className="bg-gray-50 dark:bg-gray-900 opacity-70 cursor-not-allowed"
             />
           </div>
         </div>
@@ -147,16 +202,16 @@ export function Settings({ onNavigate }: SettingsProps) {
       {/* Preferences Section */}
       <div className="bg-white dark:bg-gray-800/50 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-6">
         <h2 className="text-lg font-bold flex items-center gap-2 mb-4"><Palette size={20} /> Theme Preferences</h2>
-        <div className="flex gap-2 p-1 bg-gray-100 dark:bg-gray-900 rounded-xl">
+        <div className="flex gap-2 p-1 bg-gray-100 dark:bg-gray-900 rounded-xl w-fit">
           <button
             onClick={() => handleThemeChange('light')}
-            className={`flex-1 py-2 px-3 text-sm font-bold rounded-lg transition-all ${theme === 'light' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}
+            className={`px-6 py-2 text-sm font-bold rounded-lg transition-all ${theme === 'light' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}
           >
             Light
           </button>
           <button
             onClick={() => handleThemeChange('dark')}
-            className={`flex-1 py-2 px-3 text-sm font-bold rounded-lg transition-all ${theme === 'dark' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}
+            className={`px-6 py-2 text-sm font-bold rounded-lg transition-all ${theme === 'dark' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}
           >
             Dark
           </button>
@@ -181,7 +236,7 @@ export function Settings({ onNavigate }: SettingsProps) {
               <Input type="password" value={passwordForm.confirmNewPassword} onChange={(e) => setPasswordForm({ ...passwordForm, confirmNewPassword: e.target.value })} className="dark:bg-gray-900" />
             </div>
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-end pt-2">
             <Button type="submit" variant="primary" className="font-bold text-sm">Update Password</Button>
           </div>
         </form>
@@ -190,12 +245,12 @@ export function Settings({ onNavigate }: SettingsProps) {
       {/* Danger Zone */}
       <div className="bg-red-50 dark:bg-red-900/20 rounded-2xl border border-red-200 dark:border-red-800 p-6">
         <h2 className="text-lg font-bold flex items-center gap-2 text-red-700 dark:text-red-400 mb-2">Danger Zone</h2>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <p className="font-bold">Delete this account</p>
-            <p className="text-xs text-gray-600 dark:text-gray-400">Once you delete your account, there is no going back. Please be certain.</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Once you delete your account, there is no going back. Please be certain.</p>
           </div>
-          <Button onClick={() => setShowDeleteDialog(true)} variant="destructive" className="font-bold text-sm">
+          <Button onClick={() => setShowDeleteDialog(true)} variant="destructive" className="font-bold text-sm whitespace-nowrap">
             Delete Account
           </Button>
         </div>
@@ -204,14 +259,14 @@ export function Settings({ onNavigate }: SettingsProps) {
       {/* Delete Account Dialog */}
       {showDeleteDialog && (
         <>
-          <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setShowDeleteDialog(false)} />
+          <div className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onClick={() => setShowDeleteDialog(false)} />
           <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl shadow-2xl z-50 p-6">
             <form onSubmit={handleDeleteAccount}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold flex items-center gap-2 text-red-600 dark:text-red-400"><AlertTriangle /> Delete Account</h3>
-                <button type="button" onClick={() => setShowDeleteDialog(false)} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"><X size={18} /></button>
+                <button type="button" onClick={() => setShowDeleteDialog(false)} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"><X size={18} /></button>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">
                 This action cannot be undone. This will permanently delete your account and all associated data.
               </p>
               <div className="space-y-4">
@@ -238,7 +293,7 @@ export function Settings({ onNavigate }: SettingsProps) {
                 </div>
               </div>
               <div className="mt-6">
-                <Button type="submit" variant="destructive" className="w-full font-bold text-sm">
+                <Button type="submit" variant="destructive" className="w-full font-bold text-sm py-2.5">
                   I understand, delete my account
                 </Button>
               </div>

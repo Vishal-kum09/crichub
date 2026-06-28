@@ -69,10 +69,7 @@ export function Matches({ onNavigate }: MatchesProps) {
       {/* =========================================================================
           TOP BANNER HEADER
          ========================================================================= */}
-      <div>
-        <h2 className="text-2xl font-semibold text-[#1a1a1a]">Matches</h2>
-        <p className="text-sm text-[#666666]">Browse and monitor live tournament metrics</p>
-      </div>
+      
 
       {/* =========================================================================
           🔥 ULTRA-COMPACT FILTERS SECTION (Single Row) 🔥

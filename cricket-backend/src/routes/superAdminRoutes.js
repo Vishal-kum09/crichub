@@ -11,17 +11,23 @@ const router = express.Router();
 
 router.use(authenticate, requireApproved, requireRole('Super_Admin'));
 
-// Clubs directory + drill-down
+// ─── Clubs directory + drill-down ────────────────────────────────────────────
 router.get('/clubs', ctrl.getClubs);
+router.get('/clubs/:id', ctrl.getClub);
 router.get('/clubs/:id/members', ctrl.getClubMembers);
 
-// Pending club approvals inbox
+// ─── Pending club approvals inbox ────────────────────────────────────────────
 router.get('/approvals/pending', ctrl.getPendingApprovals);
 
-// Approve a club
+// ─── Approve / reject a club ────────────────────────────────────────────────
 router.put('/clubs/:id/approve', ctrl.approveClub);
+router.delete('/clubs/:id/remove', ctrl.deleteClub);
+router.delete('/clubs/:id', ctrl.rejectClub); // reject = delete pending club
 
-// Irreversible data-audit hard delete of a match + all child records
+// ─── Platform-wide aggregate statistics ──────────────────────────────────────
+router.get('/stats', ctrl.getPlatformStats);
+
+// ─── Irreversible data-audit hard delete of a match + all child records ──────
 router.delete('/data-audit/:match_id', ctrl.deleteDataAudit);
 
 module.exports = router;

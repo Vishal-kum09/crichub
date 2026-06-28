@@ -142,10 +142,28 @@ Activating a Wicket event instantly freezes the scoring console interface layout
 
 ### 7.2 Super Administrator Governance Dashboard Panel
 [cite_start]The master administrative cockpit provides overarching ecosystem control parameters across all registered tenants[cite: 110].
+The Super Admin dashboard is organized into the following tabs: `Matches`, `Registered Clubs`, `NV-Play Analytics`, `Super Admin`, `Notifications`, and `Settings`.
 
-* [cite_start]**Global Clubs Directory Workspace:** Unified master review interface showcasing every active organization platform-wide, with drill-down nested table expansion access into internal sub-members[cite: 111].
-* [cite_start]**System Approvals Inbox:** Monitors and manages onboarding requests from brand-new standalone clubs or academies[cite: 112].
-* [cite_start]**Absolute Data Authority Overrides Console:** Privileged database permissions panel to amend score entries, fix errors, edit historical scoresheets, or purge entries to preserve overall platform data health[cite: 113].
+*   **Registered Clubs Tab:**
+    *   Displays a row-formatted list of all approved clubs.
+    *   Each row includes the Club Name, Number of Affiliated Members, and action buttons.
+    *   **Actions:**
+        *   `Edit`: Allows modification of club details.
+        *   `Delete`: Permanently removes the club and its associated data.
+        *   Clicking a club name navigates to that club's `ClubAdmin` dashboard, giving the Super Admin full control over that club's operations.
+
+*   **Super Admin Tab:** This section is the central hub for platform-wide administration.
+    *   **Club Approvals:**
+        *   A queue of newly registered clubs awaiting validation.
+        *   Each entry shows the club name and registration details.
+        *   **Actions:** `Approve` or `Reject`. Approved clubs move to the "Registered Clubs" list.
+    *   **Database Management:**
+        *   A dashboard of key platform metrics:
+            *   Total Number of Clubs
+            *   Total Number of Matches
+            *   Total Number of Users
+            *   Total Number of Tournaments
+        *   Provides tools for global data integrity checks and management.
 
 ---
 

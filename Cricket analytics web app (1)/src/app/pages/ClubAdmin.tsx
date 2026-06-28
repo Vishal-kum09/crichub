@@ -28,7 +28,14 @@ import {
   type ClubTeam,
 } from '../../lib/adminApi';
 
-export function ClubAdmin() {
+const managedQuery = (managedClubId?: string, extra: Record<string, any> = {}) => {
+  const params: Record<string, any> = {};
+  if (managedClubId && managedClubId !== 'undefined' && managedClubId !== '') params.managedClubId = managedClubId;
+  Object.assign(params, extra);
+  return Object.keys(params).length > 0 ? { params } : undefined;
+};
+
+export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
   const [activeTab, setActiveTab] = useState<'approvals' | 'my-matches' | 'create-match' | 'create-tournament' | 'roster'>('approvals');
   
   // 🔥 ADDED NEW STATE VARIABLES FOR MATCH SEARCH & SORT
@@ -92,7 +99,7 @@ export function ClubAdmin() {
   const [tournamentForm, setTournamentForm] = useState({ name: '', type: '', oversLimit: '', maxTeams: '', startDate: '', endDate: '' });
 
   const loadApprovals = () => {
-    getPendingApprovals().then(setPendingApprovals).catch(() => setPendingApprovals([]));
+    getPendingApprovals(managedClubId).then(setPendingApprovals).catch(() => setPendingApprovals([]));
   };
 
   const loadIncomingInvites = async () => {
@@ -105,10 +112,10 @@ export function ClubAdmin() {
   };
 
   const loadRosterData = () => {
-    getRosterMatches().then(setMyMatches).catch(() => setMyMatches([]));
-    getRosterPlayers().then((data: any) => setMyPlayers(data.players || data)).catch(() => setMyPlayers([]));
-    getRosterScorers().then(setMyScorers).catch(() => setMyScorers([]));
-    getClubTeams().then(setMyTeams).catch(() => setMyTeams([]));
+    getRosterMatches(managedClubId).then(setMyMatches).catch(() => setMyMatches([]));
+    getRosterPlayers(managedClubId).then((data: any) => setMyPlayers(data.players || data)).catch(() => setMyPlayers([]));
+    getRosterScorers(managedClubId).then(setMyScorers).catch(() => setMyScorers([]));
+    getClubTeams(managedClubId).then(setMyTeams).catch(() => setMyTeams([]));
   };
 
   const loadTeamPlayers = (teamId: string) => {
@@ -160,13 +167,13 @@ export function ClubAdmin() {
   
   useEffect(() => {
     loadRosterData();
-    getGlobalApprovedClubs().then((data) => setGlobalClubs(data || [])).catch(() => setGlobalClubs([]));
+    getGlobalApprovedClubs(managedClubId).then((data) => setGlobalClubs(data || [])).catch(() => setGlobalClubs([]));
   }, []);
 
   const handleApprove = async (id: string) => {
     const approval = pendingApprovals.find(a => a.id === id);
     try {
-      await decideApproval(id, 'APPROVE', toAssignedRole(approval?.role || 'player'));
+      await decideApproval(id, 'APPROVE', toAssignedRole(approval?.role || 'player'), managedClubId);
       setPendingApprovals(prev => prev.filter(a => a.id !== id));
       toast.success('Approved successfully!');
       loadRosterData();
@@ -177,7 +184,7 @@ export function ClubAdmin() {
 
   const handleReject = async (id: string) => {
     try {
-      await decideApproval(id, 'REJECT');
+      await decideApproval(id, 'REJECT', undefined, managedClubId);
       setPendingApprovals(prev => prev.filter(a => a.id !== id));
       toast.error('Registration rejected');
     } catch (err: any) {
@@ -197,7 +204,8 @@ export function ClubAdmin() {
         squad_player_ids: inviteSquadIds,
         captain_id: inviteCaptainId || null,
         wicketkeeper_id: inviteWicketKeeperId || null,
-        assigned_scorer_id: inviteScorerId
+        assigned_scorer_id: inviteScorerId,
+        ...(managedClubId ? { managedClubId } : {})
       });
 
       toast.success('Match accepted and scheduled live!');
@@ -237,7 +245,7 @@ export function ClubAdmin() {
         jersey_number: playerForm.jerseyNumber ? Number(playerForm.jerseyNumber) : undefined,
         date_of_birth: playerForm.dateOfBirth || undefined, batting_style: playerForm.battingStyle,
         bowling_style: playerForm.bowlingStyle || undefined, primary_role: playerForm.primaryRole, nationality: playerForm.nationality
-      } as any);
+      } as any, managedClubId);
 
       toast.success(`Player registered!`);
       setPlayerForm({ firstName: '', lastName: '', displayName: '', contactNumber: '', gender: 'male', jerseyNumber: '', dateOfBirth: '', battingStyle: 'right_hand_bat', bowlingStyle: 'right_arm_fast', primaryRole: 'batter', nationality: 'India' });

@@ -86,8 +86,8 @@ export interface PendingClub {
 
 // ─── club-admin endpoints ────────────────────────────────────────────────────
 
-export async function getPendingApprovals(): Promise<PendingApproval[]> {
-  const { data } = await api.get('/api/club-admin/approvals/pending');
+export async function getPendingApprovals(managedClubId?: string): Promise<PendingApproval[]> {
+  const { data } = await api.get('/api/club-admin/approvals/pending', managedQuery(managedClubId));
   return data.approvals as PendingApproval[];
 }
 
@@ -114,18 +114,18 @@ export async function createTournament(
   return data;
 }
 
-export async function getRosterMatches(): Promise<RosterMatch[]> {
-  const { data } = await api.get('/api/club-admin/roster/matches');
+export async function getRosterMatches(managedClubId?: string): Promise<RosterMatch[]> {
+  const { data } = await api.get('/api/club-admin/roster/matches', managedQuery(managedClubId));
   return data.matches as RosterMatch[];
 }
 
-export async function getRosterPlayers(): Promise<RosterMember[]> {
-  const { data } = await api.get('/api/club-admin/roster/players');
+export async function getRosterPlayers(managedClubId?: string): Promise<RosterMember[]> {
+  const { data } = await api.get('/api/club-admin/roster/players', managedQuery(managedClubId));
   return data.players as RosterMember[];
 }
 
-export async function getRosterScorers(): Promise<RosterMember[]> {
-  const { data } = await api.get('/api/club-admin/roster/scorers');
+export async function getRosterScorers(managedClubId?: string): Promise<RosterMember[]> {
+  const { data } = await api.get('/api/club-admin/roster/scorers', managedQuery(managedClubId));
   return data.scorers as RosterMember[];
 }
 
@@ -180,8 +180,8 @@ export interface ClubTeam {
   player_count: number;
 }
 
-export async function getClubTeams(): Promise<ClubTeam[]> {
-  const { data } = await api.get('/api/club-admin/teams');
+export async function getClubTeams(managedClubId?: string): Promise<ClubTeam[]> {
+  const { data } = await api.get('/api/club-admin/teams', managedQuery(managedClubId));
   return data.teams as ClubTeam[];
 }
 
@@ -235,6 +235,15 @@ export function toAssignedRole(role: string): AssignedRole {
   return map[role.toLowerCase()] || 'Player';
 }
 
+const managedQuery = (managedClubId?: string, extra: Record<string, any> = {}) => {
+  const params: Record<string, any> = {};
+  if (managedClubId && managedClubId !== 'undefined' && managedClubId !== '') {
+    params.managedClubId = managedClubId;
+  }
+  Object.assign(params, extra);
+  return Object.keys(params).length > 0 ? { params } : undefined;
+};
+
 // 🔥 ADMIN SQUAD ENGINE: Allows Club Admin to register a player directly into the system database
 export async function createPlayerDirectByAdmin(payload: {
   first_name: string;
@@ -248,5 +257,43 @@ export async function createPlayerDirectByAdmin(payload: {
     ...payload,
     account_role: 'Player'
   });
+  return data;
+}
+
+
+// ─── super-admin endpoints (full integration) ───────────────────────────────────
+
+export interface PlatformStats {
+  totalClubs: number;
+  totalMatches: number;
+  totalUsers: number;
+  totalTournaments: number;
+}
+
+/** Fetch platform-wide aggregate statistics */
+export async function getPlatformStats(): Promise<PlatformStats> {
+  const { data } = await api.get('/api/super-admin/stats');
+  return data as PlatformStats;
+}
+
+/**
+ * Reject (delete) a pending club registration.
+ * DELETE /api/super-admin/clubs/:id
+ */
+export async function rejectClubRegistration(clubId: string): Promise<void> {
+  await api.delete(`/api/super-admin/clubs/${clubId}`);
+}
+
+/**
+ * Permanently delete a club (hard delete).
+ * NOTE: This is a destructive action that removes the club and all its users.
+ */
+export async function deleteClub(clubId: string): Promise<void> {
+  await api.delete(`/api/super-admin/clubs/${clubId}`);
+}
+
+/** Fetch a single club's details */
+export async function getClubDetail(clubId: string): Promise<any> {
+  const { data } = await api.get(`/api/super-admin/clubs/${clubId}`);
   return data;
 }

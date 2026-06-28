@@ -180,9 +180,9 @@ export function SignUp({ onNavigate }: SignUpProps) {
             <h2 className="text-2xl font-black text-gray-900 tracking-tight">Registration Submitted!</h2>
             <p className="text-sm text-gray-500 leading-relaxed font-semibold">
               {isClubRegistration ? (
-                <span>Bhai, your club registration request will be verified by the Super Admin. You will receive a notification once approved!</span>
+                <span>Your club registration request will be verified by the Super Admin. You will receive a notification once approved!</span>
               ) : (
-                <span>Bhai, your request will be verified by the club admin. Until then, enjoy <span className="text-[#e60023] font-bold">Viewer services</span>. You will receive a notification once your request is approved!</span>
+                <span>Your request will be verified by the club admin. Until then, enjoy <span className="text-[#e60023] font-bold">Viewer services</span>. You will receive a notification once your request is approved!</span>
               )}
             </p>
           </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import {
+import { Building2,
   LayoutDashboard,
   Trophy,
   Users,
@@ -41,12 +41,6 @@ export function Sidebar({ currentPath, onNavigate, userRole, userName }: Sidebar
       roles: ['viewer', 'player', 'scorer', 'analyst', 'club_admin', 'super_admin'] as UserRole[]
     },
     {
-      icon: ClipboardEdit,
-      label: 'Scorer Console',
-      path: '/scorer',
-      roles: ['scorer'] as UserRole[]
-    },
-    {
       icon: ClipboardList,
       label: 'Assigned Matches',
       path: '/assigned-matches',
@@ -74,13 +68,19 @@ export function Sidebar({ currentPath, onNavigate, userRole, userName }: Sidebar
       icon: BarChart3,
       label: 'NV-Play Analytics',
       path: '/nv-play-analytics',
-      roles: ['analyst', 'super_admin', 'club_admin'] as UserRole[]
+      roles: ['scorer', 'super_admin', 'club_admin'] as UserRole[]
     },
     {
       icon: Users,
       label: 'Clubs',
       path: '/clubs',
-      roles: ['viewer', 'super_admin'] as UserRole[]
+      roles: ['viewer'] as UserRole[]
+    },
+    {
+      icon: Building2,
+      label: 'Registered Clubs',
+      path: '/registered-clubs',
+      roles: ['super_admin'] as UserRole[]
     },
     {
       icon: UserCircle,
@@ -92,7 +92,7 @@ export function Sidebar({ currentPath, onNavigate, userRole, userName }: Sidebar
       icon: Shield,
       label: 'Club Admin',
       path: '/admin',
-      roles: ['club_admin', 'super_admin'] as UserRole[]
+      roles: ['club_admin','super_admin'] as UserRole[]
     },
     {
       icon: Shield,

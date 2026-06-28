@@ -182,13 +182,24 @@ Club Admins manage day-to-day team operations via a structured sidebar panel:
 
 \### Super Administrator Workspace
 
-The master governance dashboard containing global operational switches:
+The master governance dashboard is structured with the following tabs: `Matches`, `Registered Clubs`, `NV-Play Analytics`, `Super Admin`, `Notifications`, and `Settings`.
 
-\* \*\*Clubs List:\*\* View all registered clubs on the platform. Clicking into an individual club drills down into a complete registry list of its associated members.
+*   **Registered Clubs Tab:**
+    *   Presents a list of all approved clubs, showing the club name and the total number of affiliated members.
+    *   Provides `Edit` and `Delete` options for each club.
+    *   Enables the Super Admin to click on any club to access and manage its specific `ClubAdmin` dashboard.
 
-\* \*\*Global Notifications / Pending Registrations:\*\* A master inbox displaying incoming registration requests from new Club Admins or independent entities. 
-
-\* \*\*Data Management Rights:\*\* Super Admins hold global data modification capabilities, enabling them to audit, edit, or delete any entry across the entire database to maintain platform integrity.
+*   **Super Admin Tab:** This is the core administrative section with two primary functions:
+    *   **Club Approvals:**
+        *   Displays a list of clubs that have registered and are pending approval.
+        *   The Super Admin can `Approve` or `Reject` these requests. An approved club becomes active and appears in the "Registered Clubs" list.
+    *   **Database Management:**
+        *   Features a high-level overview of the platform's data, including:
+            *   Total number of registered clubs.
+            *   Total matches played.
+            *   Total user count.
+            *   Total tournaments created.
+        *   This section provides the tools for maintaining platform-wide data integrity.
 
 \## 8. ROLE-SPECIFIC WORKSPACES (PLAYER VS. ANALYST)
 
@@ -217,4 +228,3 @@ This layout is locked exclusively to the \*\*Player\*\* role. It displays person
 This layout is locked exclusively to the \*\*Analyst\*\* role. It houses the entire standalone dashboard system migrated from your existing NVPlay tracking code.
 
 I have Nvplayanalytics.tsx and analytics.tsx  in src folder all the dashboards of it will be shown in this tole
-

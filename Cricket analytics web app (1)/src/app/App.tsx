@@ -25,6 +25,7 @@ import { ClubDetail } from './pages/ClubDetail.tsx'; // New component for club d
 import { PlayerDetail } from './pages/PlayerDetail';
 import { Admin } from './pages/Admin';
 import { ClubAdmin } from './pages/ClubAdmin';
+import { RegisteredClubs } from './pages/RegisteredClubs';
 import { SuperAdmin } from './pages/SuperAdmin';
 import { Settings } from './pages/Settings';
 import { ScorerDashboard } from './pages/Assignedmatches.tsx';
@@ -43,6 +44,7 @@ import {
 type Route = {
   path: string;
   params?: Record<string, string>;
+  query?: Record<string, string>;
 };
 
 export default function App() {
@@ -75,11 +77,12 @@ export default function App() {
       .finally(() => setBootstrapping(false));
   }, []);
 
-  const navigate = (path: string, id?: string) => {
+  const navigate = (path: string, id?: string, extraQuery?: Record<string, string>) => {
+    const query: Record<string, string> = extraQuery || {};
     if (id) {
-      setCurrentRoute({ path, params: { id } });
+      setCurrentRoute({ path, params: { id }, query });
     } else {
-      setCurrentRoute({ path });
+      setCurrentRoute({ path, query });
     }
   };
 
@@ -182,8 +185,11 @@ export default function App() {
         return <Players onNavigate={navigate} />;
       case '/player':
         return <PlayerDetail playerId={currentRoute.params?.id || ''} onNavigate={navigate} />;
+      case '/registered-clubs':
+        return <RegisteredClubs onNavigate={navigate} />;
       case '/admin':
-        return <ClubAdmin />;
+        const managedClubId = currentRoute.params?.managedClubId || currentRoute.query?.managedClubId;
+        return <ClubAdmin managedClubId={managedClubId} />;
       case '/super-admin':
         return <SuperAdmin />;
       case '/settings':

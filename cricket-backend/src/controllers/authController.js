@@ -171,6 +171,24 @@ const approveClubMember = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const rejectClubRegistration = async (req, res, next) => {
+  try {
+    // This should be a Super_Admin only route
+    const { club_id } = req.body;
+    if (!club_id) {
+      return res.status(400).json({ error: 'club_id is required.' });
+    }
+
+    const result = await authService.rejectClubRegistration(club_id);
+    res.status(200).json({
+      success: true,
+      message: 'Club registration rejected and removed.',
+      data: result
+    });
+  } catch (err) {
+    next(err);
+  }
+};
 // ─── FORGOT PASSWORD HANDLERS ─────────────────────────────────────────────
 
 // 1. Send OTP for Password Reset
@@ -304,6 +322,7 @@ module.exports = {
   listClubs,
   getPendingClubMembers,
   approveClubMember,
+  rejectClubRegistration,
   RegisterIndividualSchema,
   RegisterClubSchema,
   LoginSchema,

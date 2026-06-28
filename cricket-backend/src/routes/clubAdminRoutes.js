@@ -8,7 +8,20 @@ const { requireRole } = require('../middlewares/requireRole');
 const router = express.Router();
 
 // Central secure guard stack for all endpoints below
-router.use(authenticate, requireApproved, requireRole('Club_Admin'));
+router.use(authenticate, requireApproved, requireRole('Club_Admin', 'Super_Admin'));
+
+// Allow Super_Admin to operate on any club via managedClubId query/body param
+const allowManagedClub = (req, res, next) => {
+  if (req.user && req.user.role === 'Super_Admin') {
+    const override = req.query.managedClubId || req.body.managedClubId;
+    if (override) {
+      req.user = { ...req.user, club_id: override };
+    }
+  }
+  next();
+};
+
+router.use(allowManagedClub);
 
 // Direct Operational Player Onboarding
 router.post('/players/direct-register', ctrl.directRegisterPlayer);

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
 import { toast } from '../../lib/toast';
 import { Trophy, Mail, Lock, User, Building, Phone, Loader2, ArrowLeft, ShieldCheck, CheckCircle2, Shield } from 'lucide-react';
+import Select, { components } from 'react-select';
+import { getCountries } from 'country-list';
 
 interface SignUpProps {
   onNavigate: (path: string) => void;
@@ -11,6 +13,39 @@ interface ClubOption {
   id: string;
   name: string;
 }
+const countryOptions = [
+  { value: 'gb', label: 'England' },
+  { value: 'in', label: 'India' },
+  { value: 'ie', label: 'Ireland' },
+  { value: 'gb-sct', label: 'Scotland' },
+  { value: 'gb-wls', label: 'Wales' },
+  { value: 'nl', label: 'Netherlands' },
+  { value: 'au', label: 'Australia' },
+  { value: 'pk', label: 'Pakistan' },
+  { value: 'za', label: 'South Africa' },
+  { value: 'nz', label: 'New Zealand' },
+  { value: 'wi', label: 'West Indies' },
+  { value: 'sl', label: 'Sri Lanka' },
+  { value: 'bd', label: 'Bangladesh' },
+  { value: 'af', label: 'Afghanistan' },
+  { value: 'us', label: 'United States' },
+  { value: 'ca', label: 'Canada' },
+  { value: 'ae', label: 'United Arab Emirates' },
+  { value: 'af', label: 'Afghanistan' },
+  { value: 'zw', label: 'Zimbabwe' },
+  { value: 'np', label: 'Nepal' },
+  { value: 'om', label: 'Oman' },
+  { value: 'kw', label: 'Kuwait' },
+  // ... aap baaki countries add kar sakte hain
+];
+const CountryOption = (props: any) => (
+  <components.Option {...props}>
+    <div style={{ display: 'flex', alignItems: 'center' }}>
+      <img src={`https://flagcdn.com/20x15/${props.data.value.toLowerCase()}.png`} alt={props.data.label} style={{ marginRight: 10 }} />
+      {props.data.label}
+    </div>
+  </components.Option>
+);
 
 export function SignUp({ onNavigate }: SignUpProps) {
   const [isClubRegistration, setIsClubRegistration] = useState(false);
@@ -25,7 +60,7 @@ export function SignUp({ onNavigate }: SignUpProps) {
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [displayName, setDisplayName] = useState('');
-
+  const [country, setCountry] = useState('gb'); // Default England
   // Club Affiliation & Role Specific States
   const [isAffiliatedWithClub, setIsAffiliatedWithClub] = useState(false);
   const [clubsList, setClubsList] = useState<ClubOption[]>([]);
@@ -44,7 +79,6 @@ export function SignUp({ onNavigate }: SignUpProps) {
   const [clubName, setClubName] = useState('');
   const [homeGround, setHomeGround] = useState('');
   const [clubInitials, setClubInitials] = useState('');
-  const [country, setCountry] = useState('India');
 
   // Retrieve approved clubs on layout mount
   useEffect(() => {
@@ -259,8 +293,19 @@ export function SignUp({ onNavigate }: SignUpProps) {
                 <div className="space-y-1"><label>Club Name *</label><input type="text" value={clubName} onChange={e => setClubName(e.target.value)} className="w-full p-2.5 bg-white border rounded-xl text-black font-normal focus:ring-1 focus:ring-[#e60023]" placeholder="e.g. Thunder Strikers" /></div>
                 <div className="space-y-1"><label>Club Initials</label><input type="text" value={clubInitials} onChange={e => setClubInitials(e.target.value)} className="w-full p-2.5 bg-white border rounded-xl text-black font-normal focus:ring-1 focus:ring-[#e60023]" placeholder="e.g. TS" /></div>
                 <div className="space-y-1"><label>Home Ground Venue</label><input type="text" value={homeGround} onChange={e => setHomeGround(e.target.value)} className="w-full p-2.5 bg-white border rounded-xl text-black font-normal focus:ring-1 focus:ring-[#e60023]" placeholder="e.g. Lords Stadium" /></div>
-                <div className="space-y-1"><label>Country</label><input type="text" value={country} onChange={e => setCountry(e.target.value)} className="w-full p-2.5 bg-white border rounded-xl text-black font-normal focus:ring-1 focus:ring-[#e60023]" /></div>
-              </div>
+                <div className="space-y-1">
+    <label className="text-xs font-black text-gray-500 uppercase">Country *</label>
+    <Select
+      options={countryOptions}
+      components={{ Option: CountryOption, SingleValue: CountryOption }}
+      value={countryOptions.find(c => c.value === country)}
+      onChange={(selected: any) => setCountry(selected.value)}
+      className="text-sm"
+      styles={{
+        control: (provided) => ({ ...provided, borderRadius: '0.75rem', padding: '2px', borderColor: '#d1d5db' })
+      }}
+    />
+  </div></div>
             </div>
           )}
 

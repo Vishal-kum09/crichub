@@ -211,10 +211,10 @@ const findClubTeamById = async (clubId, teamId) => {
 
 const insertTeam = async (t) => {
   const r = await query(
-    `INSERT INTO teams (name, short_name, logo_url, home_ground, country, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6)
-     RETURNING teams_id AS id, name, short_name, logo_url, home_ground, country`,
-    [t.name, t.short_name, t.logo_url || null, t.home_ground || null, t.country || null, t.created_by]
+    `INSERT INTO teams (name, short_name, logo_url, home_ground, country, created_by, club_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)
+     RETURNING teams_id AS id, name, short_name, logo_url, home_ground, country,club_id`,
+    [t.name, t.short_name, t.logo_url || null, t.home_ground || null, t.country || null, t.created_by, t.club_id]
   );
   return r.rows[0];
 };

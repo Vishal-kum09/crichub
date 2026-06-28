@@ -115,7 +115,8 @@ const createMatch = async (user, input) => {
     status: 'scheduled', // status match column ENUM state
     is_public: input.is_public ?? true,
     notes: input.notes || '', // Holds structural local derby strings or meta context cleanly
-    created_by: user.user_id
+    created_by: user.user_id,
+    club_id: user.club_id
   });
 
   return {
@@ -150,7 +151,8 @@ const createTournament = async (user, input) => {
       start_date: input.start_date || new Date().toISOString().slice(0, 10),
       end_date: input.end_date || null,
       host_team: hostTeam || 'Host Club',
-      created_by: user.user_id
+      created_by: user.user_id,
+    club_id: user.club_id
     }, exec);
 
     let participant = null;
@@ -213,7 +215,8 @@ const createTeam = async (user, input) => {
     logo_url: input.logo_url,
     home_ground: input.home_ground,
     country: input.country,
-    created_by: user.user_id
+    created_by: user.user_id,
+    club_id: user.club_id
   });
   return { team_id: team.id, name: team.name, short_name: team.short_name };
 };

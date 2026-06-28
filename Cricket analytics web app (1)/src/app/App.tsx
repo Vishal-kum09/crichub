@@ -189,7 +189,7 @@ export default function App() {
         return <RegisteredClubs onNavigate={navigate} />;
       case '/admin':
         const managedClubId = currentRoute.params?.managedClubId || currentRoute.query?.managedClubId;
-        return <ClubAdmin managedClubId={managedClubId} />;
+        return <ClubAdmin managedClubId={managedClubId} onNavigate={navigate} />;
       case '/super-admin':
         return <SuperAdmin />;
       case '/settings':

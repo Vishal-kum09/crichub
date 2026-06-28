@@ -21,6 +21,7 @@ interface RegisteredClubsProps {
 export function RegisteredClubs({ onNavigate }: RegisteredClubsProps) {
   const [clubs, setClubs] = useState<Club[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     setLoading(true);
@@ -49,10 +50,20 @@ export function RegisteredClubs({ onNavigate }: RegisteredClubsProps) {
         <h2 className="text-xl font-semibold text-[#1a1a1a]">Registered Clubs</h2>
       </div>
 
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Search clubs by name..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full md:w-96 px-4 py-2 border border-[#e0e0e0] rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+        />
+      </div>
+
       {loading ? (
         <p className="text-center py-12 text-[#666666]">Loading clubs...</p>
-      ) : clubs.length === 0 ? (
-        <p className="text-center py-8 text-[#666666]">No registered clubs yet.</p>
+      ) : (clubs.filter(c => (c.club_name || c.name || '').toLowerCase().includes(search.toLowerCase())).length === 0) ? (
+        <p className="text-center py-8 text-[#666666]">No clubs match your search.</p>
       ) : (
         <div className="overflow-x-auto bg-white rounded-xl border border-[#e0e0e0]">
           <table className="w-full text-sm">
@@ -60,20 +71,23 @@ export function RegisteredClubs({ onNavigate }: RegisteredClubsProps) {
               <tr className="border-b border-[#e0e0e0]">
                 <th className="text-left py-3 px-4 font-medium text-[#666666]">Club Name</th>
                 <th className="text-center py-3 px-4 font-medium text-[#666666]">Affiliated Members</th>
+                  <th className="text-center py-3 px-4 font-medium text-[#666666]">Active Players</th>
                 <th className="text-right py-3 px-4 font-medium text-[#666666]">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {clubs.map((club, index) => {
+              {clubs.filter(c => (c.club_id || c.id || c.club_name || c.name || '').toLowerCase().includes(search.toLowerCase())).map((club, index) => {
                 // Safely extract values in case backend keys are named slightly differently
                 const uniqueId = club.club_id || club.id || `fallback-key-${index}`;
                 const displayName = club.club_name || club.name || 'Unnamed Club';
                 const totalMembers = club.members ?? club.memberCount ?? 0;
+                const activePlayers = (club as any).activePlayers ?? 0;
 
                 return (
                   <tr key={uniqueId} className="border-b border-[#e0e0e0] hover:bg-[#f9f9f9]">
                     <td className="py-3 px-4 font-medium text-purple-600">{displayName}</td>
                     <td className="py-3 px-4 text-center">{totalMembers}</td>
+                    <td className="py-3 px-4 text-center">{activePlayers}</td>
                     <td className="py-3 px-4 text-right space-x-2">
                       <button
                         onClick={() => {

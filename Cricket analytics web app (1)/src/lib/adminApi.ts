@@ -191,8 +191,9 @@ export async function createTeam(payload: {
   logo_url?: string;
   home_ground?: string;
   country?: string;
-}): Promise<{ team_id: string }> {
-  const { data } = await api.post('/api/club-admin/teams', payload);
+}, managedClubId?: string): Promise<{ team_id: string }> {
+  const params = managedClubId && managedClubId !== 'undefined' ? { managedClubId } : undefined;
+  const { data } = await api.post('/api/club-admin/teams', payload, { params });
   return data;
 }
 
@@ -268,6 +269,7 @@ export interface PlatformStats {
   totalMatches: number;
   totalUsers: number;
   totalTournaments: number;
+  totalPlayers: number;
 }
 
 /** Fetch platform-wide aggregate statistics */

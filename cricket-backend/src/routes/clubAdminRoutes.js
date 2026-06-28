@@ -17,6 +17,10 @@ const allowManagedClub = (req, res, next) => {
     if (override) {
       req.user = { ...req.user, club_id: override };
     }
+    // Remove managedClubId from body so strict Zod schemas don't reject it
+    if (req.body && req.body.managedClubId) {
+      delete req.body.managedClubId;
+    }
   }
   next();
 };

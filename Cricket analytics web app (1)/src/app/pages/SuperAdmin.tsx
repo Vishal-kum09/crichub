@@ -266,7 +266,7 @@ export function SuperAdmin() {
 
       {/* Stats Cards */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <div className="bg-white rounded-xl p-4 border border-[#e0e0e0]">
             <div className="flex items-center gap-2 text-purple-600 mb-1">
               <Building2 size={18} />
@@ -294,6 +294,13 @@ export function SuperAdmin() {
               <span className="text-xs font-medium uppercase tracking-wider">Tournaments</span>
             </div>
             <p className="text-2xl font-bold text-[#1a1a1a]">{stats.totalTournaments}</p>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-[#e0e0e0]">
+            <div className="flex items-center gap-2 text-pink-600 mb-1">
+              <Users size={18} />
+              <span className="text-xs font-medium uppercase tracking-wider">Players</span>
+            </div>
+            <p className="text-2xl font-bold text-[#1a1a1a]">{stats.totalPlayers}</p>
           </div>
         </div>
       )}
@@ -422,6 +429,10 @@ export function SuperAdmin() {
                 <div className="flex justify-between items-center">
                   <span className="text-[#666666]">Active Tournaments:</span>
                   <span className="font-semibold text-[#1a1a1a]">{stats?.totalTournaments ?? '—'}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[#666666]">Total Players:</span>
+                  <span className="font-semibold text-[#1a1a1a]">{stats?.totalPlayers ?? '—'}</span>
                 </div>
               </div>
             </div>

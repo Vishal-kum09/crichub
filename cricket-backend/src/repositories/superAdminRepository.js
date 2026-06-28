@@ -13,7 +13,8 @@ const findAllClubs = async () => {
             (SELECT count(*) FROM users u WHERE u.club_id = c.club_id)::int AS members,
             (SELECT count(*) FROM matches m
                WHERE m.created_by IN (SELECT user_id FROM users u2 WHERE u2.club_id = c.club_id)
-            )::int AS matches
+            )::int AS matches,
+            (SELECT count(*) FROM players p WHERE p.club_id = c.club_id AND p.is_active = true)::int AS "activePlayers"
        FROM club c
       ORDER BY c.created_at DESC`
   );
@@ -125,10 +126,11 @@ const deleteMatchCascade = async (client, matchId) => {
 const getPlatformStats = async (exec = query) => {
   const r = await exec(`
     SELECT
-      (SELECT count(*) FROM club WHERE is_approved = true)::int AS totalClubs,
-      (SELECT count(*) FROM matches)::int AS totalMatches,
-      (SELECT count(*) FROM users)::int AS totalUsers,
-      (SELECT count(*) FROM tournaments)::int AS totalTournaments
+      (SELECT count(*) FROM clubs WHERE is_approved = true)::int AS "totalClubs",
+      (SELECT count(*) FROM matches)::int AS "totalMatches",
+      (SELECT count(*) FROM users)::int AS "totalUsers",
+      (SELECT count(*) FROM tournaments)::int AS "totalTournaments",
+      (SELECT count(*) FROM players)::int AS "totalPlayers"
   `);
   return r.rows[0];
 };

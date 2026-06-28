@@ -28,6 +28,8 @@ import {
   type ClubTeam,
 } from '../../lib/adminApi';
 
+
+
 const managedQuery = (managedClubId?: string, extra: Record<string, any> = {}) => {
   const params: Record<string, any> = {};
   if (managedClubId && managedClubId !== 'undefined' && managedClubId !== '') params.managedClubId = managedClubId;
@@ -78,6 +80,11 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
 
   const [assignScorerId, setAssignScorerId] = useState<Record<string, string>>({});
   const [countryCode, setCountryCode] = useState('+91'); 
+  const goBack = () => {
+  if (managedClubId) {
+    window.location.href = '/registered-clubs';
+  }
+    };
   
   const [playerForm, setPlayerForm] = useState({ 
     firstName: '', lastName: '', displayName: '', contactNumber: '', gender: 'male',
@@ -319,13 +326,13 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
         await updateClubTeam(editingTeamId, payload);
         toast.success('Team updated.');
       } else {
-        const created = await apiCreateTeam(payload);
+        const created = await apiCreateTeam(payload, managedClubId);
         toast.success('Team created.');
         setSelectedTeamId(created.team_id);
         setEditingTeamId(created.team_id);
         loadTeamPlayers(created.team_id);
       }
-      getClubTeams().then(setMyTeams).catch(() => {});
+      getClubTeams(managedClubId).then(setMyTeams).catch(() => {});
     } catch (err: any) {
       toast.error('Failed to save team.');
     }
@@ -340,7 +347,7 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
         resetTeamForm();
         setShowTeamForm(false);
       }
-      getClubTeams().then(setMyTeams).catch(() => {});
+      getClubTeams(managedClubId).then(setMyTeams).catch(() => {});
     } catch (err: any) {
       toast.error('Failed to delete team.');
     }
@@ -352,7 +359,7 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
       await addPlayerToClubTeam(selectedTeamId, playerId);
       toast.success('Player added to team.');
       loadTeamPlayers(selectedTeamId);
-      getClubTeams().then(setMyTeams).catch(() => {});
+      getClubTeams(managedClubId).then(setMyTeams).catch(() => {});
     } catch (err: any) {
       toast.error('Could not add player.');
     }
@@ -364,7 +371,7 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
       await removePlayerFromClubTeam(selectedTeamId, playerId);
       toast.success('Player removed from team.');
       loadTeamPlayers(selectedTeamId);
-      getClubTeams().then(setMyTeams).catch(() => {});
+      getClubTeams(managedClubId).then(setMyTeams).catch(() => {});
     } catch (err: any) {
       toast.error('Could not remove player.');
     }
@@ -460,6 +467,17 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
   });
 
   return (
+    <>
+  {managedClubId && (
+      <div className="mb-4">
+        <button
+          onClick={goBack}
+          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-white border border-[#e0e0e0] rounded-lg hover:bg-[#f9f9f9]"
+        >
+          ← Back to Registered Clubs
+        </button>
+      </div>
+    )}
     <div className="space-y-6 text-black w-full px-2 sm:px-4 max-w-7xl mx-auto">
       {/* Header Panel */}
       <div className="bg-gradient-to-r from-[#e60023] to-[#c41e3a] rounded-2xl p-5 md:p-6 text-white shadow-md">
@@ -1483,4 +1501,4 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
         )}
       </div>
   </div>
-  );}
+  </>); }

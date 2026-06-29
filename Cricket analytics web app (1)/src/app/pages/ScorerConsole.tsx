@@ -1085,7 +1085,7 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
               <div className="flex items-center justify-between p-1.5 bg-green-50 rounded-md border border-green-200">
                 <div>
                   <span className="font-bold text-sm text-gray-900">{striker}*</span>
-                  <p className="text-[10px] text-gray-500 font-semibold">On Strike</p>
+                  <p className="text-[10px] text-gray-500 font-semibold">On Strike</p>  
                 </div>
                 <span className="text-sm font-bold tabular-nums">
                   {batsmen.find(b => b.name === striker)?.runs || 0} ({batsmen.find(b => b.name === striker)?.balls || 0})

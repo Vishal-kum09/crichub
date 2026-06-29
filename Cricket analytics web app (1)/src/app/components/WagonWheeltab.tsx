@@ -19,10 +19,12 @@ export function WagonWheelTab({ matchId }: { matchId: string }) {
           const x = Number(d.wagon_x);
           const y = Number(d.wagon_y);
           const batsmanHand = d.batting_style === 'left_hand_bat' ? 'left' : 'right';
+          
           return {
             x,
             y,
-            fieldArea: describePoint(x, y, batsmanHand).fieldArea,
+            // 🟢 FIX 1: Backend se aane wale d.field_area ko priority di hai
+            fieldArea: d.field_area || describePoint(x, y, batsmanHand).fieldArea,
             runs: Number(d.runs_batter) || 0,
             isFour: d.is_boundary_four || false,
             isSix: d.is_boundary_six || false
@@ -39,25 +41,28 @@ export function WagonWheelTab({ matchId }: { matchId: string }) {
       });
   }, [matchId]);
 
-  // 🔥 NAYA LOGIC: Data ko exactly 6 categories mein baantna
+  // 🔥 NAYA LOGIC: Strict Lowercase aur Hyphen Sanitization ke saath
   const stats = shots.reduce((acc, shot) => {
-    const area = (shot.fieldArea || '').toLowerCase();
+    // 🟢 FIX 2: Hyphens (-) aur Underscores (_) ko space se replace kiya taaki "long-off" -> "long off" ban jaye
+    const area = (shot.fieldArea || '').toLowerCase().replace(/[-_]/g, ' ');
     
-    // Priority 1: Specific regions match karenge
-    if (area.includes('third man') || area.includes('short third Man') || area.includes('slips cordon') || area.includes('Wicket keeper')) {
+    // 🟢 FIX 3: Saare .includes() ke andar stricly lowercase words use kiye hain
+    if (area.includes('third man') || area.includes('slips') || area.includes('keeper')) {
       acc.thirdMan += shot.runs;
-    } else if (area.includes('fine leg') || area.includes('leg slip') || area.includes('short fine leg') || area.includes('Long leg') ) {
+    } else if (area.includes('fine leg') || area.includes('leg slip') || area.includes('long leg')) {
       acc.fineLeg += shot.runs;
     } else if (area.includes('long off') || area.includes('mid off')) {
       acc.longOff += shot.runs;
-    } else if (area.includes('long on') || area.includes('mid on') || area.includes('Straight hit')) {
+    } else if (area.includes('long on') || area.includes('mid on') || area.includes('straight')) {
       acc.longOn += shot.runs;
     } 
-    // Priority 2: Agar upar ke 4 mein se nahi hai, toh broad sides mein daalenge
-    else if (area.includes('cover') || area.includes('point')  || area.includes('extra cover')) {
-      acc.offSide += shot.runs; // Bacha hua Off Side ka area
-    } else {
-      acc.legSide += shot.runs; // Bacha hua Leg Side ka area (Square leg, Mid wicket etc)
+    // Broad Off Side check
+    else if (area.includes('cover') || area.includes('point') || area.includes('gully')) {
+      acc.offSide += shot.runs; 
+    } 
+    // Broad Leg Side check (Square leg, Mid wicket, Cow corner)
+    else {
+      acc.legSide += shot.runs; 
     }
     
     return acc;
@@ -74,33 +79,25 @@ export function WagonWheelTab({ matchId }: { matchId: string }) {
         <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">🎯 Radial Shot Distribution Wheel</h3>
         <p className="text-sm text-gray-500">Interactive zone allocation vector showing where runs have been compiled across the field boundary coordinates.</p>
         
-        {/* 🔥 NAYA UI: 6 Boxes grid */}
         <div className="grid grid-cols-2 gap-3 text-xs font-bold text-gray-700">
-          
           <div className="p-3 bg-purple-50 border border-purple-100 rounded-xl flex justify-between">
             <span>Third Man:</span><span className="text-purple-600">{stats.thirdMan} Runs</span>
           </div>
-          
           <div className="p-3 bg-yellow-50 border border-yellow-100 rounded-xl flex justify-between">
             <span>Fine Leg:</span><span className="text-yellow-600">{stats.fineLeg} Runs</span>
           </div>
-          
           <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl flex justify-between">
             <span>Long Off:</span><span className="text-blue-600">{stats.longOff} Runs</span>
           </div>
-          
           <div className="p-3 bg-green-50 border border-green-100 rounded-xl flex justify-between">
             <span>Long On:</span><span className="text-green-600">{stats.longOn} Runs</span>
           </div>
-          
           <div className="p-3 bg-red-50 border border-red-100 rounded-xl flex justify-between">
             <span>Off Side:</span><span className="text-red-600">{stats.offSide} Runs</span>
           </div>
-          
           <div className="p-3 bg-orange-50 border border-orange-100 rounded-xl flex justify-between">
             <span>Leg Side:</span><span className="text-orange-600">{stats.legSide} Runs</span>
           </div>
-          
         </div>
       </div>
 

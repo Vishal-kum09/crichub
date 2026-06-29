@@ -49,6 +49,16 @@ const getCommentary = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const getRecentMatchCommentary = async (req, res, next) => {
+  try {
+    if (!isUuid(req.params.id)) throw new AppError('Match not found', 404);
+    const commentary = await viewerService.getRecentCommentary(req.params.id);
+    if (commentary === null) throw new AppError('Match not found', 404);
+    // The frontend expects the data inside a 'commentary' key
+    res.json({ commentary });
+  } catch (err) { next(err); }
+};
+
 const getTeams = async (req, res, next) => {
   try {
     const teams = await viewerService.listTeams();
@@ -89,8 +99,9 @@ const getDashboardKpis = async (req, res, next) => {
 };
 
 // Backend Route: GET /api/viewer/matches/:matchId/wagon-wheel
+// Backend Route: GET /api/viewer/matches/:id/wagon-wheel
 const getMatchWagonWheel = async (req, res, next) => {
-  const { matchId } = req.params;
+  const matchId = req.params.id; // 🟢 FIX: Extracting 'id' instead of 'matchId'
   try {
     if (!isUuid(matchId)) throw new AppError('Match not found', 404);
     const sql = `
@@ -100,6 +111,7 @@ const getMatchWagonWheel = async (req, res, next) => {
         d.is_boundary_six, 
         d.wagon_x, 
         d.wagon_y, 
+        d.field_area,
         p.batting_style
       FROM deliveries d
       JOIN innings i ON d.innings_id = i.innings_id
@@ -113,12 +125,78 @@ const getMatchWagonWheel = async (req, res, next) => {
   }
 };
 
+const getMatchPartnerships = async (req, res, next) => {
+  const matchId = req.params.id; // 🟢 FIX: Extracting 'id' instead of 'matchId'
+  try {
+    if (!isUuid(matchId)) throw new AppError('Match not found', 404);
+    
+    const sql = `
+      SELECT p.partnerships_id,
+             i.innings_number,
+             p.wicket_number,
+             COALESCE(concat(p1.display_name, ' & ', p2.display_name), 'Partnership') AS batsmen,
+             p.runs,
+             p.balls,
+             p.batter1_runs,
+             p.batter1_balls,
+             p.batter2_runs,
+             p.batter2_balls
+        FROM partnerships p
+        JOIN innings i ON p.innings_id = i.innings_id
+   LEFT JOIN players p1 ON p1.players_id = p.batter1_id
+   LEFT JOIN players p2 ON p2.players_id = p.batter2_id
+       WHERE i.match_id = $1 
+       ORDER BY i.innings_number, p.wicket_number
+    `; 
+    
+    const result = await query(sql, [matchId]);
+    res.json({ count: result.rows.length, partnerships: result.rows });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getMatchOvers = async (req, res, next) => {
+  const matchId = req.params.id; // 🟢 FIX: Extracting 'id' instead of 'matchId'
+  try {
+    if (!isUuid(matchId)) throw new AppError('Match not found', 404);
+    const sql = `
+      SELECT o.overs_id,
+             i.innings_number,
+             o.over_number,
+             o.runs_scored,
+             o.wickets_taken,
+             o.legal_balls,
+             o.dot_balls,
+             o.boundaries_four,
+             o.boundaries_six,
+             o.wides,
+             o.no_balls,
+             o.is_maiden,
+             o.cumulative_runs,
+             o.cumulative_wickets,
+             o.run_rate,
+             o.phase
+        FROM overs o
+        JOIN innings i ON o.innings_id = i.innings_id
+       WHERE i.match_id = $1  
+       ORDER BY i.innings_number, o.over_number
+    `;
+    const result = await query(sql, [matchId]);
+    res.json({ count: result.rows.length, overs: result.rows });
+  } catch (error) {
+    next(error);
+  }
+};
 module.exports = {
   getMatchWagonWheel,
+  getMatchPartnerships,
+  getMatchOvers,
   getMatches,
   getMatchById,
   getScorecard,
   getCommentary,
+  getRecentMatchCommentary,
   getTeams,
   getTeamById,
   getPlayers,

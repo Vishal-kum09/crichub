@@ -50,6 +50,12 @@ const getCommentary = async (matchId) => {
   return matchRepo.findCommentary(matchId);
 };
 
+const getRecentCommentary = async (matchId) => {
+  const match = await matchRepo.findMatchById(matchId);
+  if (!match) return null;
+  return matchRepo.findRecentCommentary(matchId);
+};
+
 // ─── Teams ────────────────────────────────────────────────────────────────────
 
 const listTeams = async () => {
@@ -133,6 +139,7 @@ module.exports = {
   getMatch,
   getScorecard,
   getCommentary,
+  getRecentCommentary,
   listTeams,
   getTeam,
   listPlayers,

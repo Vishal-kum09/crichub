@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { buildCommentarySocketUrl, commentaryKey, getCommentaryHistory, getRealtimeCommentaryConfig } from '../../lib/commentaryApi';
 import { WagonWheelTab } from '../components/WagonWheeltab';
 import { CommentaryItem } from '../components/CommentaryItem'; 
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { AudioCommentaryPlayer } from '../components/AudioCommentaryPlayer';
 
 interface MatchDetailProps {
@@ -93,6 +94,8 @@ const extraLabel = (type: string | null) => {
   return type ? (map[type] || type.replace(/_/g, ' ').toUpperCase()) : 'EX';
 };
 
+const ordinal = (n: number) => { const s = ["th","st","nd","rd"]; const v = n % 100; return s[(v-20)%10]||s[v]||s[0]; };
+
 const ballOutcome = (delivery: RecentDelivery) => {
   if (delivery.is_wicket) return 'W';
   if (delivery.is_boundary_six) return '6';
@@ -116,12 +119,19 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'scorecard' | 'commentary' | 'analytics' | 'watch_live'>('overview');
   const [activeInningsIndex, setActiveInningsIndex] = useState<number>(0);
 
+  const [recentCommentary, setRecentCommentary] = useState<any[]>([]);
+  const [loadingRecentCommentary, setLoadingRecentCommentary] = useState(true);
   const [commentaryInnings, setCommentaryInnings] = useState<1 | 2>(1);
+  const [partnerships, setPartnerships] = useState<any[]>([]);
+  const [overs, setOvers] = useState<any[]>([]);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [activeAnalyticsInnings, setActiveAnalyticsInnings] = useState<1|2>(1);
   const [commentarySort, setCommentarySort] = useState<'asc' | 'desc'>('desc');
   const [commentaryList, setCommentaryList] = useState<any[]>([]);
   const [isWsConnected, setIsWsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
 
+  // Scorecard Fetching
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -133,6 +143,55 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
     return () => { cancelled = true; };
   }, [matchId]);
 
+  // Fetch Recent Commentary for Overview Tab
+  useEffect(() => {
+    if (!matchId) return;
+    let cancelled = false;
+    setLoadingRecentCommentary(true);
+    api.get(`/api/viewer/matches/${matchId}/recent-commentary`)
+      .then(res => {
+        if (!cancelled) setRecentCommentary(res.data.commentary || []);
+      })
+      .catch(() => {
+        if (!cancelled) setRecentCommentary([]);
+      })
+      .finally(() => { if (!cancelled) setLoadingRecentCommentary(false); });
+    return () => { cancelled = true; };
+  }, [matchId]);
+
+  // Analytics Fetching
+  useEffect(() => {
+    let isMounted = true;
+    
+    if (activeTab === 'analytics') {
+      setAnalyticsLoading(true);
+      
+      Promise.all([
+        api.get(`/api/viewer/matches/${matchId}/partnerships`),
+        api.get(`/api/viewer/matches/${matchId}/overs`)
+      ])
+      .then(([partnershipsRes, oversRes]) => {
+        if (isMounted) {
+          setPartnerships(partnershipsRes.data.partnerships || []);
+          setOvers(oversRes.data.overs || []);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch analytics data:", err);
+        if (isMounted) {
+          setPartnerships([]);
+          setOvers([]);
+        }
+      })
+      .finally(() => {
+        if (isMounted) setAnalyticsLoading(false);
+      });
+    }
+
+    return () => { isMounted = false; };
+  }, [matchId, activeTab]);
+
+  // Commentary WebSockets
   useEffect(() => {
     let ws: WebSocket | null = null;
     let isMounted = true;
@@ -215,14 +274,22 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
     { id: 'watch_live' as const, label: 'Watch Live', icon: MonitorPlay },
   ];
 
-  const scoreFor = (teamName: string) => {
-    const inn = scorecard.innings.find((i) => i.batting_team_name === teamName);
+  // 🟢 YAHAN UPDATE KIYA HAI SCORE FALLBACK LOGIC 🟢
+  const scoreFor = (teamName: string, expectedInningsIndex: number) => {
+    let inn = scorecard.innings.find((i) => i.batting_team_name === teamName);
+    
+    // Fallback: Agar naam mismatch hai toh index se data uthao
+    if (!inn && scorecard.innings[expectedInningsIndex]) {
+      inn = scorecard.innings[expectedInningsIndex];
+    }
+    
     if (!inn) return null;
     return `${inn.total.runs}/${inn.total.wickets} (${oversFromBalls(inn.total.balls)} Ov)`;
   };
 
-  const team1Score = scoreFor(scorecard.team1_name);
-  const team2Score = scoreFor(scorecard.team2_name);
+  const team1Score = scoreFor(scorecard.team1_name, 0);
+  const team2Score = scoreFor(scorecard.team2_name, 1);
+  
   const liveInnings = scorecard.innings.find((inn) => inn.status === 'in_progress') || scorecard.innings[scorecard.innings.length - 1] || null;
   const firstInnings = scorecard.innings.find((inn) => inn.innings_number === 1);
   const recentDeliveries = liveInnings?.recent_deliveries ?? [];
@@ -314,15 +381,9 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
           </div>
         </div>
 
-        {/* 🔥 YAHAN ADD KIYA HAI AUDIO PLAYER 🔥 */}
         <AudioCommentaryPlayer matchId={matchId} />
 
         <div className="space-y-6">
-          
-          {activeTab === 'overview' && (
-            <div>
-            </div>
-          )}
           
           {activeTab === 'overview' && liveInnings && (
             <div className="bg-white rounded-2xl p-4 md:p-5 border border-gray-200 shadow-sm space-y-4 animate-fadeIn">
@@ -408,26 +469,46 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
                 <div className="flex items-center gap-2 overflow-x-auto pb-1">
                   {recentDeliveries.length === 0 ? (
                     <span className="text-xs font-bold text-gray-400">No deliveries recorded yet.</span>
-                  ) : recentDeliveries.map((delivery, index) => {
-                    const previous = recentDeliveries[index - 1];
-                    const showOverLabel = !previous || previous.over_number !== delivery.over_number;
+                  ) : [...recentDeliveries].slice(-10).reverse().map((delivery, index, arr) => {
+                    const nextDelivery = arr[index + 1];
+                    // Show the over summary label after the last ball of an over.
+                    const showOverLabel = !nextDelivery || nextDelivery.over_number !== delivery.over_number;
                     const overRuns = recentDeliveries
                       .filter((item) => item.over_number === delivery.over_number)
                       .reduce((sum, item) => sum + item.runs_total, 0);
+
                     return (
                       <div key={delivery.delivery_id} className="flex items-center gap-2">
-                        {showOverLabel && (
-                          <span className="shrink-0 text-[10px] font-black text-gray-400 uppercase tracking-wide border-l border-gray-300 pl-2">
-                            Over {delivery.over_number} | {overRuns} runs
-                          </span>
-                        )}
                         <span className={`shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-xs font-black tabular-nums ${ballOutcomeClass(delivery)}`}>
                           {ballOutcome(delivery)}
                         </span>
+                        {showOverLabel && (
+                          <span className="shrink-0 text-[10px] font-black text-gray-400 uppercase tracking-wide border-r-2 border-gray-300 pr-2 mr-2">
+                            Over {delivery.over_number} | {overRuns} Runs
+                          </span>
+                        )}
                       </div>
                     );
                   })}
                 </div>
+              </div>
+
+              {/* Last 10 Deliveries Commentary */}
+              <div className="space-y-2 pt-4 border-t border-gray-100">
+                <p className="text-xs font-black uppercase tracking-wide text-gray-500">Recent Commentary</p>
+                {loadingRecentCommentary ? (
+                  <p className="text-sm text-gray-400 italic">Loading commentary...</p>
+                ) : recentCommentary.length > 0 ? (
+                  <div className="space-y-2 text-sm text-gray-700 font-medium">
+                    {recentCommentary.map((item, index) => (
+                      <p key={index} className="pb-2 border-b border-gray-100 last:border-b-0">
+                        <span className="font-black text-gray-900">{item.over_number}.{item.ball_number}:</span> {item.output.split(': ')[1]}
+                      </p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400 italic">No recent commentary available.</p>
+                )}
               </div>
             </div>
           )}
@@ -577,14 +658,13 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
                 )}
               </div>
 
-              <div className="space-y-4 max-w-3xl">
+              <div className="space-y-4 w-full">
                 {!Array.isArray(commentaryList) || commentaryList.length === 0 ? (
                   <p className="text-gray-500 text-sm italic">Waiting for commentary updates...</p>
                 ) : (
                   [...commentaryList]
                     .filter(c => c && c.is_visible !== false && c.innings_number === commentaryInnings)
                     .sort((a, b) => {
-                      // 🔥 FIX: Check both over/over_number and ball/ball_number
                       const overA = a.over !== undefined ? a.over : (a.over_number !== undefined ? a.over_number : 0);
                       const ballA = a.ball !== undefined ? a.ball : (a.ball_number !== undefined ? a.ball_number : 0);
                       const overB = b.over !== undefined ? b.over : (b.over_number !== undefined ? b.over_number : 0);
@@ -602,7 +682,6 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
                       
                       const uniqueKey = commentaryKey(item, index);
                       
-                      // 🔥 FIX FOR 0.0: Fallbacks to over_number if 'over' is missing
                       const overVal = item.over !== undefined ? item.over : (item.over_number !== undefined ? item.over_number : 0);
                       const ballVal = item.ball !== undefined ? item.ball : (item.ball_number !== undefined ? item.ball_number : 0);
                       const displayOver = `Over ${overVal}.${ballVal}`;
@@ -642,30 +721,66 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
             <div className="space-y-6 animate-fadeIn">
               <WagonWheelTab matchId={matchId} />
 
-              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-6">
-                <h3 className="text-lg font-black text-gray-900 border-b border-gray-100 pb-3 flex items-center gap-2">🤝 Innings Partnership Breakdown</h3>
-                <div className="space-y-5 max-w-2xl">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs md:text-sm font-bold text-gray-700"><span>Virat Kohli (42)</span><span className="text-[#e60023]">84 Runs (52 Balls)</span><span>Rohit Sharma (38)</span></div>
-                    <div className="w-full bg-gray-100 h-3 rounded-full overflow-hidden flex shadow-inner"><div className="bg-red-500 h-full w-[55%]" /><div className="bg-amber-400 h-full w-[45%]" /></div>
-                    <p className="text-[11px] text-gray-400 font-medium text-center">1st Wicket Stand · Progressive run-rate acceleration marker</p>
+              {analyticsLoading ? (
+                <div className="text-center py-6 text-gray-500 font-medium">Loading analytics...</div>
+              ) : (
+                <>
+                  <div className="flex gap-2">
+                    <button onClick={() => setActiveAnalyticsInnings(1)} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeAnalyticsInnings === 1 ? "bg-[#e60023] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>Innings 1</button>
+                    <button onClick={() => setActiveAnalyticsInnings(2)} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeAnalyticsInnings === 2 ? "bg-[#e60023] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>Innings 2</button>
                   </div>
-                </div>
-              </div>
 
-              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-6">
-                <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">📊 Over-by-Over Worm & Run-Rate Graph</h3>
-                <p className="text-sm text-gray-500">Comparative run progression analysis matrix tracking matching milestones and fall-of-wicket intersections.</p>
-                <div className="w-full bg-gray-50 border border-gray-100 rounded-xl h-64 flex items-end justify-between p-4 relative shadow-inner">
-                  <div className="w-4 bg-[#e60023] h-[15%] rounded-t-sm" />
-                  <div className="w-4 bg-[#e60023] h-[35%] rounded-t-sm" />
-                  <div className="w-4 bg-[#e60023] h-[30%] rounded-t-sm relative"><span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] bg-black text-white p-0.5 rounded font-bold">W</span></div>
-                  <div className="w-4 bg-[#e60023] h-[55%] rounded-t-sm" />
-                  <div className="w-4 bg-[#e60023] h-[70%] rounded-t-sm" />
-                  <div className="w-4 bg-[#e60023] h-[90%] rounded-t-sm" />
-                  <span className="absolute left-4 top-2 text-[10px] font-black uppercase text-gray-400 bg-white px-2 py-1 rounded border shadow-sm">Runs Stack Bar Chart</span>
-                </div>
-              </div>
+                  <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-6">
+                    <h3 className="text-lg font-black text-gray-900 border-b border-gray-100 pb-3 flex items-center gap-2">🤝 Partnership Breakdown</h3>
+                    {(() => {
+                      const flt = partnerships.filter(p => Number(p.innings_number) === activeAnalyticsInnings);
+                      if (flt.length === 0) return <p className='text-sm text-gray-400'>No partnership data for this innings.</p>;
+                      const mx = Math.max(...flt.map(x => x.runs), 1);
+                      return (
+                        <div className='space-y-4 max-w-2xl'>
+                          {flt.map((p, i) => (
+                            <div key={p.partnerships_id || i} className='space-y-2'>
+                              <div className='flex justify-between text-xs md:text-sm font-bold text-gray-700'>
+                                <span>{p.batsmen}</span>
+                                <span className='text-[#e60023]'>{p.runs} runs ({p.balls} balls)</span>
+                              </div>
+                              <div className='w-full bg-gray-100 h-3 rounded-full overflow-hidden flex shadow-inner'>
+                                <div className='bg-red-500 h-full' style={{ width: Math.min(100, Math.round((p.runs / mx) * 100)) + '%' }} />
+                              </div>
+                              <p className='text-[11px] text-gray-400 font-medium text-center'>
+                                {p.wicket_number}{ordinal(p.wicket_number)} Wicket Stand &middot; {p.batter1_runs}({p.batter1_balls}) &middot; {p.batter2_runs}({p.batter2_balls})</p>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-6">
+                    <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">📈 Over-by-Over Run Rate</h3>
+                    <p className="text-sm text-gray-500">Run rate progression across the innings</p>
+                    {(() => {
+                      const flt = overs.filter(o => Number(o.innings_number) === activeAnalyticsInnings);
+                      if (flt.length === 0) return <p className='text-sm text-gray-400'>No over data for this innings.</p>;
+                      const ch = flt.map(o => ({ over: o.over_number, runs: o.runs_scored, cumulative: o.cumulative_runs, runRate: Number(o.run_rate) }));
+                      return (
+                        <ResponsiveContainer width='100%' height={300}>
+                          <LineChart data={ch}>
+                            <CartesianGrid strokeDasharray='3 3' stroke='#e5e7eb' />
+                            <XAxis dataKey='over' stroke='#6b7280' label={{ value: 'Over', position: 'insideBottom', offset: -5 }} />
+                            <YAxis yAxisId='l' stroke='#6b7280' label={{ value: 'Runs', angle: -90, position: 'insideLeft', style: { fontSize: 11 } }} />
+                            <YAxis yAxisId='r' orientation='right' stroke='#e60023' label={{ value: 'Run Rate', angle: 90, position: 'insideRight', style: { fontSize: 11, fill: '#e60023' } }} />
+                            <Tooltip />
+                            <Line yAxisId='l' type='monotone' dataKey='cumulative' stroke='#2563eb' strokeWidth={2} name='Cumulative Runs' dot={false} />
+                            <Line yAxisId='l' type='monotone' dataKey='runs' stroke='#10b981' strokeWidth={2} name='Runs in Over' />
+                            <Line yAxisId='r' type='monotone' dataKey='runRate' stroke='#e60023' strokeWidth={2} name='Run Rate' dot={false} strokeDasharray='4 4' />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      );
+                    })()}
+                  </div>
+                </>
+              )}
             </div>
           )}
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Mic, Settings2, Sparkles, Volume2, Play, Loader2 } from 'lucide-react';
 import { toast } from '../../lib/toast';
+import { api } from '../../lib/api';
 
 export interface AudioSettings {
   audio_enabled: boolean;
@@ -53,24 +54,17 @@ export function AudioMatchSettings({ settings, onChange }: AudioMatchSettingsPro
   const handlePreview = async () => {
     setIsPreviewing(true);
     try {
-      // Main app backend proxy call[cite: 1]
-      const response = await fetch('/api/scorer/audio/voice-preview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          provider: settings.provider || 'gemini',
-          model: settings.provider_model || 'gemini-2.5-flash-tts',
-          voice: settings.provider_voice || 'Fenrir',
-          language: settings.language_code || 'en-GB',
-          character_key: settings.character_key || 'veteran',
-          tone: settings.tone || 'normal',
-          speaking_rate: settings.speaking_rate || 1.0,
-          character_prompt: settings.character_prompt || null
-        })
+      // Main app backend proxy call with authentication
+      const { data } = await api.post('/api/scorer/audio/voice-preview', {
+        provider: settings.provider || "gemini",
+        model: settings.provider_model || "gemini-2.5-flash-tts",
+        voice: settings.provider_voice || "Fenrir",
+        language: settings.language_code || "en-GB",
+        character_key: settings.character_key || "veteran",
+        tone: settings.tone || "normal",
+        speaking_rate: settings.speaking_rate || 1.0,
+        character_prompt: settings.character_prompt || null
       });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Voice preview failed');
 
       // Play the base64 audio[cite: 1]
       audioElement.src = `data:${data.content_type};base64,${data.audio}`;

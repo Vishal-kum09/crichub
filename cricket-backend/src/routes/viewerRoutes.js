@@ -9,6 +9,10 @@ router.get('/matches', ctrl.getMatches);                  // ?status=live|schedu
 router.get('/matches/:id', ctrl.getMatchById);
 router.get('/matches/:id/scorecard', ctrl.getScorecard);
 router.get('/matches/:id/commentary', ctrl.getCommentary);
+router.get('/matches/:id/recent-commentary', ctrl.getRecentMatchCommentary);
+router.get('/matches/:id/wagon-wheel', ctrl.getMatchWagonWheel);
+router.get('/matches/:id/partnerships', ctrl.getMatchPartnerships);
+router.get('/matches/:id/overs', ctrl.getMatchOvers);
 
 // Teams
 router.get('/teams', ctrl.getTeams);

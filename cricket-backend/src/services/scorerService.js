@@ -327,34 +327,40 @@ const initialize = async (matchId, input) => {
     }
 
     // 2. Resolve or Create the Teams entries to satisfy the Foreign Key constraint
-    const resolveTeamId = async (clubId, teamLabel) => {
-  // 1. Sabse pehle check karo ki is naam ki team table mein already hai ya nahi
-  let tRes = await client.query(
-    `SELECT teams_id FROM teams WHERE name = $1 LIMIT 1`, 
-    [teamLabel]
-  );
-  
-  // 2. Agar team mil gayi, toh direct wahi ID use karo (No duplicate insert)
-  if (tRes.rows.length > 0) {
-    return tRes.rows[0].teams_id;
-  }
-  
-  // 3. Agar team NAHI mili, tabhi hum naya record banayenge
-  // Find a user from this club to attach as the "creator" of the team
-  let userRes = await client.query(`SELECT user_id FROM users WHERE club_id = $1 LIMIT 1`, [clubId]);
-  const creatorId = userRes.rows.length > 0 ? userRes.rows[0].user_id : '00000000-0000-0000-0000-000000000000';
-  
-  // Insert with ON CONFLICT safety check
-  tRes = await client.query(
-    `INSERT INTO teams (name, short_name, created_by, is_active, created_at) 
-     VALUES ($1, $2, $3, true, NOW()) 
-     ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name 
-     RETURNING teams_id`,
-    [teamLabel, teamLabel.substring(0, 3).toUpperCase(), creatorId]
-  );
-  
-  return tRes.rows[0].teams_id;
-};
+    // Resolve team IDs, creating them if needed under the match club
+    const resolveTeamId = async (teamId, teamLabel) => {
+      // 1. Try to resolve by explicit team UUID first
+      let tRes = await client.query('SELECT teams_id, club_id FROM teams WHERE teams_id = $1 LIMIT 1', [teamId]);
+
+      if (tRes.rows.length > 0) {
+        return tRes.rows[0].teams_id;
+      }
+
+      // 2. Fallback: resolve by name (create-on-miss)
+      tRes = await client.query('SELECT teams_id FROM teams WHERE name = $1 LIMIT 1', [teamLabel]);
+
+      if (tRes.rows.length > 0) {
+        return tRes.rows[0].teams_id;
+      }
+
+      // 3. Team not found anywhere - create one using match club_id so FK is valid
+      const clubId = match?.club_id || null;
+      if (!clubId) {
+        throw new Error('Cannot create team: match club_id is missing');
+      }
+      let userRes = await client.query('SELECT user_id FROM users WHERE club_id = $1 LIMIT 1', [clubId]);
+      const creatorId = userRes.rows.length > 0 ? userRes.rows[0].user_id : '00000000-0000-0000-0000-000000000000';
+
+      tRes = await client.query(
+        `INSERT INTO teams (name, short_name, club_id, created_by, is_active, created_at)
+         VALUES ($1, $2, $3, $4, true, NOW())
+         ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+         RETURNING teams_id`,
+        [teamLabel, teamLabel.substring(0, 3).toUpperCase(), clubId, creatorId]
+      );
+
+      return tRes.rows[0].teams_id;
+    };
 
     const finalBattingTeamId = await resolveTeamId(input.batting_team_id, input.metadata?.batting_team_label || 'Batting Team');
     const finalFieldingTeamId = await resolveTeamId(input.fielding_team_id, input.metadata?.fielding_team_label || 'Fielding Team');

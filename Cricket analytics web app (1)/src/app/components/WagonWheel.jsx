@@ -269,8 +269,8 @@ export default function WagonWheel({
       </svg>
 
       <div className="wagon-status">
-        <span>{hover ? hover.fieldArea : "Move cursor over the field"}</span>
-        <strong>{hover ? `X ${hover.dbX}, Y ${hover.dbY}` : "Click to capture shot point"}</strong>
+        <span>{hover ? hover.fieldArea : ""}</span>
+        <strong>{hover ? `X ${hover.dbX}, Y ${hover.dbY}` : ""}</strong>
         {saving && <em>Saving...</em>}
       </div>
 

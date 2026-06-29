@@ -125,7 +125,7 @@ const findBattingCards = async (inningsId, battingTeamId) => {
             d.dismissal_type,
             bowl.display_name AS dismissal_bowler_name,
             fld.display_name  AS dismissal_fielder_name,
-            (tp.squad_role = 'captain')             AS is_captain,
+            (tp.squad_role = 'captain')             AS is_captain,            
             (p.primary_role = 'wicket_keeper')      AS is_wicket_keeper
      FROM batting_scorecards bc
      JOIN players p ON p.players_id = bc.player_id
@@ -229,7 +229,7 @@ const findCommentary = async (matchId, inningsNumber = null) => {
     `SELECT ac.ai_commentary_id, ac.match_id, ac.innings_id, ac.delivery_id, ac.task, ac.style,
             ac.output, ac.source, ac.status, ac.is_visible, ac.is_manual_override, ac.version,
             ac.response_time_ms, ac.created_at,
-            d.over_number, d.ball_in_over as ball_number, d.runs_total as runs, i.innings_number,
+            (d.over_number - 1) as over_number, d.ball_in_over as ball_number, d.runs_total as runs, i.innings_number,
             bat.display_name AS batter_name, bow.display_name AS bowler_name,
             ag.storage_bucket, ag.storage_object
        FROM ai_commentary ac
@@ -259,7 +259,7 @@ const findCommentary = async (matchId, inningsNumber = null) => {
   const fallbackParams = inningsNumber ? [matchId, inningsNumber] : [matchId];
 
   const fallbackResult = await query(
-    `SELECT d.deliveries_id AS delivery_id, d.over_number, d.ball_in_over,
+    `SELECT d.deliveries_id AS delivery_id, (d.over_number - 1) as over_number, d.ball_in_over,
             d.delivery_sequence, d.delivery_type, d.runs_batter, d.runs_extras,
             d.runs_total, d.is_wicket, d.is_boundary_four, d.is_boundary_six,
             i.innings_number,
@@ -278,7 +278,7 @@ const findCommentary = async (matchId, inningsNumber = null) => {
     ai_commentary_id: `fallback-${row.delivery_id}`,
     match_id: matchId,
     delivery_id: row.delivery_id,
-    task: row.is_wicket ? 'wicket_alert' : row.is_boundary_four || row.is_boundary_six ? 'boundary_special' : 'live_ball_short',
+    task: row.is_wicket ? 'wicket_alert' : (row.is_boundary_four || row.is_boundary_six ? 'boundary_special' : 'live_ball_short'),
     output: `${row.over_number}.${row.ball_in_over}: ${row.batter_name} faces ${row.bowler_name}. ${row.runs_total} run${row.runs_total === 1 ? '' : 's'}${row.is_wicket ? ', wicket' : ''}.`,
     source: 'score_fallback',
     status: 'visible',
@@ -293,6 +293,51 @@ const findCommentary = async (matchId, inningsNumber = null) => {
     batter_name: row.batter_name,
     bowler_name: row.bowler_name
   }));
+};
+
+// Find recent commentary for the match summary, limited to the last N deliveries.
+const findRecentCommentary = async (matchId, limit = 10) => {
+  // This query fetches the last 10 deliveries and LEFT JOINS ai_commentary.
+  // This ensures we get a result for every recent delivery, and can use AI
+  // output where available or generate a fallback where it is not.
+  const result = await query(
+    `SELECT
+        d.deliveries_id,
+        (d.over_number - 1) as over_number,
+        d.ball_in_over,
+        d.runs_total,
+        d.is_wicket,
+        bat.display_name AS batter_name,
+        bow.display_name AS bowler_name,
+        ac.output AS ai_output
+     FROM deliveries d
+     JOIN innings i ON i.innings_id = d.innings_id
+     JOIN players bat ON bat.players_id = d.batter_id
+     JOIN players bow ON bow.players_id = d.bowler_id
+     LEFT JOIN ai_commentary ac ON ac.delivery_id = d.deliveries_id AND ac.is_visible = true
+     WHERE i.match_id = $1 AND d.deleted_at IS NULL
+     ORDER BY i.innings_number DESC, d.delivery_sequence DESC
+     LIMIT $2`,
+    [matchId, limit]
+  );
+
+  const rows = result.rows.map((row) => {
+    // Use the AI-generated output if it exists, otherwise generate fallback text.
+    const commentaryText = row.ai_output
+      ? row.ai_output
+      : `${row.batter_name} faces ${row.bowler_name}. ${row.runs_total} run${row.runs_total === 1 ? '' : 's'}${row.is_wicket ? ', wicket' : ''}.`;
+
+    return {
+      over_number: row.over_number,
+      ball_number: row.ball_in_over,
+      // Prepend "over.ball: " to the text to ensure the frontend's split logic works consistently.
+      output: `${row.over_number}.${row.ball_in_over}: ${commentaryText}`
+    };
+  });
+
+  // The SQL query already sorts by recent first (DESC), which is what the user wants.
+  // We do not reverse the array.
+  return rows;
 };
 // src/repositories/matchRepository.js
 
@@ -359,5 +404,6 @@ module.exports = {
   findBowlingFigures,
   findRecentDeliveries,
   findFallOfWickets,
-  findCommentary
+  findCommentary,
+  findRecentCommentary
 };

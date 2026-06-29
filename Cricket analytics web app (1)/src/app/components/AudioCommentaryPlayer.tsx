@@ -12,13 +12,11 @@ export function AudioCommentaryPlayer({ matchId }: AudioPlayerProps) {
   
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(1); // 0.0 to 1.0
+  const [volume, setVolume] = useState(1);
 
-  // The base URL and endpoint structure from the integration guide
   const streamUrl = `https://live-audio-pipeline-106171733624.europe-west2.run.app/${matchId}/stream.m3u8`;
 
   useEffect(() => {
-    // Cleanup HLS instance on unmount
     return () => {
       if (hlsRef.current) {
         hlsRef.current.destroy();
@@ -34,11 +32,28 @@ export function AudioCommentaryPlayer({ matchId }: AudioPlayerProps) {
       audio.pause();
       setIsPlaying(false);
     } else {
-      // Initialize HLS only when user clicks play to save bandwidth
       if (!hlsRef.current) {
         if (Hls.isSupported()) {
-          const hls = new Hls();
+          // 🟢 ADDED RETRY LOGIC HERE
+          const hls = new Hls({
+            manifestLoadingMaxRetry: 10,     // 10 baar try karega
+            manifestLoadingRetryDelay: 3000, // Har 3 second baad
+          });
           hlsRef.current = hls;
+
+          // 🟢 ERROR HANDLER: 404 aane par retry karega
+          hls.on(Hls.Events.ERROR, (event, data) => {
+            if (data.fatal) {
+              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                console.warn("Audio processing, retrying in 3 seconds...");
+                setTimeout(() => hls.startLoad(), 3000);
+              } else {
+                hls.destroy();
+                setIsPlaying(false);
+              }
+            }
+          });
+
           hls.loadSource(streamUrl);
           hls.attachMedia(audio);
           hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -46,15 +61,11 @@ export function AudioCommentaryPlayer({ matchId }: AudioPlayerProps) {
             setIsPlaying(true);
           });
         } else if (audio.canPlayType('application/vnd.apple.mpegurl')) {
-          // Fallback for Safari native support
           audio.src = streamUrl;
-          audio.addEventListener('loadedmetadata', () => {
-            audio.play();
-            setIsPlaying(true);
-          });
+          audio.play();
+          setIsPlaying(true);
         }
       } else {
-        // Already initialized, just play
         audio.play();
         setIsPlaying(true);
       }
@@ -73,7 +84,6 @@ export function AudioCommentaryPlayer({ matchId }: AudioPlayerProps) {
     setVolume(newVolume);
     if (audioRef.current) {
       audioRef.current.volume = newVolume;
-      // Automatically unmute if volume is dragged above 0
       if (newVolume > 0 && isMuted) {
         audioRef.current.muted = false;
         setIsMuted(false);
@@ -83,10 +93,8 @@ export function AudioCommentaryPlayer({ matchId }: AudioPlayerProps) {
 
   return (
     <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-3 my-4 flex items-center justify-between shadow-sm">
-      {/* Hidden Audio Element */}
       <audio ref={audioRef} />
 
-      {/* Left Side: Play Button & Label */}
       <div className="flex items-center gap-3">
         <button
           onClick={togglePlay}
@@ -100,7 +108,6 @@ export function AudioCommentaryPlayer({ matchId }: AudioPlayerProps) {
         </div>
       </div>
 
-      {/* Right Side: Volume Controls */}
       <div className="flex items-center gap-2">
         <button onClick={toggleMute} className="text-gray-400 hover:text-white transition-colors">
           {isMuted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
@@ -117,4 +124,4 @@ export function AudioCommentaryPlayer({ matchId }: AudioPlayerProps) {
       </div>
     </div>
   );
-} 
+}

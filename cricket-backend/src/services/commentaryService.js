@@ -8,12 +8,11 @@ const COMMENTARY_AUDIENCE = process.env.COMMENTARY_AUDIENCE || 'https://ai-comme
 // Google Auth Client setup
 const auth = new GoogleAuth();
 
-exports.triggerDeliveryCommentary = async (matchId, deliveryId, userId) => {
+// 🟢 FIX: 'exports.' ki jagah 'const' use karein
+const triggerDeliveryCommentary = async (matchId, deliveryId, userId) => {
   try {
-    // 1. Private Cloud Run ke liye Auth Token Generate karein
     const client = await auth.getIdTokenClient(COMMENTARY_AUDIENCE);
 
-    // 2. Commentary API ko Trigger karein
     const response = await client.request({
       url: `${COMMENTARY_API_URL}/commentary/trigger-delivery`,
       method: 'POST',
@@ -36,11 +35,11 @@ exports.triggerDeliveryCommentary = async (matchId, deliveryId, userId) => {
     return response.data;
   } catch (error) {
     console.error('❌ Failed to trigger AI Commentary:', error.message);
-    // Ignore error so scoring workflow is not blocked
   }
 };
 
-exports.invalidateDeliveryCommentary = async (matchId, deliveryId) => {
+// 🟢 FIX: 'exports.' ki jagah 'const' use karein
+const invalidateDeliveryCommentary = async (matchId, deliveryId) => {
   try {
     const client = await auth.getIdTokenClient(COMMENTARY_AUDIENCE);
     const response = await client.request({
@@ -61,7 +60,6 @@ exports.invalidateDeliveryCommentary = async (matchId, deliveryId) => {
 };
 
 const generateVoicePreview = async (settings) => {
-  // Integration Doc ke hisaab se Cloud Run URL
   const targetUrl = 'https://commentary-audio-worker-106171733624.europe-west2.run.app/api/voice-preview';
 
   try {
@@ -69,9 +67,7 @@ const generateVoicePreview = async (settings) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // Headers requested by the audio integration document[cite: 1]
         'X-Audio-API-Key': process.env.AUDIO_API_KEY, 
-        // 'Authorization': `Bearer ${process.env.CLOUD_RUN_IDENTITY_TOKEN}` // Agar Auth required hai toh ise uncomment karein[cite: 1]
       },
       body: JSON.stringify(settings)
     });
@@ -87,7 +83,10 @@ const generateVoicePreview = async (settings) => {
     throw new Error('Failed to communicate with Audio Commentary Service');
   }
 };
+
+// 🟢 FIX: Saare functions ko yahan ek sath export karein
 module.exports = {
-  // ... existing exports
+  triggerDeliveryCommentary,
+  invalidateDeliveryCommentary,
   generateVoicePreview
 };

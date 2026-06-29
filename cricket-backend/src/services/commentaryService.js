@@ -59,3 +59,35 @@ exports.invalidateDeliveryCommentary = async (matchId, deliveryId) => {
     console.error('Failed to invalidate AI Commentary:', error.message);
   }
 };
+
+const generateVoicePreview = async (settings) => {
+  // Integration Doc ke hisaab se Cloud Run URL
+  const targetUrl = 'https://commentary-audio-worker-106171733624.europe-west2.run.app/api/voice-preview';
+
+  try {
+    const response = await fetch(targetUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // Headers requested by the audio integration document[cite: 1]
+        'X-Audio-API-Key': process.env.AUDIO_API_KEY, 
+        // 'Authorization': `Bearer ${process.env.CLOUD_RUN_IDENTITY_TOKEN}` // Agar Auth required hai toh ise uncomment karein[cite: 1]
+      },
+      body: JSON.stringify(settings)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Audio Service returned an error');
+    }
+
+    return data;
+  } catch (error) {
+    throw new Error('Failed to communicate with Audio Commentary Service');
+  }
+};
+module.exports = {
+  // ... existing exports
+  generateVoicePreview
+};

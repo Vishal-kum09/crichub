@@ -1,4 +1,6 @@
-import { Mic, Settings2, Sparkles, Volume2 } from 'lucide-react';
+import { useState } from 'react';
+import { Mic, Settings2, Sparkles, Volume2, Play, Loader2 } from 'lucide-react';
+import { toast } from '../../lib/toast';
 
 export interface AudioSettings {
   audio_enabled: boolean;
@@ -25,13 +27,15 @@ const PRESETS = {
 };
 
 export function AudioMatchSettings({ settings, onChange }: AudioMatchSettingsProps) {
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [audioElement] = useState(new Audio());
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     onChange({
       ...settings,
       [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : 
-               type === 'number' || type === 'range' ? parseFloat(value) : value
+                type === 'number' || type === 'range' ? parseFloat(value) : value
     });
   };
 
@@ -43,6 +47,41 @@ export function AudioMatchSettings({ settings, onChange }: AudioMatchSettingsPro
       tone: preset.tone,
       speaking_rate: preset.rate
     });
+  };
+
+  // Voice Preview Handler based on the integration document
+  const handlePreview = async () => {
+    setIsPreviewing(true);
+    try {
+      // Main app backend proxy call[cite: 1]
+      const response = await fetch('/api/scorer/audio/voice-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: settings.provider || 'gemini',
+          model: settings.provider_model || 'gemini-2.5-flash-tts',
+          voice: settings.provider_voice || 'Fenrir',
+          language: settings.language_code || 'en-GB',
+          character_key: settings.character_key || 'veteran',
+          tone: settings.tone || 'normal',
+          speaking_rate: settings.speaking_rate || 1.0,
+          character_prompt: settings.character_prompt || null
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Voice preview failed');
+
+      // Play the base64 audio[cite: 1]
+      audioElement.src = `data:${data.content_type};base64,${data.audio}`;
+      await audioElement.play();
+      
+      toast.success(data.cached ? "Played cached sample" : "New voice sample generated!");
+    } catch (err: any) {
+      toast.error(err.message || 'Preview failed. Check configuration.');
+    } finally {
+      setIsPreviewing(false);
+    }
   };
 
   return (
@@ -99,51 +138,57 @@ export function AudioMatchSettings({ settings, onChange }: AudioMatchSettingsPro
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Persona / Character */}
-          <div>
-            <label className="block text-xs font-black text-gray-500 uppercase mb-2">Commentator Persona</label>
-            <select name="character_key" value={settings.character_key} onChange={handleChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-gray-800 focus:outline-none focus:border-[#e60023]">
-              <option value="veteran">Veteran (Classic Broadcast)</option>
-              <option value="play_by_play">Play-by-Play (Action)</option>
-              <option value="analyst">Analyst (Tactical)</option>
-              <option value="stadium">Stadium Announcer</option>
-            </select>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+  
+  {/* Left Column (Persona & Voice Model) */}
+  <div className="space-y-6">
+    {/* Persona */}
+    <div>
+      <label className="block text-xs font-black text-gray-500 uppercase mb-2">Commentator Persona</label>
+      <select name="character_key" value={settings.character_key} onChange={handleChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-gray-800 focus:outline-none focus:border-[#e60023]">
+        <option value="veteran">Veteran (Classic Broadcast)</option>
+        <option value="play_by_play">Play-by-Play (Action)</option>
+        <option value="analyst">Analyst (Tactical)</option>
+        <option value="stadium">Stadium Announcer</option>
+      </select>
+    </div>
 
-          {/* Tone */}
-          <div>
-            <label className="block text-xs font-black text-gray-500 uppercase mb-2">Delivery Tone</label>
-            <select name="tone" value={settings.tone} onChange={handleChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-gray-800 focus:outline-none focus:border-[#e60023]">
-              <option value="normal">Normal</option>
-              <option value="calm">Calm & Analytical</option>
-              <option value="energetic">Energetic</option>
-              <option value="dramatic">Dramatic (High Tension)</option>
-            </select>
-          </div>
+    {/* Voice Model */}
+    <div>
+      <label className="block text-xs font-black text-gray-500 uppercase mb-2">Voice Model</label>
+      <select name="provider_voice" value={settings.provider_voice} onChange={handleChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-gray-800 focus:outline-none focus:border-[#e60023]">
+        <option value="Fenrir">Fenrir (Deep, Male)</option>
+        <option value="Kore">Kore (Clear, Female)</option>
+      </select>
+    </div>
+  </div>
 
-        
-          {/* Voice Model */}
-          <div>
-            <label className="block text-xs font-black text-gray-500 uppercase mb-2">Voice Model</label>
-            <select name="provider_voice" value={settings.provider_voice} onChange={handleChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-gray-800 focus:outline-none focus:border-[#e60023]">
-              <option value="Fenrir">Fenrir (Deep, Male)</option>
-              <option value="Kore">Kore (Clear, Female)</option>
-            </select>
-          </div>
+  {/* Right Column (Tone & Language) */}
+  <div className="space-y-6">
+    {/* Tone */}
+    <div>
+      <label className="block text-xs font-black text-gray-500 uppercase mb-2">Delivery Tone</label>
+      <select name="tone" value={settings.tone} onChange={handleChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-gray-800 focus:outline-none focus:border-[#e60023]">
+        <option value="normal">Normal</option>
+        <option value="calm">Calm & Analytical</option>
+        <option value="energetic">Energetic</option>
+        <option value="dramatic">Dramatic (High Tension)</option>
+      </select>
+    </div>
 
-          {/* Language */}
-          <div>
-            <label className="block text-xs font-black text-gray-500 uppercase mb-2">Language Dialect</label>
-            <select name="language_code" value={settings.language_code} onChange={handleChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-gray-800 focus:outline-none focus:border-[#e60023]">
-              <option value="en-GB">English (UK) - Recommended</option>
-              <option value="en-AU">English (Australia)</option>
-              <option value="en-IN">English (India)</option>
-              <option value="en-US">English (US)</option>
-            </select>
-          </div>
-        </div>
+    {/* Language */}
+    <div>
+      <label className="block text-xs font-black text-gray-500 uppercase mb-2">Language Dialect</label>
+      <select name="language_code" value={settings.language_code} onChange={handleChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-gray-800 focus:outline-none focus:border-[#e60023]">
+        <option value="en-GB">English (UK) - Default</option>
+        <option value="en-AU">English (Australia)</option>
+        <option value="en-IN">English (India)</option>
+        <option value="en-US">English (US)</option>
+      </select>
+    </div>
+  </div>
 
+</div>
         {/* Speaking Rate Slider */}
         <div className="mt-8 bg-gray-50 p-4 rounded-xl border border-gray-200">
           <div className="flex justify-between items-center mb-2">
@@ -169,19 +214,24 @@ export function AudioMatchSettings({ settings, onChange }: AudioMatchSettingsPro
           </div>
         </div>
 
-        {/* Advanced: Custom Prompt */}
-        <div className="mt-6">
-          <label className="block text-xs font-black text-gray-500 uppercase mb-2 flex items-center gap-1">
-            <Settings2 size={14} /> Advanced: Custom Instructions (Optional)
-          </label>
-          <textarea 
-            name="character_prompt"
-            value={settings.character_prompt || ''}
-            onChange={handleChange}
-            placeholder="e.g., Use heavy cricket jargon and always mention the bowler's pace..."
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-800 focus:outline-none focus:border-[#e60023] focus:ring-1 focus:ring-[#e60023] min-h-[80px] resize-none"
-          ></textarea>
+        {/* 🚀 Voice Preview Section */}
+        <div className="mt-8 p-4 bg-gray-50 border border-gray-200 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-xs font-semibold text-gray-500">
+            <span className="block font-black text-gray-800 uppercase mb-1">Preview Sample Line:</span>
+            "The bowler has the ball in hand, the batter is focused, and the field is waiting."
+          </div>
+          <button
+            type="button"
+            onClick={handlePreview}
+            disabled={isPreviewing}
+            className="shrink-0 flex items-center justify-center gap-2 px-5 py-2.5 bg-black hover:bg-gray-800 text-white text-xs font-black rounded-xl transition-all disabled:opacity-50"
+          >
+            {isPreviewing ? <Loader2 className="animate-spin" size={16} /> : <Play size={16} />}
+            {isPreviewing ? 'Generating Preview...' : 'Preview Voice'}
+          </button>
         </div>
+
+        
       </div>
     </div>
   );

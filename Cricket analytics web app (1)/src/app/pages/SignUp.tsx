@@ -13,40 +13,66 @@ interface ClubOption {
   id: string;
   name: string;
 }
+// 40 Countries List for Cricket
 const countryOptions = [
-  { value: 'gb', label: 'England' },
+  // Top Priority (Custom Order)
+  { value: 'gb-eng', label: 'England' },
   { value: 'in', label: 'India' },
   { value: 'ie', label: 'Ireland' },
   { value: 'gb-sct', label: 'Scotland' },
   { value: 'gb-wls', label: 'Wales' },
   { value: 'nl', label: 'Netherlands' },
+  
+  // Remaining 34 in Strictly Alphabetical Order
+  { value: 'af', label: 'Afghanistan' },
   { value: 'au', label: 'Australia' },
-  { value: 'pk', label: 'Pakistan' },
-  { value: 'za', label: 'South Africa' },
-  { value: 'nz', label: 'New Zealand' },
-  { value: 'wi', label: 'West Indies' },
-  { value: 'sl', label: 'Sri Lanka' },
+  { value: 'bh', label: 'Bahrain' },
   { value: 'bd', label: 'Bangladesh' },
-  { value: 'af', label: 'Afghanistan' },
-  { value: 'us', label: 'United States' },
+  { value: 'bm', label: 'Bermuda' },
   { value: 'ca', label: 'Canada' },
-  { value: 'ae', label: 'United Arab Emirates' },
-  { value: 'af', label: 'Afghanistan' },
-  { value: 'zw', label: 'Zimbabwe' },
-  { value: 'np', label: 'Nepal' },
-  { value: 'om', label: 'Oman' },
+  { value: 'fj', label: 'Fiji' },
+  { value: 'de', label: 'Germany' },
+  { value: 'hk', label: 'Hong Kong' },
+  { value: 'it', label: 'Italy' },
+  { value: 'je', label: 'Jersey' },
+  { value: 'ke', label: 'Kenya' },
   { value: 'kw', label: 'Kuwait' },
-  // ... aap baaki countries add kar sakte hain
+  { value: 'my', label: 'Malaysia' },
+  { value: 'mv', label: 'Maldives' },
+  { value: 'na', label: 'Namibia' },
+  { value: 'np', label: 'Nepal' },
+  { value: 'nz', label: 'New Zealand' },
+  { value: 'ng', label: 'Nigeria' },
+  { value: 'om', label: 'Oman' },
+  { value: 'pk', label: 'Pakistan' },
+  { value: 'pg', label: 'Papua New Guinea' },
+  { value: 'qa', label: 'Qatar' },
+  { value: 'rw', label: 'Rwanda' },
+  { value: 'sg', label: 'Singapore' },
+  { value: 'za', label: 'South Africa' },
+  { value: 'es', label: 'Spain' },
+  { value: 'sl', label: 'Sri Lanka' },
+  { value: 'tz', label: 'Tanzania' },
+  { value: 'ug', label: 'Uganda' },
+  { value: 'ae', label: 'United Arab Emirates' },
+  { value: 'us', label: 'United States' },
+  { value: 'vu', label: 'Vanuatu' },
+  { value: 'zw', label: 'Zimbabwe' }
 ];
+
+// Option UI with Flags
 const CountryOption = (props: any) => (
   <components.Option {...props}>
     <div style={{ display: 'flex', alignItems: 'center' }}>
-      <img src={`https://flagcdn.com/20x15/${props.data.value.toLowerCase()}.png`} alt={props.data.label} style={{ marginRight: 10 }} />
+      <img 
+        src={`https://flagcdn.com/20x15/${props.data.value.toLowerCase()}.png`} 
+        alt={props.data.label} 
+        style={{ marginRight: 10, width: 20, height: 15, objectFit: 'cover' }} 
+      />
       {props.data.label}
     </div>
   </components.Option>
 );
-
 export function SignUp({ onNavigate }: SignUpProps) {
   const [isClubRegistration, setIsClubRegistration] = useState(false);
   const [loading, setLoading] = useState(false);

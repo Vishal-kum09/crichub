@@ -88,6 +88,7 @@ app.use('/api/auth', require('./src/routes/authRoutes'));
 app.use('/api/viewer', require('./src/routes/viewerRoutes'));
 
 // Scorer routes
+
 app.use('/api/scorer', require('./src/routes/scorerRoutes'));
 
 // Club Admin routes

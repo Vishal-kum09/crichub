@@ -74,12 +74,18 @@ export function Sidebar({ currentPath, onNavigate, userRole, userName }: Sidebar
       icon: Users,
       label: 'Clubs',
       path: '/clubs',
-      roles: ['viewer'] as UserRole[]
+      roles: ['viewer','general_member'] as UserRole[]
     },
     {
       icon: Building2,
       label: 'Registered Clubs',
       path: '/registered-clubs',
+      roles: ['super_admin'] as UserRole[]
+    },
+    {
+      icon: Shield,
+      label: 'Super Admin',
+      path: '/super-admin',
       roles: ['super_admin'] as UserRole[]
     },
     {
@@ -92,13 +98,7 @@ export function Sidebar({ currentPath, onNavigate, userRole, userName }: Sidebar
       icon: Shield,
       label: 'Club Admin',
       path: '/admin',
-      roles: ['club_admin','super_admin'] as UserRole[]
-    },
-    {
-      icon: Shield,
-      label: 'Super Admin',
-      path: '/super-admin',
-      roles: ['super_admin'] as UserRole[]
+      roles: ['club_admin'] as UserRole[]
     },
     {
       icon: Bot,

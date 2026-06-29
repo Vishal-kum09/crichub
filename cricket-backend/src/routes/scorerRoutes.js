@@ -31,5 +31,6 @@ router.post('/matches/:id/undo', ctrl.undo);
 
 router.get('/matches/:id/audio-settings', ctrl.getAudioSettings);
 router.post('/matches/:id/audio-settings', ctrl.saveAudioSettings);
+router.post('/audio/voice-preview', ctrl.previewVoice);
 
 module.exports = router;

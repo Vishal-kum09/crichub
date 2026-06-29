@@ -297,13 +297,13 @@ export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
             <div className="space-y-6 animate-fadeIn">
               <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
                 <Landmark className="text-[#e60023]" size={22} />
-                <h2 className="text-xl font-black text-gray-900">Step 1: Administrative Schedule Dispatch</h2>
+                <h2 className="text-xl font-black text-gray-900">Match Details : </h2>
               </div>
               {matchId ? (
                 <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 text-center space-y-4">
-                  <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Locked Fixture Matches Matrix</p>
+                  <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Match Configuration</p>
                   <p className="text-2xl font-black text-gray-900">{teamA} <span className="text-red-500 text-lg font-normal">vs</span> {teamB}</p>
-                  <p className="text-xs text-gray-500 font-semibold bg-white border px-3 py-1.5 rounded-xl max-w-md mx-auto shadow-inner">📍 Operational Venue Locked: {venue} {ground ? `| ${ground}` : ''}</p>
+                  <p className="text-xs text-gray-500 font-semibold bg-white border px-3 py-1.5 rounded-xl max-w-md mx-auto shadow-inner">📍 Venue/Ground: {venue} {ground ? `| ${ground}` : ''}</p>
                 </div>
               ) : (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-xs font-bold text-yellow-800 flex items-center gap-2">

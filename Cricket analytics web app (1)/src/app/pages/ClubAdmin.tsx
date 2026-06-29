@@ -5,6 +5,8 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { Input } from '../components/Input';
 import { toast } from '../../lib/toast';
+import Select, { components } from 'react-select';
+import { getCountries } from 'country-list';
 import { api } from '../../lib/api'; 
 import {
   getPendingApprovals,
@@ -28,7 +30,127 @@ import {
   type ClubTeam,
 } from '../../lib/adminApi';
 
+// 40 Countries Phone Codes List
+const phoneCodeOptions = [
+  // Top Priority (Custom Order)
+  { value: 'gb', dialCode: '+44', name: 'England' },
+  { value: 'in', dialCode: '+91', name: 'India' },
+  { value: 'ie', dialCode: '+353', name: 'Ireland' },
+  { value: 'gb-sct', dialCode: '+44', name: 'Scotland' },
+  { value: 'gb-wls', dialCode: '+44', name: 'Wales' },
+  { value: 'nl', dialCode: '+31', name: 'Netherlands' },
+  
+  // Remaining 34 Alphabetical Order
+  { value: 'af', dialCode: '+93', name: 'Afghanistan' },
+  { value: 'au', dialCode: '+61', name: 'Australia' },
+  { value: 'bh', dialCode: '+973', name: 'Bahrain' },
+  { value: 'bd', dialCode: '+880', name: 'Bangladesh' },
+  { value: 'bm', dialCode: '+1441', name: 'Bermuda' },
+  { value: 'ca', dialCode: '+1', name: 'Canada' },
+  { value: 'fj', dialCode: '+679', name: 'Fiji' },
+  { value: 'de', dialCode: '+49', name: 'Germany' },
+  { value: 'hk', dialCode: '+852', name: 'Hong Kong' },
+  { value: 'it', dialCode: '+39', name: 'Italy' },
+  { value: 'je', dialCode: '+44', name: 'Jersey' },
+  { value: 'ke', dialCode: '+254', name: 'Kenya' },
+  { value: 'kw', dialCode: '+965', name: 'Kuwait' },
+  { value: 'my', dialCode: '+60', name: 'Malaysia' },
+  { value: 'mv', dialCode: '+960', name: 'Maldives' },
+  { value: 'na', dialCode: '+264', name: 'Namibia' },
+  { value: 'np', dialCode: '+977', name: 'Nepal' },
+  { value: 'nz', dialCode: '+64', name: 'New Zealand' },
+  { value: 'ng', dialCode: '+234', name: 'Nigeria' },
+  { value: 'om', dialCode: '+968', name: 'Oman' },
+  { value: 'pk', dialCode: '+92', name: 'Pakistan' },
+  { value: 'pg', dialCode: '+675', name: 'Papua New Guinea' },
+  { value: 'qa', dialCode: '+974', name: 'Qatar' },
+  { value: 'rw', dialCode: '+250', name: 'Rwanda' },
+  { value: 'sg', dialCode: '+65', name: 'Singapore' },
+  { value: 'za', dialCode: '+27', name: 'South Africa' },
+  { value: 'es', dialCode: '+34', name: 'Spain' },
+  { value: 'sl', dialCode: '+94', name: 'Sri Lanka' },
+  { value: 'tz', dialCode: '+255', name: 'Tanzania' },
+  { value: 'ug', dialCode: '+256', name: 'Uganda' },
+  { value: 'ae', dialCode: '+971', name: 'United Arab Emirates' },
+  { value: 'us', dialCode: '+1', name: 'United States' },
+  { value: 'vu', dialCode: '+678', name: 'Vanuatu' },
+  { value: 'zw', dialCode: '+263', name: 'Zimbabwe' }
+];
 
+const formatPhoneCodeLabel = (data: any, { context }: { context: string }) => (
+  <div style={{ display: 'flex', alignItems: 'center' }}>
+    <img 
+      src={`https://flagcdn.com/20x15/${data.value.toLowerCase()}.png`} 
+      alt={data.name} 
+      style={{ width: '20px', height: '15px', marginRight: '8px', objectFit: 'cover' }} 
+    />
+    <span className="font-medium text-gray-800">
+      {/* Agar dropdown open hai toh Name + Code, nahi toh sirf Code */}
+      {context === 'menu' ? `${data.name} (${data.dialCode})` : data.dialCode}
+    </span>
+  </div>
+);
+
+// 40 Countries List for Cricket
+const countryOptions = [
+  // Top Priority (Custom Order)
+  { value: 'gb-eng', label: 'England' },
+  { value: 'in', label: 'India' },
+  { value: 'ie', label: 'Ireland' },
+  { value: 'gb-sct', label: 'Scotland' },
+  { value: 'gb-wls', label: 'Wales' },
+  { value: 'nl', label: 'Netherlands' },
+  
+  // Remaining 34 in Strictly Alphabetical Order
+  { value: 'af', label: 'Afghanistan' },
+  { value: 'au', label: 'Australia' },
+  { value: 'bh', label: 'Bahrain' },
+  { value: 'bd', label: 'Bangladesh' },
+  { value: 'bm', label: 'Bermuda' },
+  { value: 'ca', label: 'Canada' },
+  { value: 'fj', label: 'Fiji' },
+  { value: 'de', label: 'Germany' },
+  { value: 'hk', label: 'Hong Kong' },
+  { value: 'it', label: 'Italy' },
+  { value: 'je', label: 'Jersey' },
+  { value: 'ke', label: 'Kenya' },
+  { value: 'kw', label: 'Kuwait' },
+  { value: 'my', label: 'Malaysia' },
+  { value: 'mv', label: 'Maldives' },
+  { value: 'na', label: 'Namibia' },
+  { value: 'np', label: 'Nepal' },
+  { value: 'nz', label: 'New Zealand' },
+  { value: 'ng', label: 'Nigeria' },
+  { value: 'om', label: 'Oman' },
+  { value: 'pk', label: 'Pakistan' },
+  { value: 'pg', label: 'Papua New Guinea' },
+  { value: 'qa', label: 'Qatar' },
+  { value: 'rw', label: 'Rwanda' },
+  { value: 'sg', label: 'Singapore' },
+  { value: 'za', label: 'South Africa' },
+  { value: 'es', label: 'Spain' },
+  { value: 'sl', label: 'Sri Lanka' },
+  { value: 'tz', label: 'Tanzania' },
+  { value: 'ug', label: 'Uganda' },
+  { value: 'ae', label: 'United Arab Emirates' },
+  { value: 'us', label: 'United States' },
+  { value: 'vu', label: 'Vanuatu' },
+  { value: 'zw', label: 'Zimbabwe' }
+];
+
+// Option UI with Flags
+const CountryOption = (props: any) => (
+  <components.Option {...props}>
+    <div style={{ display: 'flex', alignItems: 'center' }}>
+      <img 
+        src={`https://flagcdn.com/20x15/${props.data.value.toLowerCase()}.png`} 
+        alt={props.data.label} 
+        style={{ marginRight: 10, width: 20, height: 15, objectFit: 'cover' }} 
+      />
+      {props.data.label}
+    </div>
+  </components.Option>
+);
 
 const managedQuery = (managedClubId?: string, extra: Record<string, any> = {}) => {
   const params: Record<string, any> = {};
@@ -65,7 +187,9 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
   const [teamPlayerSearch, setTeamPlayerSearch] = useState('');
   const [matchTeamSearch, setMatchTeamSearch] = useState('');
   const [matchTeamPlayers, setMatchTeamPlayers] = useState<RosterMember[]>([]);
-  const [teamForm, setTeamForm] = useState({ name: '', short_name: '', logo_url: '', home_ground: '', country: 'India' });
+  const [teamForm, setTeamForm] = useState({ name: '', short_name: '', logo_url: '', home_ground: '', country: 'gb' });
+  const [country, setCountry] = useState('gb'); // Default England
+  
   
   const [incomingInvites, setIncomingInvites] = useState<any[]>([]);
   const [selectedInvite, setSelectedInvite] = useState<any | null>(null);
@@ -79,7 +203,7 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
   const [inviteScorerId, setInviteScorerId] = useState<string>('');
 
   const [assignScorerId, setAssignScorerId] = useState<Record<string, string>>({});
-  const [countryCode, setCountryCode] = useState('+91'); 
+  const [countryCode, setCountryCode] = useState('gb'); 
   const goBack = () => {
   if (managedClubId) {
     window.location.href = '/registered-clubs';
@@ -89,12 +213,12 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
   const [playerForm, setPlayerForm] = useState({ 
     firstName: '', lastName: '', displayName: '', contactNumber: '', gender: 'male',
     jerseyNumber: '', dateOfBirth: '', battingStyle: 'right_hand_bat',
-    bowlingStyle: 'right_arm_fast', primaryRole: 'batter', nationality: 'India'
+    bowlingStyle: 'right_arm_fast', primaryRole: 'batter', nationality: ''
   });
 
   const [matchForm, setMatchForm] = useState({ 
     matchDateTime: new Date(), format: '', ballType: '', oversPerMatch: '', 
-    venue: '', pitchNum: '', venueNeutral: false, city: '', country: '',address:'',postcode:'',
+    venue: '', pitchNum: '', venueNeutral: false, city: '', country: 'gb',address:'',postcode:'',
     opponentClubId: '', selectedSquadIds: [] as string[], assignedScorerId: '' 
     , team1Id: '', team2Id: '',
     wideCountsAsBall: false,
@@ -255,7 +379,7 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
       } as any, managedClubId);
 
       toast.success(`Player registered!`);
-      setPlayerForm({ firstName: '', lastName: '', displayName: '', contactNumber: '', gender: 'male', jerseyNumber: '', dateOfBirth: '', battingStyle: 'right_hand_bat', bowlingStyle: 'right_arm_fast', primaryRole: 'batter', nationality: 'India' });
+      setPlayerForm({ firstName: '', lastName: '', displayName: '', contactNumber: '', gender: 'male', jerseyNumber: '', dateOfBirth: '', battingStyle: 'right_hand_bat', bowlingStyle: 'right_arm_fast', primaryRole: 'batter', nationality: '' });
       setShowAddPlayerForm(false);
       getRosterPlayers().then((data: any) => setMyPlayers(data.players || data)).catch(() => {});
     } catch (err: any) { toast.error('Failed to onboard player'); }
@@ -285,7 +409,7 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
   };
 
   const resetTeamForm = () => {
-    setTeamForm({ name: '', short_name: '', logo_url: '', home_ground: '', country: 'India' });
+    setTeamForm({ name: '', short_name: '', logo_url: '', home_ground: '', country: 'gb' });
     setEditingTeamId(null);
     setSelectedTeamId(null);
     setTeamPlayers([]);
@@ -305,7 +429,7 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
       short_name: team.short_name || '',
       logo_url: team.logo_url || '',
       home_ground: team.home_ground || '',
-      country: team.country || 'India'
+      country: team.country || ''
     });
     setShowTeamForm(true);
     loadTeamPlayers(team.id);
@@ -479,11 +603,7 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
       </div>
     )}
     <div className="space-y-6 text-black w-full px-2 sm:px-4 max-w-7xl mx-auto">
-      {/* Header Panel */}
-      <div className="bg-gradient-to-r from-[#e60023] to-[#c41e3a] rounded-2xl p-5 md:p-6 text-white shadow-md">
-        <h1 className="text-2xl md:text-3xl font-black tracking-tight">Club Administration Console</h1>
-        <p className="text-xs md:text-sm text-white/80 mt-1">Manage operations, approval queries, schedules and player rosters</p>
-      </div>
+     <div></div>
 
       {/* Tabs */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
@@ -862,7 +982,7 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
         {activeTab === 'create-match' && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3">
-              <h2 className="text-lg font-black text-gray-900">Create Match Configuration</h2>
+              <h2 className="text-lg font-black text-gray-900">Create Match</h2>
               <div className="flex items-center gap-1.5 text-[10px] font-black text-gray-400">
                 <span className={`px-2 py-0.5 rounded-md ${wizardStep === 1 ? 'bg-[#e60023] text-white shadow-sm' : 'bg-gray-100'}`}>1. DETAILS</span>
                 <span className={`px-2 py-0.5 rounded-md ${wizardStep === 2 ? 'bg-[#e60023] text-white shadow-sm' : 'bg-gray-100'}`}>2. SQUAD ({matchForm.selectedSquadIds.length})</span>
@@ -1010,14 +1130,17 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
       </div>
       <div>
         <label className="block text-xs font-black text-gray-500 uppercase mb-1">Country *</label>
-        <input 
-          type="text" 
-          placeholder="Country" 
-          required 
-          value={matchForm.country} 
-          onChange={(e) => setMatchForm({ ...matchForm, country: e.target.value })}
-          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#e60023] placeholder:text-gray-300 transition-all"
-        />
+        <Select
+      options={countryOptions}
+      components={{ Option: CountryOption, SingleValue: CountryOption }}
+      value={countryOptions.find(c => c.value === country)}
+      onChange={(selected: any) => setCountry(selected.value)}
+      isSearchable={false}
+      className="text-sm"
+      styles={{
+        control: (provided) => ({ ...provided, borderRadius: '0.75rem', padding: '2px', borderColor: '#d1d5db' })
+      }}
+    />
       </div>
       <div>
         <label className="block text-xs font-black text-gray-500 uppercase mb-1">PostCode / ZIP *</label>
@@ -1108,102 +1231,105 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
               </div>
             )}
             {wizardStep === 2 && (
-              <div className="space-y-4 animate-fadeIn">
-                <div className="bg-gray-50 border border-gray-200 p-3 rounded-xl text-xs text-gray-500 font-semibold">
-                  <h4 className="font-extrabold text-gray-900 mb-0.5">Team Members</h4>
-                  <p>Players are loaded from the selected team. Add extra club players here when the squad changes.</p>
-                </div>
-                {matchTeamPlayers.length === 0 ? (
-                  <div className="text-center py-6 text-xs text-gray-400 font-bold">Selected team has no players yet.</div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto p-1">
-                    {matchTeamPlayers.map((player) => (
-                      <div key={player.id} className="p-3 border rounded-xl flex items-center justify-between bg-white border-gray-200">
-                        <div>
-                          <p className="text-xs text-gray-900 font-bold">{player.name}</p>
-                          <p className="text-[10px] text-gray-400 capitalize">{player.role || 'Player'} | Below 18: {player.below_18 ? 'Yes' : 'No'}</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!matchForm.team1Id) return;
-                            removePlayerFromClubTeam(matchForm.team1Id, player.id)
-                              .then(() => loadMatchTeamPlayers(matchForm.team1Id))
-                              .catch(() => toast.error('Could not remove player from team.'));
-                          }}
-                          className="p-1 text-gray-400 hover:text-[#e60023]"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="border border-gray-100 rounded-xl overflow-hidden">
-                  <div className="p-3 bg-gray-50 border-b border-gray-100 space-y-2">
-                    <h5 className="text-xs font-black text-gray-900">Add Other Club Player</h5>
-                    <div className="relative">
-                      <Search className="absolute left-2.5 top-2.5 text-gray-400" size={14} />
-                      <Input type="text" value={matchTeamSearch} onChange={(e) => setMatchTeamSearch(e.target.value)} placeholder="Search players..." className="pl-8 text-xs" />
-                    </div>
-                  </div>
-                  <div className="divide-y divide-gray-100 max-h-48 overflow-y-auto">
-                    {filteredMatchTeamCandidates.length === 0 ? (
-                      <div className="p-4 text-xs text-gray-400 font-bold text-center">No matching players available.</div>
-                    ) : filteredMatchTeamCandidates.map((player) => (
-                      <div key={player.id} className="p-3 flex items-center justify-between gap-3 hover:bg-gray-50/50">
-                        <div>
-                          <p className="text-xs font-extrabold text-gray-900">{player.name}</p>
-                          <p className="text-[10px] text-gray-400 capitalize">{player.role || 'Player'} | Below 18: {player.below_18 ? 'Yes' : 'No'}</p>
-                        </div>
-                        <Button
-                          type="button"
-                          onClick={() => {
-                            if (!matchForm.team1Id) { toast.error('Select team first.'); return; }
-                            addPlayerToClubTeam(matchForm.team1Id, player.id)
-                              .then(() => loadMatchTeamPlayers(matchForm.team1Id))
-                              .catch(() => toast.error('Could not add player to team.'));
-                          }}
-                          variant="secondary"
-                          className="text-[10px] py-1 px-2 rounded-lg font-black"
-                        >
-                          Add
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <Button onClick={() => setWizardStep(1)} variant="secondary" className="flex-1 flex items-center justify-center gap-1 text-xs font-bold py-2.5 rounded-xl"><ArrowLeft size={14} /> Back</Button>
-                  <Button onClick={() => {
-                    if (matchForm.selectedSquadIds.length === 0) { toast.error("Selected team has no players."); return; }
-                    setWizardStep(3);
-                  }} variant="primary" className="flex-1 flex items-center justify-center gap-1 text-xs font-bold py-2.5 rounded-xl bg-[#e60023] text-white border-none">Assign Match Scorer <ArrowRight size={14} /></Button>
-                </div>
-              </div>
-            )}
-            {wizardStep === 3 && (
-              <form onSubmit={handleCreateMatchFinalSubmission} className="space-y-4 animate-fadeIn">
+  <div className="space-y-4 animate-fadeIn">
+    {/* Info Box */}
+    <div className="bg-gray-50 border border-gray-200 p-3 rounded-xl text-xs text-gray-500 font-semibold">
+      <h4 className="font-extrabold text-gray-900 mb-0.5">Team Members</h4>
+      <p>Players are loaded from the selected team. Add extra club players here when the squad changes.</p>
+    </div>
+
+    {/* 🚀 SIDE-BY-SIDE GRID WRAPPER */}
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      
+      {/* Column 1: Team Members */}
+      <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
+        <div className="p-3 bg-gray-50 border-b border-gray-100 font-black text-xs text-gray-900">Current Squad</div>
+        {matchTeamPlayers.length === 0 ? (
+          <div className="text-center py-6 text-xs text-gray-400 font-bold">No players added.</div>
+        ) : (
+          <div className="max-h-80 overflow-y-auto p-2 space-y-2">
+            {matchTeamPlayers.map((player) => (
+              <div key={player.id} className="p-3 border rounded-xl flex items-center justify-between bg-white border-gray-200">
                 <div>
-                  <label className="block text-xs font-black text-gray-500 uppercase mb-2">Assign Official Match Scorer *</label>
-                  <select value={matchForm.assignedScorerId} onChange={(e) => setMatchForm({ ...matchForm, assignedScorerId: e.target.value })} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white text-xs font-bold text-gray-800 focus:outline-none" required>
-                    <option value="">-- Choose Registered Scorer from List --</option>
-                    {myScorers.map((scorer) => (
-                      <option key={scorer.id} value={scorer.id}>{scorer.name} ({scorer.email})</option>
-                    ))}
-                  </select>
+                  <p className="text-xs text-gray-900 font-bold">{player.name}</p>
+                  <p className="text-[10px] text-gray-400 capitalize">{player.role} | Below 18: {player.below_18 ? 'Yes' : 'No'}</p>
                 </div>
-                <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl text-xs space-y-1.5 text-gray-500 font-semibold shadow-inner">
-                  <h5 className="font-extrabold text-gray-800 flex items-center gap-1 mb-1 text-sm"><ShieldCheck className="text-green-600" size={16} /> Summary Checklist Telemetry</h5>
-                  <p>• <span className="font-extrabold text-gray-700">Format Structure:</span> {matchForm.format} Match | <span className="capitalize">{matchForm.ballType}</span> Ball</p>
-                  <p>• <span className="font-extrabold text-gray-700">Venue Ground:</span> {matchForm.venue}, {matchForm.city} on {matchForm.matchDateTime.toLocaleDateString()} @ {matchForm.matchDateTime.toLocaleTimeString()}</p>
-                </div>
-                <div className="flex gap-2">
-                  <Button type="button" onClick={() => setWizardStep(2)} variant="secondary" className="flex-1 flex items-center justify-center gap-1 text-xs font-bold py-2.5 rounded-xl"><ArrowLeft size={14} /> Back</Button>
-                  <Button type="submit" variant="primary" className="flex-1 shadow-md bg-green-600 hover:bg-green-700 text-white font-bold text-xs py-2.5 rounded-xl border-none">Schedule Active Match</Button>
-                </div>
-              </form>
-            )}
+                <button onClick={() => removePlayerFromClubTeam(matchForm.team1Id, player.id).then(() => loadMatchTeamPlayers(matchForm.team1Id))} className="p-1 text-gray-400 hover:text-[#e60023]">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Column 2: Search & Add */}
+      <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
+        <div className="p-3 bg-gray-50 border-b border-gray-100 space-y-2">
+          <h5 className="text-xs font-black text-gray-900">Add Other Club Player</h5>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 text-gray-400" size={14} />
+            <Input type="text" value={matchTeamSearch} onChange={(e) => setMatchTeamSearch(e.target.value)} placeholder="Search players..." className="pl-8 text-xs" />
+          </div>
+        </div>
+        <div className="divide-y divide-gray-100 max-h-80 overflow-y-auto">
+          {filteredMatchTeamCandidates.length === 0 ? (
+            <div className="p-4 text-xs text-gray-400 font-bold text-center">No players available.</div>
+          ) : filteredMatchTeamCandidates.map((player) => (
+            <div key={player.id} className="p-3 flex items-center justify-between gap-3 hover:bg-gray-50/50">
+              <div>
+                <p className="text-xs font-extrabold text-gray-900">{player.name}</p>
+                <p className="text-[10px] text-gray-400 capitalize">{player.role} | Below 18: {player.below_18 ? 'Yes' : 'No'}</p>
+              </div>
+              <Button onClick={() => addPlayerToClubTeam(matchForm.team1Id, player.id).then(() => loadMatchTeamPlayers(matchForm.team1Id))} variant="secondary" className="text-[10px] py-1 px-2 rounded-lg font-black">Add</Button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    {/* Buttons */}
+    <div className="flex gap-2 pt-2">
+      <Button onClick={() => setWizardStep(1)} variant="secondary" className="flex-1 text-xs font-bold py-2.5 rounded-xl"><ArrowLeft size={14} /> Back</Button>
+      <Button onClick={() => { if (matchForm.selectedSquadIds.length === 0) { toast.error("Selected team has no players."); return; } setWizardStep(3); }} variant="primary" className="flex-1 text-xs font-bold py-2.5 rounded-xl bg-[#e60023] text-white">Assign Match Scorer <ArrowRight size={14} /></Button>
+    </div>
+  </div>
+)}
+            {wizardStep === 3 && (
+  <form onSubmit={handleCreateMatchFinalSubmission} className="space-y-4 animate-fadeIn">
+    <div>
+      <label className="block text-xs font-black text-gray-500 uppercase mb-2">
+        Assign Official Match Scorer
+      </label>
+      <select 
+        value={matchForm.assignedScorerId} 
+        onChange={(e) => setMatchForm({ ...matchForm, assignedScorerId: e.target.value })} 
+        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white text-xs font-bold text-gray-800 focus:outline-none focus:border-[#e60023]" 
+        // 'required' attribute hata diya hai 👈
+      >
+        <option value="">-- No Scorer Assigned Yet --</option>
+        {myScorers.map((scorer) => (
+          <option key={scorer.id} value={scorer.id}>{scorer.name} ({scorer.email})</option>
+        ))}
+      </select>
+    </div>
+
+    <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl text-xs space-y-1.5 text-gray-500 font-semibold shadow-inner">
+      <h5 className="font-extrabold text-gray-800 flex items-center gap-1 mb-1 text-sm">
+        <ShieldCheck className="text-green-600" size={16} /> Summary 
+      </h5>
+      <p>• <span className="font-extrabold text-gray-700">Format Structure:</span> {matchForm.format} Match | <span className="capitalize">{matchForm.ballType}</span> Ball</p>
+      <p>• <span className="font-extrabold text-gray-700">Venue Ground:</span> {matchForm.venue}, {matchForm.city} on {matchForm.matchDateTime.toLocaleDateString()} @ {matchForm.matchDateTime.toLocaleTimeString()}</p>
+      {/* Scorer Status Dynamic Display */}
+      <p>• <span className="font-extrabold text-gray-700">Assigned Scorer:</span> {myScorers.find(s => s.id === matchForm.assignedScorerId)?.name || <span className="text-orange-500 italic">Pending Assignment</span>}</p>
+    </div>
+
+    <div className="flex gap-2">
+      <Button type="button" onClick={() => setWizardStep(2)} variant="secondary" className="flex-1 flex items-center justify-center gap-1 text-xs font-bold py-2.5 rounded-xl"><ArrowLeft size={14} /> Back</Button>
+      <Button type="submit" variant="primary" className="flex-1 shadow-md bg-green-600 hover:bg-green-700 text-white font-bold text-xs py-2.5 rounded-xl border-none">Schedule Active Match</Button>
+    </div>
+  </form>
+)}
           </div>
         )}
 
@@ -1254,7 +1380,7 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
                 <div className="flex justify-between items-center bg-gray-50 border border-gray-200 p-3 rounded-xl gap-2">
                   <div>
                     <h4 className="text-xs font-black text-gray-900">Total Club Registered Players: {myPlayers.length}</h4>
-                    <p className="text-[10px] text-gray-400 font-semibold">Active squad list directly loaded from players table.</p>
+                    <p className="text-[10px] text-gray-400 font-semibold">Active squad list</p>
                   </div>
                   <Button onClick={() => setShowAddPlayerForm(!showAddPlayerForm)} variant={showAddPlayerForm ? 'secondary' : 'primary'} className="text-[11px] py-1.5 px-3 flex items-center gap-1 font-black bg-[#e60023] text-white rounded-lg shadow-sm border-none">
                     <UserPlus size={14} /> {showAddPlayerForm ? 'Close Form' : 'Add New Player'}
@@ -1263,7 +1389,7 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
                 {showAddPlayerForm && (
                   <form onSubmit={handleAddPlayerSubmit} className="bg-red-50/10 border border-red-100 rounded-2xl p-4 md:p-5 space-y-4 shadow-inner animate-fadeIn">
                     <div className="flex items-center gap-1 text-[#e60023] font-black text-xs border-b pb-2 border-red-100/60 uppercase tracking-wider">
-                      <UserPlus size={16} /> Direct Database Player Profile Allocation
+                      <UserPlus size={16} /> Player Registration
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                       <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-1">First Name *</label><Input type="text" placeholder="e.g., Virat" required value={playerForm.firstName} onChange={(e) => setPlayerForm({ ...playerForm, firstName: e.target.value })} /></div>
@@ -1289,14 +1415,69 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
                       <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Primary Role *</label><select value={playerForm.primaryRole} onChange={(e) => setPlayerForm({ ...playerForm, primaryRole: e.target.value })} className="w-full p-2.5 border border-gray-200 rounded-xl bg-white text-xs font-bold focus:outline-none" required><option value="batter">Pure Batsman</option><option value="bowler">Specialist Bowler</option><option value="all_rounder">All-Rounder Combo</option><option value="wicket_keeper">Wicketkeeper Batsman</option></select></div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
+                      <div className="space-y-1">
                         <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Contact Mobile Number *</label>
                         <div className="flex gap-1 w-full">
-                          <select value={countryCode} onChange={(e) => setCountryCode(e.target.value)} className="px-2 border border-gray-200 rounded-xl bg-gray-50 text-[11px] font-black focus:outline-none"><option value="+91">🇮🇳 +91</option><option value="+1">🇺🇸 +1</option></select>
-                          <div className="flex-1"><Input type="tel" placeholder="Enter mobile number" required value={playerForm.contactNumber} onChange={(e) => setPlayerForm({ ...playerForm, contactNumber: e.target.value })} /></div>
+                          <div className="w-[120px]"><Select
+        options={phoneCodeOptions}
+        formatOptionLabel={formatPhoneCodeLabel}
+        value={phoneCodeOptions.find(c => c.dialCode === countryCode)}
+        onChange={(selected: any) => setCountryCode(selected.dialCode)}
+        isSearchable={false}
+        className="text-[11px]"
+        styles={{
+          control: (base) => ({
+            ...base,
+            minHeight: '42px',
+            height: '42px',
+            borderRadius: '0.75rem',
+            borderColor: '#e5e7eb',
+            boxShadow: 'none',
+            cursor: 'pointer',
+            fontSize: '11px',
+            '&:hover': { borderColor: '#e60023' }
+          }),
+          valueContainer: (base) => ({
+            ...base,
+            padding: '0 8px',
+          }),
+          indicatorSeparator: () => ({ display: 'none' }),
+        }}
+      /></div>
+      <div className="flex-1">
+      <Input
+        type="tel"
+        placeholder="Enter mobile number"
+        required
+        value={playerForm.contactNumber}
+        onChange={(e) => setPlayerForm({ ...playerForm, contactNumber: e.target.value.replace(/\D/g, '') })}
+      />
+    </div>
                         </div>
                       </div>
-                      <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Nationality</label><Input type="text" placeholder="India" value={playerForm.nationality} onChange={(e) => setPlayerForm({ ...playerForm, nationality: e.target.value })} /></div>
+                      <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Nationality</label>
+                      <Select
+      options={countryOptions} // Wahi 40 countries ki list
+      CountryOption={CountryOption} // Wahi formatter jo flag dikhata hai
+      value={countryOptions.find(c => c.value === (playerForm.nationality || 'gb-eng'))}      
+      onChange={(selected: any) => setPlayerForm({ ...playerForm, nationality: selected.label })}
+      isSearchable={false}
+      className="text-sm"
+      styles={{
+        control: (base) => ({
+          ...base,
+          minHeight: '42px',
+          height: '42px',
+          borderRadius: '0.75rem',
+          borderColor: '#e5e7eb',
+          boxShadow: 'none',
+          cursor: 'pointer',
+          '&:hover': { borderColor: '#e60023' }
+        }),
+        valueContainer: (base) => ({ ...base, padding: '0 12px' }),
+        indicatorSeparator: () => ({ display: 'none' }),
+      }}
+    />                     </div>
                     </div>
                     <div className="pt-2 flex justify-end gap-2 text-xs">
                       <Button type="button" onClick={() => setShowAddPlayerForm(false)} variant="secondary" className="py-2 px-4 rounded-xl">Cancel</Button>
@@ -1309,7 +1490,7 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200 text-gray-400 font-bold uppercase">
                         <th className="py-3 px-4">Player Name</th>
-                        <th className="py-3 px-4">Role Matrix</th>
+                        <th className="py-3 px-4">Role</th>
                         <th className="py-3 px-4 text-center">Contact Info</th>
                         <th className="py-3 px-4 text-center">Status</th>
                         <th className="py-3 px-4 text-right">Actions</th>
@@ -1387,7 +1568,7 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
                       <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Short Name</label><Input type="text" value={teamForm.short_name} onChange={(e) => setTeamForm({ ...teamForm, short_name: e.target.value })} placeholder="LXI" /></div>
                       <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Logo URL</label><Input type="url" value={teamForm.logo_url} onChange={(e) => setTeamForm({ ...teamForm, logo_url: e.target.value })} placeholder="https://..." /></div>
                       <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Home Ground</label><Input type="text" value={teamForm.home_ground} onChange={(e) => setTeamForm({ ...teamForm, home_ground: e.target.value })} placeholder="Main Oval" /></div>
-                      <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Country</label><Input type="text" value={teamForm.country} onChange={(e) => setTeamForm({ ...teamForm, country: e.target.value })} placeholder="India" /></div>
+                      <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Country</label><Input type="text" value={teamForm.country} onChange={(e) => setTeamForm({ ...teamForm, country: e.target.value })} placeholder="" /></div>
                     </div>
                     <div className="flex justify-end gap-2">
                       <Button type="submit" variant="primary" className="bg-[#e60023] hover:bg-red-700 text-white font-black py-2 px-6 rounded-xl border-none shadow-sm">
@@ -1480,7 +1661,7 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
                 <table className="w-full text-xs text-left whitespace-nowrap">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200 text-gray-400 font-bold uppercase">
-                      <th className="py-3 px-4">Scorer Identity</th>
+                      <th className="py-3 px-4">Officials Identity</th>
                       <th className="py-3 px-4">Email</th>
                       <th className="py-3 px-4 text-center">Status</th>
                     </tr>

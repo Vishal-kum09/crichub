@@ -3,6 +3,7 @@
 // the central errorHandler. All ids are UUIDs in the live schema.
 const { z } = require('zod');
 const scorerService = require('../services/scorerService');
+const commentaryService = require('../services/commentaryService');
 const { AppError } = require('../middlewares/errorHandler');
 
 const uuid = z.string().uuid();
@@ -67,6 +68,19 @@ const StartSecondInningsSchema = z.object({
 }).default({});
 
 const UndoSchema = z.object({ innings_id: uuid.optional() }).default({});
+
+// 🎙️ AI Audio Commentary Schemas
+const VoicePreviewSchema = z.object({
+  provider: z.string().optional(),
+  model: z.string().optional(),
+  voice: z.string().optional(),
+  language: z.string().optional(),
+  character_key: z.string().optional(),
+  tone: z.string().optional(),
+  speaking_rate: z.number().min(0.5).max(1.5).optional(),
+  character_prompt: z.string().nullable().optional()
+});
+
 
 // ─── handlers ───────────────────────────────────────────────────────────────
 
@@ -180,6 +194,21 @@ const saveAudioSettings = async (req, res) => {
     res.status(400).json({ success: false, error: error.message });
   }
 };
+
+const previewVoice = async (req, res, next) => {
+  try {
+    // Validate incoming settings against the Zod schema
+    const settings = VoicePreviewSchema.parse(req.body);
+    
+    // Call the service function to generate the preview
+    const previewData = await commentaryService.generateVoicePreview(settings);
+    
+    res.json(previewData);
+  } catch (error) {
+    next(error); // Pass error to the central handler
+  }
+};
+
 module.exports = {
   getAudioSettings,
   saveAudioSettings,
@@ -195,5 +224,7 @@ module.exports = {
   BallInputSchema,
   WicketWizardSchema,
   InitializeSchema,
-  StartSecondInningsSchema
+  StartSecondInningsSchema,
+  previewVoice,
+  VoicePreviewSchema
 };

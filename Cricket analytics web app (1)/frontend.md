@@ -84,6 +84,12 @@ Horizontal segmented control tab row layout evenly distributed across the bottom
   * *Bowling Table Matrix:* `Bowling Line Name`, `O (Overs)`, `M (Maidens)`, `R (Runs Conceded)`, `W (Wickets Taken)`, and `Econ (Economy Rate)`.
 
 ---
+#### Component Frame 5: Special Events Logger
+*   **Structure**: A full-width container positioned directly below the Recent Deliveries ribbon.
+*   **Content**: A single-line text input field with a placeholder prompting for qualitative events (e.g., "Catch drop", "Excellent fielding", "Runout miss"). A small "Log" button is positioned to the right of the input.
+*   **Behavior**: The text from this input is captured and sent with the next ball data payload, to be stored in the `deliveries.events` column.
+
+---
 
 ## 5. Scorer Console Dashboard Logic & Workspace Components
 

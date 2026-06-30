@@ -131,6 +131,8 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
   const [isWicket, setIsWicket] = useState(false);
   const [shotPoint, setShotPoint] = useState<any>(null);
   const [batsmanHand, setBatsmanHand] = useState<'right' | 'left'>('right');
+  const [bowlingSide, setBowlingSide] = useState<'Over' | 'Around' | 'Across'>('Over');
+  const [eventText, setEventText] = useState('');
 
   // 🔥 REAL PLAYERS STATE: Replaced mock data with session variables
   const [striker, setStriker] = useState(
@@ -679,6 +681,7 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
         extra_type: extraType,
         extra_runs: extraRuns,
         is_wicket: wicketSelected,
+        events: eventText || null,
         striker_id: session.playerIdMap?.[striker] || session.strikerId,
         non_striker_id: session.playerIdMap?.[nonStriker] || session.nonStrikerId,
         bowler_id: session.playerIdMap?.[currentBowler] || session.bowlerId,
@@ -686,6 +689,7 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
         wagon_y: shotPoint?.y || null,
         field_area: shotPoint?.fieldArea || null,
         batsman_hand: batsmanHand,
+        bowling_side: bowlingSide,
         shot_angle: shotPoint?.angleDeg || null,
         pitch_distance: shotPoint?.distanceFromPitch || null
       };
@@ -884,6 +888,7 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
     setSelectedOutBatsman(striker);
     setNextBatsman('');
     setShotPoint(null); // 🔥 Shot clear
+    setEventText('');
   };
 
   const undoLastBall = () => {
@@ -1283,6 +1288,31 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
             <div className="bg-white rounded-lg shadow-sm p-3 border border-gray-200 shrink-0">
               <ViewerRecentDeliveries scorecard={viewerScorecard} compact />
             </div>
+
+            <div className="bg-white rounded-lg shadow-sm p-3 border border-gray-200 shrink-0">
+              <label htmlFor="event-logger" className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                Log Special Event (for next delivery)
+              </label>
+              <div className="mt-2 flex rounded-md shadow-sm">
+                <input
+                  type="text"
+                  id="event-logger"
+                  name="event"
+                  className="flex-1 block w-full rounded-none rounded-l-md sm:text-sm border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100"
+                  placeholder="e.g., Catch drop, Run-out miss"
+                  value={eventText}
+                  onChange={(e) => setEventText(e.target.value)}
+                  disabled={!isLive}
+                />
+                <button
+                  type="button"
+                  disabled={!isLive}
+                  className="inline-flex items-center px-3 py-2 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                >
+                  Log
+                </button>
+              </div>
+            </div>
 </div>
           {/* RIGHT COLUMN: WAGON WHEEL & ACTIONS */}
           <div className="col-span-5 flex flex-col gap-0 min-h-0">
@@ -1296,6 +1326,26 @@ export function ScorerConsole({ matchId, onNavigate }: ScorerConsoleProps) {
                   stadiumEnd="Pavilion End"
                   savePoint={async () => {}}
                 />
+                <div className="absolute top-2 left-2 z-10 flex bg-gray-100/80 backdrop-blur-sm p-1 rounded-lg shrink-0">
+                  <button
+                    onClick={() => setBowlingSide('Over')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${bowlingSide === 'Over' ? 'bg-white shadow-sm text-[#1a1a1a]' : 'text-gray-500 hover:text-[#1a1a1a]'}`}
+                  >
+                    Over
+                  </button>
+                  <button
+                    onClick={() => setBowlingSide('Around')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${bowlingSide === 'Around' ? 'bg-white shadow-sm text-[#1a1a1a]' : 'text-gray-500 hover:text-[#1a1a1a]'}`}
+                  >
+                    Around
+                  </button>
+                  <button
+                    onClick={() => setBowlingSide('Across')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${bowlingSide === 'Across' ? 'bg-white shadow-sm text-[#1a1a1a]' : 'text-gray-500 hover:text-[#1a1a1a]'}`}
+                  >
+                    Across
+                  </button>
+                </div>
                 <div className="absolute top-2 right-2 z-10 flex bg-gray-100/80 backdrop-blur-sm p-1 rounded-lg shrink-0">
                   <button 
                     onClick={() => setBatsmanHand('right')}

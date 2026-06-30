@@ -240,8 +240,8 @@ export default function WagonWheel({
         <rect width={SIZE} height={SIZE} className="wagon-bg" />
         <rect width={SIZE} height={SIZE} fill="url(#wagon-grid)" className="wagon-grid" />
 
-        <text x={CENTER} y="16" className="end-label">{topEnd}</text>
-        <text x={CENTER} y="412" className="end-label">{bottomEnd}</text>
+        <text x="170" y="18" className="end-label">{topEnd}</text>
+        <text x="170" y="412" className="end-label">{bottomEnd}</text>
 
         <text x="13" y="215" className="side-label">{sideLabels.off}</text>
         <text x="407" y="215" className="side-label">{sideLabels.leg}</text>

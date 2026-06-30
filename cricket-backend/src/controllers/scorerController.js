@@ -29,7 +29,9 @@ const BallInputSchema = z.object({
   field_area: z.string().nullable().optional(),
   shot_angle: z.number().nullable().optional(),
   batsman_hand: z.enum(['right', 'left']).optional(),
-  pitch_distance: z.number().nullable().optional()
+  pitch_distance: z.number().nullable().optional(),
+  events: z.string().nullable().optional(),
+  bowling_side: z.enum(['Over', 'Around', 'Across']).optional(),
 });
 
 const WicketWizardSchema = z.object({

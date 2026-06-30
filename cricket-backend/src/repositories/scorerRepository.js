@@ -219,17 +219,17 @@ const insertDelivery = async (client, p) => {
     `INSERT INTO deliveries
        (innings_id, over_id, over_number, ball_in_over, delivery_sequence,
         bowler_id, batter_id, non_striker_id, delivery_type,
-        runs_batter, runs_extras, runs_total,
+        runs_batter, runs_extras, runs_total, events,
         is_dot, is_boundary_four, is_boundary_six, is_wicket, scored_by,
-        wagon_x, wagon_y, field_area, shot_angle, batsman_hand)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::delivery_type,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+        wagon_x, wagon_y, field_area, shot_angle, batsman_hand, bowling_side)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::delivery_type,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
      RETURNING *`,
     [
       p.inningsId, p.overId, p.overNumber, p.ballInOver, p.deliverySequence,
       p.bowlerId, p.batterId, p.nonStrikerId, p.deliveryType,
-      p.runsBatter, p.runsExtras, p.runsTotal,
+      p.runsBatter, p.runsExtras, p.runsTotal, p.events ?? null,
       p.isDot, p.isFour, p.isSix, p.isWicket, p.scoredBy,
-      p.wagonX ?? null, p.wagonY ?? null, p.fieldArea ?? null, p.shotAngle ?? null, p.batsmanHand ?? null
+      p.wagonX ?? null, p.wagonY ?? null, p.fieldArea ?? null, p.shotAngle ?? null, p.batsmanHand ?? null, p.bowlingSide ?? null
     ]
   );
   return r.rows[0];

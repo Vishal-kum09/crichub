@@ -493,7 +493,9 @@ const recordBall = async (matchId, input) => {
       wagonY: input.wagon_y,
       fieldArea: input.field_area,
       shotAngle: input.shot_angle,
-      batsmanHand: input.batsman_hand
+      batsmanHand: input.batsman_hand,
+      events: input.events,
+      bowlingSide: input.bowling_side
     });
 
     if (deliveryType !== 'legal') {

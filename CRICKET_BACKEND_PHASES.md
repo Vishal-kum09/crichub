@@ -79,7 +79,7 @@ squad_selections (id UUID PK, match_id FK, team_id FK, player_id FK, is_captain 
 innings (id UUID PK, match_id FK, batting_team_id FK, bowling_team_id FK, innings_number INT, total_runs INT DEFAULT 0, wickets INT DEFAULT 0, overs_completed INT DEFAULT 0, balls_in_over INT DEFAULT 0, extras_wides INT DEFAULT 0, extras_no_balls INT DEFAULT 0, extras_byes INT DEFAULT 0, extras_leg_byes INT DEFAULT 0, status ENUM[Active,Completed])
 
 -- Ball-by-ball log
-deliveries (id UUID PK, innings_id FK, over_number INT, ball_number INT, bowler_id FK, striker_id FK, non_striker_id FK, runs_off_bat INT, extra_type ENUM[None,NB,WD,LB,B], extra_runs INT, is_wicket BOOLEAN, dismissal_type VARCHAR, dismissed_player_id FK nullable, fielder_id FK nullable, commentary_text TEXT, created_at TIMESTAMPTZ)
+deliveries (id UUID PK, innings_id FK, over_number INT, ball_number INT, bowler_id FK, striker_id FK, non_striker_id FK, runs_off_bat INT, extra_type ENUM[None,NB,WD,LB,B], extra_runs INT, is_wicket BOOLEAN, dismissal_type VARCHAR, dismissed_player_id FK nullable, fielder_id FK nullable, commentary_text TEXT, events TEXT, bowling_side VARCHAR, created_at TIMESTAMPTZ)
 
 -- Player career stats (aggregated)
 player_batting_stats (id UUID PK, player_id FK UNIQUE, total_runs, balls_faced, fours, sixes, fifties, hundreds, double_hundreds, matches_played, innings_batted, times_dismissed)
@@ -237,7 +237,7 @@ POST /api/scorer/matches/:id/undo           — Undo last delivery
 | Bye | +extra_runs | +extra_runs | +1 | +1 |
 
 ### Zod Schemas Built This Phase
-- `BallInputSchema` (exact from spec)
+- `BallInputSchema` (updated to include optional `events: string`)
 - `WicketWizardSchema` — `{ dismissed_player_id, dismissal_type, fielder_id, incoming_batsman_id }`
 - `MatchInitializeSchema`
 

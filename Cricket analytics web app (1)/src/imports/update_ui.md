@@ -95,6 +95,11 @@ FRAME 1: MATCH OVERVIEW BANNER (Top Sticky Container) - Structure: A full-width 
 `  `\* \*\*Bowling Table Columns:\*\* `Bowling`, `O`, `M`, `R`, `W`, `Econ`.
 
 
+- FRAME 5: SPECIAL EVENTS LOG (Input Area)
+- Structure: A full-width container below the Recent Deliveries ribbon.
+- Content: A text input field with a placeholder "e.g., Catch drop, Run-out miss...". An associated "Log Event" button. This input allows the scorer to log significant non-scoring events for a specific delivery. The text is stored in the 'events' column of the deliveries table.
+
+
 \## 4. SCORER DASHBOARD & CREATE MATCH WORKFLOW
 
 \### Scorer Workspace Navigation

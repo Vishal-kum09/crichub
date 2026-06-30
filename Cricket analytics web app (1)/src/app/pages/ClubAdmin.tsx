@@ -1299,7 +1299,7 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
   <form onSubmit={handleCreateMatchFinalSubmission} className="space-y-4 animate-fadeIn">
     <div>
       <label className="block text-xs font-black text-gray-500 uppercase mb-2">
-        Assign Official Match Scorer
+        Assign Official Match Scorer (Optional)
       </label>
       <select 
         value={matchForm.assignedScorerId} 
@@ -1316,7 +1316,7 @@ export function ClubAdmin({ managedClubId }: { managedClubId?: string }) {
 
     <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl text-xs space-y-1.5 text-gray-500 font-semibold shadow-inner">
       <h5 className="font-extrabold text-gray-800 flex items-center gap-1 mb-1 text-sm">
-        <ShieldCheck className="text-green-600" size={16} /> Summary 
+        <ShieldCheck className="text-green-600" size={16} /> Summary Checklist Telemetry
       </h5>
       <p>• <span className="font-extrabold text-gray-700">Format Structure:</span> {matchForm.format} Match | <span className="capitalize">{matchForm.ballType}</span> Ball</p>
       <p>• <span className="font-extrabold text-gray-700">Venue Ground:</span> {matchForm.venue}, {matchForm.city} on {matchForm.matchDateTime.toLocaleDateString()} @ {matchForm.matchDateTime.toLocaleTimeString()}</p>

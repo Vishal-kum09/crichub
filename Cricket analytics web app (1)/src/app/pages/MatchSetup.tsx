@@ -317,7 +317,7 @@ export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
             <div className="space-y-6 animate-fadeIn">
               <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
                 <Users className="text-[#e60023]" size={22} />
-                <h2 className="text-xl font-black text-gray-900">Step 2: Lock Active Playing XI Squads</h2>
+                <h2 className="text-xl font-black text-gray-900">Step 2: Select Playing XI</h2>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -344,7 +344,7 @@ export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
                           <option value="">Select</option>{teamAPlayers.map(n => <option key={n} value={n}>{n}</option>)}
                         </select>
                       </div>
-                      <div><label className="block text-[11px] font-bold text-gray-400 mb-1">Keeper</label>
+                      <div><label className="block text-[11px] font-bold text-gray-400 mb-1">Wicket Keeper</label>
                         <select value={teamAWicketKeeper} onChange={e => setTeamAWicketKeeper(e.target.value)} className="w-full text-xs p-2 border rounded-xl bg-white font-semibold outline-none focus:border-[#e60023]">
                           <option value="">Select</option>{teamAPlayers.map(n => <option key={n} value={n}>{n}</option>)}
                         </select>
@@ -390,7 +390,7 @@ export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
 
           {currentStep === 3 && (
             <div className="space-y-6 animate-fadeIn">
-              <h2 className="text-xl font-black text-gray-900 border-b pb-2">Step 3: Toss Records</h2>
+              <h2 className="text-xl font-black text-gray-900 border-b pb-2">Step 3: Toss</h2>
               <div className="space-y-4">
                 <label className="block text-sm font-bold text-gray-500">Who won the toss?</label>
                 <div className="grid grid-cols-2 gap-4">
@@ -454,8 +454,8 @@ export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
                         onChange={(e) => setCommentaryMode(e.target.value)}
                         className="w-full p-2.5 bg-white border rounded-xl outline-none focus:border-[#e60023]"
                       >
-                        <option value="auto_with_manual_override">Auto (AI) + Manual Override</option>
-                        <option value="manual_only">Manual Only (No AI)</option>
+                        <option value="auto_with_manual_override">AI Commentary</option>
+                        <option value="manual_only">Normal Commentary</option>
                         <option value="off">Disabled</option>
                       </select>
                     </div>

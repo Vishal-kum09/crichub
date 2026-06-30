@@ -119,8 +119,6 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'scorecard' | 'commentary' | 'analytics' | 'watch_live'>('overview');
   const [activeInningsIndex, setActiveInningsIndex] = useState<number>(0);
 
-  const [recentCommentary, setRecentCommentary] = useState<any[]>([]);
-  const [loadingRecentCommentary, setLoadingRecentCommentary] = useState(true);
   const [commentaryInnings, setCommentaryInnings] = useState<1 | 2>(1);
   const [partnerships, setPartnerships] = useState<any[]>([]);
   const [overs, setOvers] = useState<any[]>([]);
@@ -131,40 +129,39 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
   const [isWsConnected, setIsWsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
 
-  // Scorecard Fetching
+  // 🟢 SCORECARD FETCHING (LIVE AUTO-REFRESH EVERY 5 SECONDS) 🟢
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    api
-      .get(`/api/viewer/matches/${matchId}/scorecard`)
-      .then((res) => { if (!cancelled) setScorecard(res.data); })
-      .catch(() => { if (!cancelled) setScorecard(null); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+    let intervalId: ReturnType<typeof setInterval>;
+    
+    const fetchScorecard = (isInitial = false) => {
+      if (isInitial) setLoading(true);
+      api
+        .get(`/api/viewer/matches/${matchId}/scorecard`)
+        .then((res) => { if (!cancelled) setScorecard(res.data); })
+        .catch(() => { if (!cancelled) setScorecard(null); })
+        .finally(() => { if (!cancelled && isInitial) setLoading(false); });
+    };
+
+    // First fetch immediately
+    fetchScorecard(true);
+
+    // Fetch silently every 5 seconds (5000ms)
+    intervalId = setInterval(() => fetchScorecard(false), 5000);
+
+    return () => { 
+      cancelled = true; 
+      clearInterval(intervalId);
+    };
   }, [matchId]);
 
-  // Fetch Recent Commentary for Overview Tab
-  useEffect(() => {
-    if (!matchId) return;
-    let cancelled = false;
-    setLoadingRecentCommentary(true);
-    api.get(`/api/viewer/matches/${matchId}/recent-commentary`)
-      .then(res => {
-        if (!cancelled) setRecentCommentary(res.data.commentary || []);
-      })
-      .catch(() => {
-        if (!cancelled) setRecentCommentary([]);
-      })
-      .finally(() => { if (!cancelled) setLoadingRecentCommentary(false); });
-    return () => { cancelled = true; };
-  }, [matchId]);
-
-  // Analytics Fetching
+  // 🟢 ANALYTICS FETCHING (LIVE AUTO-REFRESH EVERY 10 SECONDS) 🟢
   useEffect(() => {
     let isMounted = true;
+    let intervalId: ReturnType<typeof setInterval>;
     
-    if (activeTab === 'analytics') {
-      setAnalyticsLoading(true);
+    const fetchAnalytics = (isInitial = false) => {
+      if (isInitial) setAnalyticsLoading(true);
       
       Promise.all([
         api.get(`/api/viewer/matches/${matchId}/partnerships`),
@@ -178,35 +175,49 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
       })
       .catch((err) => {
         console.error("Failed to fetch analytics data:", err);
-        if (isMounted) {
-          setPartnerships([]);
-          setOvers([]);
-        }
       })
       .finally(() => {
-        if (isMounted) setAnalyticsLoading(false);
+        if (isMounted && isInitial) setAnalyticsLoading(false);
       });
+    };
+
+    if (activeTab === 'analytics') {
+      fetchAnalytics(true);
+      // Fetch silently every 10 seconds (10000ms)
+      intervalId = setInterval(() => fetchAnalytics(false), 10000);
     }
 
-    return () => { isMounted = false; };
+    return () => { 
+      isMounted = false; 
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [matchId, activeTab]);
 
   // Commentary WebSockets
   useEffect(() => {
     let ws: WebSocket | null = null;
     let isMounted = true;
+    let fallbackIntervalId: ReturnType<typeof setInterval>;
 
     const setupLiveCommentary = async () => {
       if (activeTab === 'commentary') {
-        getCommentaryHistory(matchId, commentaryInnings)
-          .then(fetchedData => {
-            if (!isMounted) return;
-            setCommentaryList(fetchedData);
-          })
-          .catch(err => {
-            console.error("Failed to load commentary history", err);
-            if (isMounted) setCommentaryList([]); 
-          });
+        const fetchHistory = () => {
+          getCommentaryHistory(matchId, commentaryInnings)
+            .then(fetchedData => {
+              if (!isMounted) return;
+              // Only update if websocket is not connected (Fallback mode)
+              if (!isWsConnected) setCommentaryList(fetchedData);
+            })
+            .catch(err => {
+              console.error("Failed to load commentary history", err);
+            });
+        };
+
+        // Initial fetch
+        fetchHistory();
+        
+        // 🟢 Fallback Polling every 5 seconds for Commentary (if WebSocket fails)
+        fallbackIntervalId = setInterval(fetchHistory, 5000);
 
         try {
           const realtime = await getRealtimeCommentaryConfig();
@@ -248,8 +259,9 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
     return () => {
       isMounted = false;
       if (ws) ws.close();
+      if (fallbackIntervalId) clearInterval(fallbackIntervalId);
     };
-  }, [activeTab, matchId, commentaryInnings]);
+  }, [activeTab, matchId, commentaryInnings, isWsConnected]);
 
   if (loading) {
     return <div className="p-6 max-w-7xl mx-auto"><div className="animate-pulse space-y-4"><div className="h-32 bg-gray-200 rounded-xl" /><div className="h-12 bg-gray-200 rounded-lg" /><div className="h-64 bg-gray-200 rounded-xl" /></div></div>;
@@ -274,15 +286,11 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
     { id: 'watch_live' as const, label: 'Watch Live', icon: MonitorPlay },
   ];
 
-  // 🟢 YAHAN UPDATE KIYA HAI SCORE FALLBACK LOGIC 🟢
   const scoreFor = (teamName: string, expectedInningsIndex: number) => {
     let inn = scorecard.innings.find((i) => i.batting_team_name === teamName);
-    
-    // Fallback: Agar naam mismatch hai toh index se data uthao
     if (!inn && scorecard.innings[expectedInningsIndex]) {
       inn = scorecard.innings[expectedInningsIndex];
     }
-    
     if (!inn) return null;
     return `${inn.total.runs}/${inn.total.wickets} (${oversFromBalls(inn.total.balls)} Ov)`;
   };
@@ -469,46 +477,26 @@ export function MatchDetail({ matchId, onNavigate }: MatchDetailProps) {
                 <div className="flex items-center gap-2 overflow-x-auto pb-1">
                   {recentDeliveries.length === 0 ? (
                     <span className="text-xs font-bold text-gray-400">No deliveries recorded yet.</span>
-                  ) : [...recentDeliveries].slice(-10).reverse().map((delivery, index, arr) => {
-                    const nextDelivery = arr[index + 1];
-                    // Show the over summary label after the last ball of an over.
-                    const showOverLabel = !nextDelivery || nextDelivery.over_number !== delivery.over_number;
+                  ) : recentDeliveries.map((delivery, index) => {
+                    const previous = recentDeliveries[index - 1];
+                    const showOverLabel = !previous || previous.over_number !== delivery.over_number;
                     const overRuns = recentDeliveries
                       .filter((item) => item.over_number === delivery.over_number)
                       .reduce((sum, item) => sum + item.runs_total, 0);
-
                     return (
                       <div key={delivery.delivery_id} className="flex items-center gap-2">
+                        {showOverLabel && (
+                          <span className="shrink-0 text-[10px] font-black text-gray-400 uppercase tracking-wide border-l border-gray-300 pl-2">
+                            Over {delivery.over_number} | {overRuns} runs
+                          </span>
+                        )}
                         <span className={`shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-xs font-black tabular-nums ${ballOutcomeClass(delivery)}`}>
                           {ballOutcome(delivery)}
                         </span>
-                        {showOverLabel && (
-                          <span className="shrink-0 text-[10px] font-black text-gray-400 uppercase tracking-wide border-r-2 border-gray-300 pr-2 mr-2">
-                            Over {delivery.over_number} | {overRuns} Runs
-                          </span>
-                        )}
                       </div>
                     );
                   })}
                 </div>
-              </div>
-
-              {/* Last 10 Deliveries Commentary */}
-              <div className="space-y-2 pt-4 border-t border-gray-100">
-                <p className="text-xs font-black uppercase tracking-wide text-gray-500">Recent Commentary</p>
-                {loadingRecentCommentary ? (
-                  <p className="text-sm text-gray-400 italic">Loading commentary...</p>
-                ) : recentCommentary.length > 0 ? (
-                  <div className="space-y-2 text-sm text-gray-700 font-medium">
-                    {recentCommentary.map((item, index) => (
-                      <p key={index} className="pb-2 border-b border-gray-100 last:border-b-0">
-                        <span className="font-black text-gray-900">{item.over_number}.{item.ball_number}:</span> {item.output.split(': ')[1]}
-                      </p>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-400 italic">No recent commentary available.</p>
-                )}
               </div>
             </div>
           )}

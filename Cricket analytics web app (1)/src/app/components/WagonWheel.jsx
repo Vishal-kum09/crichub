@@ -83,7 +83,18 @@ function describePoint(dbX, dbY, handedness = "right") {
   const angle = normalizeAngle((Math.atan2(dy, dx) * 180) / Math.PI);
 
   if (radius > OUTER_RADIUS) {
-    return { fieldArea: "Outside field", fieldKey: "outside", distance: radius, angleDeg: angle, insideField: false };
+    const boundarySector = FIELD_SECTORS.find((item) => item.ring === "outer" && isAngleBetween(angle, item.start, item.end));
+    return {
+      fieldArea: boundarySector?.key === "straight-hit"
+        ? "Into the sight screen"
+        : boundarySector
+          ? `Boundary over ${boundarySector.name}`
+          : "Boundary outside field",
+      fieldKey: boundarySector ? `boundary-over-${boundarySector.key}` : "boundary-outside",
+      distance: radius,
+      angleDeg: angle,
+      insideField: false,
+    };
   }
 
   if (radius <= 20) {
@@ -148,7 +159,9 @@ export default function WagonWheel({
   selectedShots = [],
   onPointSelect,
   savePoint,
-  stadiumEnd = "Pavilion End",
+  topEnd = "Pavilion End",
+  bottomEnd = "Nursery End",
+  currentEnd = topEnd,
   className = "",
 }) {
   const [hover, setHover] = useState(null);
@@ -173,6 +186,8 @@ export default function WagonWheel({
       fieldArea: meta.fieldArea,
       fieldKey: meta.fieldKey,
       batsmanHand,
+      battingEnd: currentEnd,
+      currentEnd,
       distanceFromPitch: Number(meta.distance.toFixed(2)),
       angleDeg: Number(meta.angleDeg.toFixed(2)),
       insideField: meta.insideField,
@@ -191,6 +206,7 @@ export default function WagonWheel({
     }
   };
 
+  // 🔥 YAHAN HANDLE-MOVE FUNCTION ADD KIYA HAI 🔥
   const handleMove = (event) => {
     const point = getSvgPoint(event);
     const meta = describePoint(point.dbX, point.dbY, batsmanHand);
@@ -224,9 +240,8 @@ export default function WagonWheel({
         <rect width={SIZE} height={SIZE} className="wagon-bg" />
         <rect width={SIZE} height={SIZE} fill="url(#wagon-grid)" className="wagon-grid" />
 
-        <g className="stadium-end">
-          <path d="M 210 10 L 207 17 L 213 17 Z" fill="#1a2416" />
-        </g>
+        <text x={CENTER} y="16" className="end-label">{topEnd}</text>
+        <text x={CENTER} y="412" className="end-label">{bottomEnd}</text>
 
         <text x="13" y="215" className="side-label">{sideLabels.off}</text>
         <text x="407" y="215" className="side-label">{sideLabels.leg}</text>
@@ -258,19 +273,24 @@ export default function WagonWheel({
           className="pitch"
         />
 
-        {selectedShots.map((shot, index) => (
-          <g key={`${shot.x}-${shot.y}-${index}`} className="shot-marker">
-            <line x1={CENTER} y1={CENTER} x2={GROUND_MIN + shot.x} y2={GROUND_MAX - shot.y} />
-            <circle cx={GROUND_MIN + shot.x} cy={GROUND_MAX - shot.y} r="4.5" />
-          </g>
-        ))}
+        {selectedShots.map((shot, index) => {
+          // Safe rendering taaki undefined properties ki wajah se crash na ho
+          const markerX = Number.isFinite(shot.svgX) ? shot.svgX : GROUND_MIN + shot.x;
+          const markerY = Number.isFinite(shot.svgY) ? shot.svgY : GROUND_MAX - shot.y;
+          return (
+            <g key={`${shot.x}-${shot.y}-${index}`} className="shot-marker">
+              <line x1={CENTER} y1={CENTER} x2={markerX} y2={markerY} />
+              <circle cx={markerX} cy={markerY} r="4.5" />
+            </g>
+          );
+        })}
 
         {hover?.insideField && <circle cx={hover.svgX} cy={hover.svgY} r="4" className="hover-dot" />}
       </svg>
 
       <div className="wagon-status">
-        <span>{hover ? hover.fieldArea : ""}</span>
-        <strong>{hover ? `X ${hover.dbX}, Y ${hover.dbY}` : ""}</strong>
+        <span>{hover ? hover.fieldArea : "Move cursor over the field"}</span>
+        <strong>{hover ? `X ${hover.dbX}, Y ${hover.dbY}` : "Click to capture shot point"}</strong>
         {saving && <em>Saving...</em>}
       </div>
 

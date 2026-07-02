@@ -51,7 +51,6 @@ export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
   const [commentaryMode, setCommentaryMode] = useState('auto_with_manual_override');
   const [commentaryStyle, setCommentaryStyle] = useState('broadcast_english');
 
-  // 🔥 Audio Settings State (LIFTED UP FOR SINGLE SAVE BUTTON)
   const [audioSettings, setAudioSettings] = useState<AudioSettings>({
     audio_enabled: true,
     provider: 'gemini',
@@ -76,11 +75,14 @@ export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
   const [striker, setStriker] = useState('');
   const [nonStriker, setNonStriker] = useState('');
   const [openingBowler, setOpeningBowler] = useState('');
+  
+  // 🟢 NAYA: Near End aur Far End states default values ke sath
+  const [nearEnd, setNearEnd] = useState('Pavilion End');
+  const [farEnd, setFarEnd] = useState('Nursery End');
 
   const totalSteps = 5;
   const stepsList = ['Schedule', 'Playing XI', 'Toss Field', 'Settings Config', 'Strike Deck'];
 
-  // FETCH: Load Assigned Match Administrative Parameters + Existing Audio Settings
   useEffect(() => {
     if (!matchId) return;
 
@@ -108,7 +110,6 @@ export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
       })
       .finally(() => setLoading(false));
 
-    // Fetch existing audio settings
     api.get(`/api/scorer/matches/${matchId}/audio-settings`)
       .then((res) => {
         if (res.data && res.data.settings) {
@@ -125,20 +126,19 @@ export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
       case 2: return teamAPlayers.length === 11 && teamBPlayers.length === 11 && teamACaptain && teamBCaptain && teamAWicketKeeper && teamBWicketKeeper;
       case 3: return tossWinner && tossDecision;
       case 4: return true; 
-      case 5: return striker && nonStriker && openingBowler && striker !== nonStriker;
+      // 🟢 NAYA: Ensure nearEnd aur farEnd khali na hon
+      case 5: return striker && nonStriker && openingBowler && striker !== nonStriker && nearEnd.trim() !== '' && farEnd.trim() !== '';
       default: return false;
     }
   };
 
   const playerIdFor = (name: string, pool: ServerPlayer[]) => pool.find((p) => p.name === name)?.id || name;
 
-  // 🔥 THIS IS THE SINGLE LAUNCH FUNCTION DOING EVERYTHING
   const startMatch = async () => {
     if (matchId && teamAId && teamBId) {
       try {
         const isLocalDerby = teamAId === teamBId;
 
-        // 1️⃣ Initialize Match Config
         const res = await initializeMatch(matchId, {
           batting_team_id: battingTeam === teamA ? teamAId : teamBId,
           fielding_team_id: bowlingTeam === teamA ? teamAId : teamBId,
@@ -158,19 +158,22 @@ export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
           captain_b: playerIdFor(teamBCaptain, teamBPool),
           wicketkeeper_a: playerIdFor(teamAWicketKeeper, teamAPool),
           wicketkeeper_b: playerIdFor(teamBWicketKeeper, teamBPool),
+          
+          // 🟢 NAYA: backend API request mein near_end aur far_end bhej rahe hain
+          near_end: nearEnd,
+          far_end: farEnd,
 
           metadata: {
             is_local_derby: isLocalDerby,
             batting_team_label: battingTeam,
             fielding_team_label: bowlingTeam,
-            wagon_wheel_enabled: wagonWheel, // Wagon Wheel Flag
+            wagon_wheel_enabled: wagonWheel, 
             commentary_mode: commentaryMode,
             commentary_style: commentaryStyle,
             name_display_format: nameDisplay
           }
         } as any);
 
-        // 2️⃣ Save Audio Settings in the SAME click event
         try {
           await api.post(`/api/scorer/matches/${matchId}/audio-settings`, audioSettings);
           console.log("Audio Settings automatically saved on launch!");
@@ -179,7 +182,6 @@ export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
           toast.error("Match launched, but audio configuration failed to save.");
         }
 
-        // 3️⃣ Set Local Scoring Session
         const fullPlayerPool = [...teamAPool, ...teamBPool];
         const generatedPlayerIdMap: { [key: string]: string } = {};
         fullPlayerPool.forEach(player => { generatedPlayerIdMap[player.name] = player.id; });
@@ -218,7 +220,6 @@ export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
       toast.error('Please complete all required fields configuration values.');
       return;
     }
-    // If Step 5, launch the match (executes startMatch)
     if (currentStep < totalSteps) setCurrentStep(currentStep + 1);
     else void startMatch();
   };
@@ -442,7 +443,6 @@ export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
                   </select>
                 </div>
 
-                {/* AI COMMENTARY CONFIGURATION */}
                 <div className="sm:col-span-2 space-y-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
                   <h4 className="font-bold text-gray-900">🎙️ AI Commentary Configuration</h4>
                   
@@ -477,7 +477,6 @@ export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
                 </div>
               </div>
 
-              {/* Conditional Audio Settings Render */}
               <div className="mt-8 pt-8 border-t border-gray-200">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Broadcast & Audio Settings</h3>
                 {matchId ? (
@@ -523,6 +522,31 @@ export function MatchSetup({ onNavigate, matchId }: MatchSetupProps) {
                   </select>
                 </div>
               </div>
+
+              {/* 🟢 NAYA: Near End aur Far End Setup Inputs */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-4 pt-6 border-t border-gray-100 text-sm font-bold">
+                <div>
+                  <label className="block text-gray-500 mb-1">Stadium Near End Name</label>
+                  <input 
+                    type="text" 
+                    value={nearEnd} 
+                    onChange={e => setNearEnd(e.target.value)} 
+                    placeholder="e.g. Pavilion End"
+                    className="w-full p-3 border rounded-xl bg-white font-semibold outline-none focus:border-[#e60023]" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-500 mb-1">Stadium Far End Name</label>
+                  <input 
+                    type="text" 
+                    value={farEnd} 
+                    onChange={e => setFarEnd(e.target.value)} 
+                    placeholder="e.g. Nursery End"
+                    className="w-full p-3 border rounded-xl bg-white font-semibold outline-none focus:border-[#e60023]" 
+                  />
+                </div>
+              </div>
+
             </div>
           )}
 

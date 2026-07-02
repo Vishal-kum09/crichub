@@ -137,7 +137,7 @@ const findBattingCards = async (inningsId, battingTeamId) => {
            AND tp.team_id = $2
            AND tp.left_at IS NULL
      WHERE bc.innings_id = $1
-     ORDER BY bc.batting_position ASC`,
+     ORDER BY bc.batting_position ASC`, 
     [inningsId, battingTeamId]
   );
   return result.rows;

@@ -32,6 +32,7 @@ const BallInputSchema = z.object({
   pitch_distance: z.number().nullable().optional(),
   events: z.string().nullable().optional(),
   bowling_side: z.enum(['Over', 'Around', 'Across']).optional(),
+  current_end: z.string().nullable().optional(),
 });
 
 const WicketWizardSchema = z.object({
@@ -54,6 +55,8 @@ const InitializeSchema = z.object({
   striker_id: uuid.optional(),
   non_striker_id: uuid.optional(),
   bowler_id: uuid.optional(),
+  near_end: z.string().optional(), // 🟢 NAYA: Setup mein Near End pass karne ke liye
+  far_end: z.string().optional(),
   
   // Scorer Console custom labels pass-through for internal club teams
   metadata: z.object({

@@ -24,6 +24,6 @@ export const buildCommentarySocketUrl = (realtimeUrl: string, matchId: string, t
   return `${base}/ws/matches/${matchId}?token=${encodeURIComponent(token)}`;
 };
 
-export const commentaryKey = (item: any, index: number) =>
-  item?.ai_commentary_id || item?.event_id || item?.delivery_id || `commentary-${index}`;
+export const commentaryKey = (item: any) =>
+  item?.ai_commentary_id || item?.event_id || item?.delivery_id || `commentary-${Math.random()}`;
 

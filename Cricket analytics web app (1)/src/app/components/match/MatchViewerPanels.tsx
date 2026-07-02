@@ -192,8 +192,40 @@ export function ViewerScorecardPanel({ matchId, refreshKey = 0 }: { matchId: str
   );
 }
 
-export function ViewerCommentaryPanel({ matchId, enabled }: { matchId: string; enabled: boolean }) {
-  const [commentaryList, setCommentaryList] = useState<any[]>([]);
+interface Commentary {
+  task: string;
+  is_wicket: boolean;
+  runs: number;
+  over: number;
+  ball: number;
+  over_number: number;
+  ball_number: number;
+  bowler_name: string;
+  bowler: string;
+  batter_name: string;
+  batter: string;
+  runs_scored: number;
+  output: string;
+  audio_url: string;
+  audioUrl: string;
+  is_visible: boolean;
+  innings_number: number;
+  source: string;
+  is_manual_override: boolean;
+}
+
+export function ViewerCommentaryPanel({
+  matchId,
+  enabled,
+  innings,
+  sort = 'desc',
+}: {
+  matchId: string;
+  enabled: boolean;
+  innings: 1 | 2;
+  sort?: 'asc' | 'desc';
+}) {
+  const [commentaryList, setCommentaryList] = useState<Commentary[]>([]);
   const [isWsConnected, setIsWsConnected] = useState(false);
 
   useEffect(() => {
@@ -203,7 +235,7 @@ export function ViewerCommentaryPanel({ matchId, enabled }: { matchId: string; e
     const setup = async () => {
       if (!enabled) return;
 
-      getCommentaryHistory(matchId)
+      getCommentaryHistory(matchId, innings)
         .then((fetchedData) => {
           if (isMounted) setCommentaryList(fetchedData);
         })
@@ -223,7 +255,7 @@ export function ViewerCommentaryPanel({ matchId, enabled }: { matchId: string; e
             const newCommentary = payload.data ? payload.data : payload;
             setCommentaryList((prev) => {
               const safePrev = Array.isArray(prev) ? prev : [];
-              if (safePrev.some((c) => commentaryKey(c, -1) === commentaryKey(newCommentary, -2))) return safePrev;
+              if (safePrev.some((c) => commentaryKey(c) === commentaryKey(newCommentary))) return safePrev;
               return [newCommentary, ...safePrev];
             });
           } catch {
@@ -241,7 +273,7 @@ export function ViewerCommentaryPanel({ matchId, enabled }: { matchId: string; e
       isMounted = false;
       ws?.close();
     };
-  }, [enabled, matchId]);
+  }, [enabled, matchId, innings]);
 
   return (
     <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-6 animate-fadeIn h-full overflow-y-auto">
@@ -262,38 +294,56 @@ export function ViewerCommentaryPanel({ matchId, enabled }: { matchId: string; e
         {!Array.isArray(commentaryList) || commentaryList.length === 0 ? (
           <p className="text-gray-500 text-sm italic">Waiting for commentary updates...</p>
         ) : (
-          [...commentaryList]
-            .filter((c) => c && c.is_visible !== false)
-            .sort((a, b) => {
-              const overA = a.over !== undefined ? a.over : (a.over_number ?? 0);
-              const ballA = a.ball !== undefined ? a.ball : (a.ball_number ?? 0);
-              const overB = b.over !== undefined ? b.over : (b.over_number ?? 0);
-              const ballB = b.ball !== undefined ? b.ball : (b.ball_number ?? 0);
-              if (overA !== overB) return overB - overA;
-              return ballB - ballA;
-            })
-            .map((item, index) => {
-              const taskStr = typeof item.task === 'string' ? item.task : '';
-              const isWicket = taskStr.includes('wicket') || item.is_wicket;
-              const isBoundary = taskStr.includes('boundary') || (item.runs !== undefined && item.runs >= 4);
-              const overVal = item.over !== undefined ? item.over : (item.over_number ?? 0);
-              const ballVal = item.ball !== undefined ? item.ball : (item.ball_number ?? 0);
+          (() => {
+            let lastOver: number | null = null;
+            return [...commentaryList]
+              .filter((c) => c && c.is_visible !== false)
+              .sort((a, b) => {
+                const overA = a.over !== undefined ? a.over : (a.over_number ?? 0);
+                const ballA = a.ball !== undefined ? a.ball : (a.ball_number ?? 0);
+                const overB = b.over !== undefined ? b.over : (b.over_number ?? 0);
+                const ballB = b.ball !== undefined ? b.ball : (b.ball_number ?? 0);
+                if (sort === 'desc') {
+                  if (overA !== overB) return overB - overA;
+                  return ballB - ballA;
+                }
+                if (overA !== overB) return overA - overB;
+                return ballA - ballB;
+              })
+              .map((item) => {
+                const taskStr = typeof item.task === 'string' ? item.task : '';
+                const isWicket = taskStr.includes('wicket') || item.is_wicket;
+                const isBoundary = taskStr.includes('boundary') || (item.runs !== undefined && item.runs >= 4);
+                const overVal = item.over !== undefined ? item.over : (item.over_number ?? 0);
+                const ballVal = item.ball !== undefined ? item.ball : (item.ball_number ?? 0);
 
-              return (
-                <div key={commentaryKey(item, index)} className="relative">
-                  <CommentaryItem
-                    overNumber={`Over ${overVal}.${ballVal}`}
-                    bowler={item.bowler_name || item.bowler || 'Bowler'}
-                    batter={item.batter_name || item.batter || 'Batter'}
-                    runs={item.runs !== undefined ? item.runs : (item.runs_scored || 0)}
-                    text={item.output || 'No commentary available'}
-                    audioUrl={item.audio_url || item.audioUrl}
-                    isWicket={isWicket}
-                    isBoundary={isBoundary}
-                  />
-                </div>
-              );
-            })
+                const overSeparator = overVal !== lastOver ? (
+                  <div className="flex items-center gap-2 my-2">
+                    <div className="flex-grow border-t border-gray-200"></div>
+                    <span className="text-xs font-bold text-gray-500">Over {overVal}</span>
+                    <div className="flex-grow border-t border-gray-200"></div>
+                  </div>
+                ) : null;
+
+                lastOver = overVal;
+
+                return (
+                  <div key={commentaryKey(item)} className="relative">
+                    {overSeparator}
+                    <CommentaryItem
+                      overNumber={`Over ${overVal}.${ballVal}`}
+                      bowler={item.bowler_name || item.bowler || 'Bowler'}
+                      batter={item.batter_name || item.batter || 'Batter'}
+                      runs={item.runs !== undefined ? item.runs : (item.runs_scored || 0)}
+                      text={item.output || 'No commentary available'}
+                      audioUrl={item.audio_url || item.audioUrl}
+                      isWicket={isWicket}
+                      isBoundary={isBoundary}
+                    />
+                  </div>
+                );
+              });
+          })()
         )}
       </div>
     </div>

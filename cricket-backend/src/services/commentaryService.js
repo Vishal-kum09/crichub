@@ -8,8 +8,7 @@ const COMMENTARY_AUDIENCE = process.env.COMMENTARY_AUDIENCE || 'https://ai-comme
 // Google Auth Client setup
 const auth = new GoogleAuth();
 
-// 🟢 FIX: 'exports.' ki jagah 'const' use karein
-const triggerDeliveryCommentary = async (matchId, deliveryId, userId) => {
+exports.triggerDeliveryCommentary = async (matchId, deliveryId, userId) => {
   try {
     const client = await auth.getIdTokenClient(COMMENTARY_AUDIENCE);
 
@@ -35,11 +34,11 @@ const triggerDeliveryCommentary = async (matchId, deliveryId, userId) => {
     return response.data;
   } catch (error) {
     console.error('❌ Failed to trigger AI Commentary:', error.message);
+    throw error;
   }
 };
 
-// 🟢 FIX: 'exports.' ki jagah 'const' use karein
-const invalidateDeliveryCommentary = async (matchId, deliveryId) => {
+exports.invalidateDeliveryCommentary = async (matchId, deliveryId) => {
   try {
     const client = await auth.getIdTokenClient(COMMENTARY_AUDIENCE);
     const response = await client.request({
@@ -56,10 +55,11 @@ const invalidateDeliveryCommentary = async (matchId, deliveryId) => {
     return response.data;
   } catch (error) {
     console.error('Failed to invalidate AI Commentary:', error.message);
+    throw error;
   }
 };
 
-const generateVoicePreview = async (settings) => {
+exports.generateVoicePreview = async (settings) => {
   const targetUrl = 'https://commentary-audio-worker-106171733624.europe-west2.run.app/api/voice-preview';
 
   try {
@@ -82,11 +82,4 @@ const generateVoicePreview = async (settings) => {
   } catch (error) {
     throw new Error('Failed to communicate with Audio Commentary Service');
   }
-};
-
-// 🟢 FIX: Saare functions ko yahan ek sath export karein
-module.exports = {
-  triggerDeliveryCommentary,
-  invalidateDeliveryCommentary,
-  generateVoicePreview
 };

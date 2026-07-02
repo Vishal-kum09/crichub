@@ -1,9 +1,6 @@
 // Scorer data-access — maps the scoring engine's mutations onto the real live
 // schema (innings, overs, deliveries, extras, batting_scorecards,
-// bowling_figures, dismissals, scorer_assignments). Every write function takes
-// the active pg client as its first argument so the ScoringEngine can run the
-// whole ball mutation inside a single withTransaction() call. Reads that run
-// outside a transaction are passed the pool (which also exposes .query).
+// bowling_figures, dismissals, scorer_assignments).
 const { pool } = require('../../db');
 
 // ─── Match / innings reads ──────────────────────────────────────────────────
@@ -11,15 +8,14 @@ const { pool } = require('../../db');
 const getMatch = async (db, matchId) => {
   const r = await db.query(
     `SELECT matches_id, status, overs_per_match, 
-            host_club_id AS team1_id, opponent_club_id AS team2_id
+            host_club_id AS team1_id, opponent_club_id AS team2_id,
+            near_end, far_end -- 🟢 NAYA: Fetch near_end and far_end from matches table
        FROM matches WHERE matches_id = $1`,
     [matchId]
   );
   return r.rows[0] || null;
 };
 
-// Lock the innings row for the duration of the transaction so concurrent balls
-// on the same innings serialize (no lost updates on the running totals).
 const lockInnings = async (client, inningsId) => {
   const r = await client.query(
     `SELECT * FROM innings WHERE innings_id = $1 FOR UPDATE`,
@@ -77,8 +73,6 @@ const createInnings = async (client, p) => {
   return r.rows[0];
 };
 
-// Apply the aggregate deltas of a single delivery to the innings totals. All
-// deltas may be negative (used by undo to reverse a delivery).
 const applyInningsDelta = async (client, inningsId, d) => {
   const r = await client.query(
     `UPDATE innings SET
@@ -149,9 +143,6 @@ const completeMatch = async (client, matchId, result) => {
 
 // ─── Overs ──────────────────────────────────────────────────────────────────
 
-// Find the over row for (innings, over_number) or create it. The overs table
-// has several NOT NULL columns (cumulative_*, run_rate, phase) so they are
-// seeded on insert and refreshed by updateOverAggregates afterwards.
 const getOrCreateOver = async (client, p) => {
   const found = await client.query(
     `SELECT * FROM overs WHERE innings_id = $1 AND over_number = $2`,
@@ -161,11 +152,11 @@ const getOrCreateOver = async (client, p) => {
   const r = await client.query(
     `INSERT INTO overs
        (innings_id, over_number, bowler_id, cumulative_runs, cumulative_wickets,
-        run_rate, phase)
-     VALUES ($1,$2,$3,$4,$5,$6,$7::phase_enum)
+        run_rate, phase, current_end) -- 🟢 NAYA: Insert current_end value here
+     VALUES ($1,$2,$3,$4,$5,$6,$7::phase_enum, $8)
      RETURNING *`,
     [p.inningsId, p.overNumber, p.bowlerId, p.cumulativeRuns, p.cumulativeWickets,
-     p.runRate, p.phase]
+     p.runRate, p.phase, p.currentEnd || null] // 🟢 NAYA: Binding currentEnd value
   );
   return r.rows[0];
 };
@@ -235,8 +226,6 @@ const insertDelivery = async (client, p) => {
   return r.rows[0];
 };
 
-// Most recent live (non-deleted) delivery for an innings — drives both undo and
-// the server-side resolution of who is on strike / bowling for the next ball.
 const getLastDelivery = async (db, inningsId) => {
   const r = await db.query(
     `SELECT * FROM deliveries
@@ -295,7 +284,6 @@ const nextBattingPosition = async (client, inningsId) => {
   return r.rows[0].pos;
 };
 
-// Create a batting card if one does not exist for the player; returns it.
 const ensureBattingCard = async (client, inningsId, playerId, opts = {}) => {
   const existing = await getBattingCard(client, inningsId, playerId);
   if (existing) return existing;
@@ -310,7 +298,6 @@ const ensureBattingCard = async (client, inningsId, playerId, opts = {}) => {
   return r.rows[0];
 };
 
-// Increment a batter's running tally (negative deltas reverse a delivery).
 const bumpBattingCard = async (client, inningsId, playerId, d) => {
   await client.query(
     `UPDATE batting_scorecards SET
@@ -353,9 +340,6 @@ const ensureBowlingFigure = async (client, inningsId, playerId) => {
   );
   return r.rows[0];
 };
-
-// Increment a bowler's figures. balls_bowled feeds overs_bowled in the standard
-// cricket O.B notation (completed overs + balls/10).
 
 const getBowlingFigure = async (db, inningsId, playerId) => {
   const r = await db.query(
@@ -456,8 +440,6 @@ const endActivePartnership = async (client, inningsId, wicketNumber, endedAtRuns
 
 // ─── Scorer assignments ─────────────────────────────────────────────────────
 
-// Matches a scorer is actively assigned to (assignment accepted/not revoked is
-// not required here — any live, non-revoked assignment is returned).
 const findAssignedMatches = async (scorerId) => {
   const r = await pool.query(
     `SELECT m.matches_id AS id, m.match_date, m.start_time, m.scheduled_at,
@@ -568,7 +550,7 @@ const updateBattingCard = async (client, inningsId, playerId, stats) => {
       stats.balls, 
       stats.fours, 
       stats.sixes, 
-      stats.runs === 0 ? 1 : 0, // Dot ball logic
+      stats.runs === 0 ? 1 : 0, 
       inningsId, 
       playerId
     ]);
@@ -582,8 +564,6 @@ const updateBowlingFigure = async (client, inningsId, bowlerId, stats) => {
     [stats.runs, inningsId, bowlerId]);
 };
 
-
-// Upgraded to calculate advanced metrics dynamically (Strike Rate, Average, Dots %)
 const bumpBowlingFigure = async (client, inningsId, playerId, d) => {
   await client.query(
     `UPDATE bowling_figures SET
@@ -617,7 +597,6 @@ const bumpBowlingFigure = async (client, inningsId, playerId, d) => {
   );
 };
 
-// New: Upsert over-by-over batsman analytics rows
 const bumpBatterOverStats = async (client, inningsId, batterId, overNumber, d) => {
   await client.query(`
     INSERT INTO batter_over_stats (innings_id, batter_id, over_number, runs, balls, fours, sixes)
@@ -631,7 +610,6 @@ const bumpBatterOverStats = async (client, inningsId, batterId, overNumber, d) =
   `, [inningsId, batterId, overNumber, d.runs || 0, d.balls || 0, d.fours || 0, d.sixes || 0]);
 };
 
-// New: Upsert over-by-over bowler analytics rows
 const bumpBowlerOverStats = async (client, inningsId, bowlerId, overNumber, d) => {
   await client.query(`
     INSERT INTO bowler_over_stats (innings_id, bowler_id, over_number, runs_conceded, wickets, fours, sixes, dot_balls, wides, no_balls, is_maiden)
@@ -652,7 +630,6 @@ const bumpBowlerOverStats = async (client, inningsId, bowlerId, overNumber, d) =
   ]);
 };
 
-// New: Updates existing continuous spells (gap <= 2 overs) or establishes a fresh one
 const bumpBowlingSpell = async (client, inningsId, bowlerId, overNumber, d) => {
   const existing = await client.query(`
     SELECT * FROM bowling_spells WHERE innings_id = $1 AND bowler_id = $2
@@ -661,7 +638,6 @@ const bumpBowlingSpell = async (client, inningsId, bowlerId, overNumber, d) => {
 
   if (existing.rows[0] && (overNumber - existing.rows[0].to_over) <= 2) {
     const spell = existing.rows[0];
-    // Fixed: Cleaned up the parameter index mismatch ($1 to $5 sequentially)
     await client.query(`
       UPDATE bowling_spells SET
         to_over = GREATEST(to_over, $2),
@@ -683,7 +659,7 @@ const bumpBowlingSpell = async (client, inningsId, bowlerId, overNumber, d) => {
     `, [inningsId, bowlerId, spellNumber, overNumber, d.balls ? (d.balls / 10) : 0, d.runs || 0, d.wickets || 0]);
   }
 };
-// New: Maiden tracking engines to increment fields safely
+
 const checkAndMarkMaidenOver = async (client, inningsId, bowlerId, overNumber) => {
   const res = await client.query(`
     SELECT runs_conceded, wides, no_balls FROM bowler_over_stats 
@@ -707,12 +683,12 @@ const checkAndUnmarkMaidenOver = async (client, inningsId, bowlerId, overNumber)
   }
 };
 
-// New: Safe transactional database cleaners to handle Undo executions
 const deleteEmptyOverStatsAndSpells = async (client, inningsId, overNumber) => {
   await client.query(`DELETE FROM batter_over_stats WHERE innings_id = $1 AND over_number = $2 AND runs = 0 AND balls = 0`, [inningsId, overNumber]);
   await client.query(`DELETE FROM bowler_over_stats WHERE innings_id = $1 AND over_number = $2 AND runs_conceded = 0 AND wickets = 0 AND wides = 0 AND no_balls = 0`, [inningsId, overNumber]);
   await client.query(`DELETE FROM bowling_spells WHERE innings_id = $1 AND overs_count = 0 AND runs_conceded = 0 AND wickets = 0`, [inningsId]);
 };
+
 module.exports = {
   updateBattingCard,
   updateBowlingFigure,

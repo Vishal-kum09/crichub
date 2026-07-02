@@ -44,14 +44,20 @@ export function CommentaryItem({ overNumber, bowler, batter, runs, text, audioUr
   };
 
   return (
-    <div className={`flex gap-4 p-4 rounded-xl border mb-3 transition-colors ${isWicket ? 'border-red-100 bg-red-50/20' : isBoundary ? 'border-blue-100 bg-blue-50/20' : 'border-gray-100 bg-white'}`}>
+    <div className={`flex gap-4 p-4 rounded-xl border mb-3 transition-colors ${
+      isWicket ? 'border-red-100 bg-red-50/20' : 
+      runs === 6 ? 'border-purple-100 bg-purple-50/20' :
+      runs === 4 ? 'border-green-100 bg-green-50/20' : 
+      'border-gray-100 bg-white'
+    }`}>
       
       {/* Over Number & Runs Badge */}
       <div className="flex flex-col items-center gap-2 min-w-[60px]">
         <span className="text-xs font-black text-gray-500 text-center uppercase tracking-wider">{overNumber}</span>
         <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-base shadow-sm border
-          ${isWicket ? 'bg-[#e60023] text-white border-red-700' : 
-            isBoundary ? 'bg-blue-600 text-white border-blue-700' : 
+          ${isWicket ? 'bg-[#e60023] text-white border-red-700' :
+            runs === 6 ? 'bg-purple-600 text-white border-purple-700' :
+            runs === 4 ? 'bg-green-600 text-white border-green-700' :
             runs === 0 ? 'bg-gray-50 text-gray-400 border-gray-200' : 'bg-gray-100 text-gray-800 border-gray-300'}
         `}>
           {isWicket ? 'W' : runs}

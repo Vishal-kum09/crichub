@@ -1,7 +1,4 @@
-// Scoring engine — the single source of truth for every run, ball and wicket
-// mutation. Every mutating path runs inside db.withTransaction() so a delivery
-// is either fully recorded or not at all (no partial state). All math is the
-// exact specification the scorer console relies on; see ballMath().
+// Scoring engine — the single source of truth for every run, ball and wicket mutation.
 const { withTransaction } = require('../../db');
 const repo = require('../repositories/scorerRepository');
 const logger = require('../../config/logger');
@@ -200,24 +197,18 @@ const presentInningsState = (inn) => ({
 
 const presentBatter = (card) => {
   if (!card) return null;
-  
-  // Extract the values safely from whatever the database returned
   const runsValue = Number(card.runs ?? card.runs_scored ?? card.runsScored ?? 0);
   const ballsValue = Number(card.balls ?? card.balls_faced ?? card.ballsFaced ?? 0);
 
   return {
     player_id: card.player_id ?? card.playerId,
-    player_name: card.player_name ?? card.playerName, // just in case
-    
-    // Provide ALL naming variations so the frontend never gets undefined
+    player_name: card.player_name ?? card.playerName,
     runs: runsValue,
     runs_scored: runsValue,
     runsScored: runsValue,
-    
     balls: ballsValue,
     balls_faced: ballsValue,
     ballsFaced: ballsValue,
-    
     fours: Number(card.fours ?? 0),
     sixes: Number(card.sixes ?? 0),
     is_dismissed: !!(card.is_dismissed ?? card.isDismissed)
@@ -308,46 +299,31 @@ const decorateLifecycle = async (client, matchId, innings, oversPerMatch, extra 
   };
 };
 
-// ─── 🔥 INITIALIZE (UPGRADED WITH TEAMS RESOLUTION BRIDGE) ───────────────────
+// ─── 🔥 INITIALIZE ───────────────────
 const initialize = async (matchId, input) => {
   return withTransaction(async (client) => {
     const match = await repo.getMatch(client, matchId);
     if (!match) throw new AppError('Match not found', 404);
 
-    // 1. Process local derby metadata and save UI configs to notes
     let combinedNotes = match.notes || '';
     if (input.metadata) {
       if (input.metadata.is_local_derby) {
         combinedNotes = `[Active Derby Run] Batting label: ${input.metadata.batting_team_label || 'A'}. ${combinedNotes}`;
       }
-      // Stringify UI Engine configs so Scorer Console can read them later
       combinedNotes = `${combinedNotes} | Configs: WW=${input.metadata.wagon_wheel_enabled ? '1' : '0'}, Comm=${input.metadata.commentary_type}, NameFmt=${input.metadata.name_display_format}`;
       
       await client.query(`UPDATE matches SET notes = $1 WHERE matches_id = $2`, [combinedNotes, matchId]);
     }
 
-    // 2. Resolve or Create the Teams entries to satisfy the Foreign Key constraint
-    // Resolve team IDs, creating them if needed under the match club
     const resolveTeamId = async (teamId, teamLabel) => {
-      // 1. Try to resolve by explicit team UUID first
       let tRes = await client.query('SELECT teams_id, club_id FROM teams WHERE teams_id = $1 LIMIT 1', [teamId]);
+      if (tRes.rows.length > 0) return tRes.rows[0].teams_id;
 
-      if (tRes.rows.length > 0) {
-        return tRes.rows[0].teams_id;
-      }
-
-      // 2. Fallback: resolve by name (create-on-miss)
       tRes = await client.query('SELECT teams_id FROM teams WHERE name = $1 LIMIT 1', [teamLabel]);
+      if (tRes.rows.length > 0) return tRes.rows[0].teams_id;
 
-      if (tRes.rows.length > 0) {
-        return tRes.rows[0].teams_id;
-      }
-
-      // 3. Team not found anywhere - create one using match club_id so FK is valid
       const clubId = match?.club_id || null;
-      if (!clubId) {
-        throw new Error('Cannot create team: match club_id is missing');
-      }
+      if (!clubId) throw new Error('Cannot create team: match club_id is missing');
       let userRes = await client.query('SELECT user_id FROM users WHERE club_id = $1 LIMIT 1', [clubId]);
       const creatorId = userRes.rows.length > 0 ? userRes.rows[0].user_id : '00000000-0000-0000-0000-000000000000';
 
@@ -358,21 +334,22 @@ const initialize = async (matchId, input) => {
          RETURNING teams_id`,
         [teamLabel, teamLabel.substring(0, 3).toUpperCase(), clubId, creatorId]
       );
-
       return tRes.rows[0].teams_id;
     };
 
     const finalBattingTeamId = await resolveTeamId(input.batting_team_id, input.metadata?.batting_team_label || 'Batting Team');
     const finalFieldingTeamId = await resolveTeamId(input.fielding_team_id, input.metadata?.fielding_team_label || 'Fielding Team');
-
-    // 3. Update Match with Toss Info (using the resolved team IDs)
     const finalTossWinnerId = input.toss_winner === input.batting_team_id ? finalBattingTeamId : finalFieldingTeamId;
+    
+    // 🟢 NAYA: Update near_end and far_end to matches table
+    const safeNearEnd = input.near_end || 'Pavilion End';
+    const safeFarEnd = input.far_end || 'Nursery End';
+
     await client.query(
-      `UPDATE matches SET toss_winner_id = $1, toss_decision = $2, status = 'live', started_at = COALESCE(started_at, now()), updated_at = now() WHERE matches_id = $3`, 
-      [finalTossWinnerId, input.toss_decision, matchId]
+      `UPDATE matches SET toss_winner_id = $1, toss_decision = $2, status = 'live', started_at = COALESCE(started_at, now()), updated_at = now(), near_end = $4, far_end = $5 WHERE matches_id = $3`, 
+      [finalTossWinnerId, input.toss_decision, matchId, safeNearEnd, safeFarEnd]
     );
 
-    // 4. Create the Innings using the valid teams_id
     const innings = await repo.createInnings(client, {
       matchId,
       inningsNumber: input.innings_number,
@@ -401,6 +378,8 @@ const initialize = async (matchId, input) => {
     return {
       innings: presentInningsState(innings),
       overs_per_match: match.overs_per_match,
+      near_end: safeNearEnd, // 🟢 NAYA
+      far_end: safeFarEnd,   // 🟢 NAYA
       playerNames: {
          [input.striker_id]: striker ? await repo.getPlayerName(client, input.striker_id) : null,
          [input.non_striker_id]: nonStriker ? await repo.getPlayerName(client, input.non_striker_id) : null,
@@ -459,7 +438,15 @@ const recordBall = async (matchId, input) => {
       });
     }
     await repo.ensureBowlingFigure(client, input.innings_id, crease.bowlerId);
-
+    
+    let currentEnd = input.current_end; // Fallback to existing behavior
+    // New logic for alternating ends based on the start end for the innings
+    if (input.starting_end_for_innings && match && match.near_end && match.far_end) {
+      const isOddOver = overNumber % 2 !== 0;
+      const otherEnd = input.starting_end_for_innings === match.near_end ? match.far_end : match.near_end;
+      currentEnd = isOddOver ? input.starting_end_for_innings : otherEnd;
+    }
+ 
     const over = await repo.getOrCreateOver(client, {
       inningsId: input.innings_id,
       overNumber,
@@ -467,7 +454,8 @@ const recordBall = async (matchId, input) => {
       cumulativeRuns: innings.total_runs,
       cumulativeWickets: innings.total_wickets,
       runRate: 0,
-      phase: phaseFor(overNumber, oversPerMatch)
+      phase: phaseFor(overNumber, oversPerMatch),
+      currentEnd: currentEnd // 🟢 NAYA: Track correct end in DB
     });
 
     const sequence = await repo.nextDeliverySequence(client, input.innings_id);
@@ -622,18 +610,13 @@ const recordBall = async (matchId, input) => {
       }
     }
 
-    // Fetch the updated records cleanly inside the transaction
     const strikerCard = await repo.getBattingCard(client, input.innings_id, crease.strikerId);
     const nonStrikerCard = crease.nonStrikerId
       ? await repo.getBattingCard(client, input.innings_id, crease.nonStrikerId)
       : null;
     const bowlerFig = await repo.getBowlingFigure(client, input.innings_id, crease.bowlerId);
 
-    // =================================================================
-    // 🏏 TRANSLATE DATABASE NAMES TO MATCH FRONTEND BatterState INTERFACE
-    // =================================================================
     const strikerState = strikerCard ? presentBatter(strikerCard) : null;
-
     const nonStrikerState = nonStrikerCard ? presentBatter(nonStrikerCard) : null;
 
     const lifecycle = await decorateLifecycle(client, innings.match_id, finalInnings, oversPerMatch, {
@@ -658,8 +641,8 @@ const recordBall = async (matchId, input) => {
           is_wicket: !!input.is_wicket
         },
         innings: presentInningsState(finalInnings),
-        striker: strikerState,          // <-- Fixed to use the newly mapped state
-        non_striker: nonStrikerState,   // <-- Fixed to use the newly mapped state
+        striker: strikerState,
+        non_striker: nonStrikerState,
         bowler: presentBowler(bowlerFig),
         ...lifecycle
       },
@@ -877,10 +860,12 @@ const startSecondInnings = async (matchId, input = {}) => {
     return {
       ok: true,
       match_id: matchId,
+      near_end: match.near_end || 'Pavilion End', // 🟢 NAYA
+      far_end: match.far_end || 'Nursery End',     // 🟢 NAYA
       innings: presentInningsState(innings),
       overs_per_match: match.overs_per_match,
       striker: presentBatter(striker),
-      non_striker: presentBatter(nonStriker),
+      nonStriker: presentBatter(nonStriker),
       bowler: presentBowler(bowler),
       playerNames,
       battingRoster: battingRoster.map((p) => p.name),
@@ -1007,28 +992,25 @@ const undo = async (matchId, input) => {
   return result;
 };
 
-const presentAssignedMatch = (r) => ({
-  id: r.id,
-  match_date: r.match_date,
-  start_time: r.start_time,
-  scheduled_at: r.scheduled_at,
-  status: r.status,
-  format: r.format,
-  overs_per_match: r.overs_per_match,
-  venue: r.venue || '',
-  team1_name: r.team1_name,
-  team1_short_name: r.team1_short_name,
-  team2_name: r.team2_name,
-  team2_short_name: r.team2_short_name,
-  live_score: r.live_score || undefined,
-  accepted: r.accepted_at != null,
-  assigned_at: r.assigned_at
-});
-
-// ─── 🔥 PREVIEW ROSTER SEGREGATION ENGINE ─────────────────────────────────────────
 const getAssignedMatches = async (scorerId) => {
   const rows = await repo.findAssignedMatches(scorerId);
-  return rows.map(presentAssignedMatch);
+  return rows.map((r) => ({
+    id: r.id,
+    match_date: r.match_date,
+    start_time: r.start_time,
+    scheduled_at: r.scheduled_at,
+    status: r.status,
+    format: r.format,
+    overs_per_match: r.overs_per_match,
+    venue: r.venue || '',
+    team1_name: r.team1_name,
+    team1_short_name: r.team1_short_name,
+    team2_name: r.team2_name,
+    team2_short_name: r.team2_short_name,
+    live_score: r.live_score || undefined,
+    accepted: r.accepted_at != null,
+    assigned_at: r.assigned_at
+  }));
 };
 
 const getCompletedMatches = async (scorerId) => {
@@ -1112,6 +1094,8 @@ const getLiveMatchState = async (matchId) => {
         return {
           ok: true,
           match_id: matchId,
+          near_end: match?.near_end || 'Pavilion End', // 🟢 NAYA
+          far_end: match?.far_end || 'Nursery End',     // 🟢 NAYA
           innings: presentInningsState(latest),
           innings_break: inningsBreakFor(latest, match?.overs_per_match),
           battingRoster: secondBattingRoster.map((p) => p.name),
@@ -1126,6 +1110,8 @@ const getLiveMatchState = async (matchId) => {
         return {
           ok: true,
           match_id: matchId,
+          near_end: match?.near_end || 'Pavilion End', // 🟢 NAYA
+          far_end: match?.far_end || 'Nursery End',     // 🟢 NAYA
           innings: presentInningsState(latest),
           match_complete: true,
           result: resultForCompletedChase(latest, previousInnings, match?.overs_per_match)
@@ -1171,9 +1157,11 @@ const getLiveMatchState = async (matchId) => {
     return {
       ok: true,
       match_id: matchId,
+      near_end: match?.near_end || 'Pavilion End', // 🟢 NAYA
+      far_end: match?.far_end || 'Nursery End',     // 🟢 NAYA
       innings: presentInningsState(activeInnings),
       striker: presentBatter(strikerCard),
-      non_striker: presentBatter(nonStrikerCard),
+      nonStriker: presentBatter(nonStrikerCard),
       bowler: presentBowler(bowlerFig),
       playerNames,
       battingRoster: uniqueRoster.map((p) => p.name),
@@ -1186,12 +1174,10 @@ const getLiveMatchState = async (matchId) => {
 
 const matchRepository = require('../repositories/matchRepository');
 
-// Function 1: Get Settings
 const getMatchAudioSettings = async (matchId) => {
   return await matchRepository.getAudioSettings(matchId);
 };
 
-// Function 2: Save Settings with Validations
 const saveMatchAudioSettings = async (matchId, data) => {
   const validProviders = ['gemini', 'google', 'google_chirp'];
   const validCharacters = ['play_by_play', 'veteran', 'analyst', 'stadium'];
@@ -1212,8 +1198,6 @@ const saveMatchAudioSettings = async (matchId, data) => {
 
   return await matchRepository.upsertAudioSettings(matchId, data);
 };
-
-
 
 module.exports = {
   initialize,
